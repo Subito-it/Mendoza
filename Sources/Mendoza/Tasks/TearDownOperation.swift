@@ -29,16 +29,7 @@ class TearDownOperation: BaseOperation<Void> {
         do {
             didStart?()
             
-            try pool.execute { (executer, source) in
-                let simulatorProxy = CommandLineProxy.Simulators(executer: executer)
-                
-                let bootedSimulators = try simulatorProxy.bootedSimulators()
-                for simulator in bootedSimulators {
-                    try simulatorProxy.terminateApp(identifier: self.configuration.buildBundleIdentifier, on: simulator)
-                    try simulatorProxy.terminateApp(identifier: self.configuration.testBundleIdentifier, on: simulator)
-                }
-                try? simulatorProxy.reset()
-                
+            try pool.execute { (executer, source) in                
                 if AddressType(node: source.node) == .remote {
                     _ = try? executer.execute("rm -rf '\(Path.base.rawValue)/*'")
                 }

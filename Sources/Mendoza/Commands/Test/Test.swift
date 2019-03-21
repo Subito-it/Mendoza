@@ -94,6 +94,7 @@ class Test {
         let codeCoverageCollectionOperation = CodeCoverageCollectionOperation(configuration: configuration, baseUrl: gitBaseUrl, timestamp: timestamp)
         let testTearDownOperation = TestTearDownOperation(configuration: configuration, timestamp: timestamp)
         let cleanupOperation = CleanupOperation(configuration: configuration, timestamp: timestamp)
+        let simulatorTearDownOperation = SimulatorTearDownOperation(configuration: configuration, nodes: uniqueNodes)
         let tearDownOperation = TearDownOperation(configuration: configuration, plugin: tearDownPlugin)
         
         let operations: [Operation & LoggedOperation] =
@@ -112,6 +113,7 @@ class Test {
              testCollectorOperation,
              codeCoverageCollectionOperation,
              testTearDownOperation,
+             simulatorTearDownOperation,
              cleanupOperation,
              tearDownOperation]
         
@@ -138,10 +140,11 @@ class Test {
         
         codeCoverageCollectionOperation.addDependency(testCollectorOperation)
         testTearDownOperation.addDependency(testCollectorOperation)
+        simulatorTearDownOperation.addDependency(testCollectorOperation)
         
         cleanupOperation.addDependencies([codeCoverageCollectionOperation, testTearDownOperation])
         
-        tearDownOperation.addDependency(cleanupOperation)
+        tearDownOperation.addDependencies([cleanupOperation, simulatorTearDownOperation])
         
         testSessionResult.device = device
         testSessionResult.destination.username = configuration.resultDestination.node.authentication?.username ?? ""

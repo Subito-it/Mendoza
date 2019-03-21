@@ -24,9 +24,6 @@ class SetupOperation: BaseOperation<Void> {
             didStart?()
             
             try pool.execute { (executer, source) in
-                let simulators = CommandLineProxy.Simulators(executer: executer)
-                try simulators.kill()
-                
                 let ramDisks = CommandLineProxy.RamDisk(executer: executer)
                 try ramDisks.eject(name: Environment.ramDiskName, throwOnError: false)
 
