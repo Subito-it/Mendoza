@@ -67,6 +67,9 @@ class Test {
         
         let gitBaseUrl = gitStatus.url
         let project = try localProject(baseUrl: gitBaseUrl, path: configuration.projectPath)
+        guard let sdk = XcodeProject.SDK(rawValue: configuration.sdk) else {
+            throw Error("Invalid sdk \(configuration.sdk)")
+        }
 
         let uniqueNodes = configuration.nodes.unique()
         let targets = try project.getTargetsInScheme(configuration.scheme)
@@ -89,7 +92,7 @@ class Test {
         let simulatorBootOperation = SimulatorBootOperation()
         let simulatorWakeupOperation = SimulatorWakeupOperation(nodes: uniqueNodes)
         let distributeTestBundleOperation = DistributeTestBundleOperation(nodes: uniqueNodes)
-        let testRunnerOperation = TestRunnerOperation(configuration: configuration, buildTarget: targets.build.name, testTarget: targets.test.name)
+        let testRunnerOperation = TestRunnerOperation(configuration: configuration, buildTarget: targets.build.name, testTarget: targets.test.name, sdk: sdk)
         let testCollectorOperation = TestCollectorOperation(configuration: configuration, timestamp: timestamp, buildTarget: targets.build.name, testTarget: targets.test.name)
         let codeCoverageCollectionOperation = CodeCoverageCollectionOperation(configuration: configuration, baseUrl: gitBaseUrl, timestamp: timestamp)
         let testTearDownOperation = TestTearDownOperation(configuration: configuration, timestamp: timestamp)
@@ -116,7 +119,15 @@ class Test {
              simulatorTearDownOperation,
              cleanupOperation,
              tearDownOperation]
-        
+        switch sdk {
+        case .ios:
+            break
+        case .macos:
+            simulatorSetupOperation.cancel()
+            simulatorBootOperation.cancel()
+            simulatorWakeupOperation.cancel()
+        }
+
         localSetupOperation.addDependency(validationOperation)
         
         setupOperation.addDependency(localSetupOperation)

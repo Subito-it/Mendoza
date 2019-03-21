@@ -14,6 +14,7 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
     private let configuration: Configuration
     private let buildTarget: String
     private let testTarget: String
+    private let sdk: XcodeProject.SDK
     private let syncQueue = DispatchQueue(label: String(describing: TestRunnerOperation.self))
     
     private lazy var pool: ConnectionPool<(Simulator, [TestCase])> = {
@@ -25,10 +26,11 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
         return makeConnectionPool(sources: input.map { (node: $0.0.node, value: ($0.0.simulator, $0.1)) })
     }()
     
-    init(configuration: Configuration, buildTarget: String, testTarget: String) {
+    init(configuration: Configuration, buildTarget: String, testTarget: String, sdk: XcodeProject.SDK) {
         self.configuration = configuration
         self.buildTarget = buildTarget
         self.testTarget = testTarget
+        self.sdk = sdk
     }
     
     override func main() {
@@ -57,7 +59,15 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                 let onlyTesting = testCases.map { "-only-testing:\(self.configuration.scheme)/\($0.testIdentifier)" }.joined(separator: " ")
                 let destinationPath = Path.logs.url.appendingPathComponent(simulator.id).path
                 
-                var testWithoutBuilding = #"xcodebuild -parallel-testing-enabled NO -disable-concurrent-destination-testing -xctestrun \#(testRun) -destination 'platform=iOS Simulator,id=\#(simulator.id)' -derivedDataPath '\#(destinationPath)' \#(onlyTesting) -enableCodeCoverage YES test-without-building"#
+                var testWithoutBuilding: String
+                    
+                switch self.sdk {
+                case .ios:
+                    testWithoutBuilding = #"xcodebuild -parallel-testing-enabled NO -disable-concurrent-destination-testing -xctestrun \#(testRun) -destination 'platform=iOS TestRunner,id=\#(testRunner.id)' -derivedDataPath '\#(destinationPath)' \#(onlyTesting) -enableCodeCoverage YES test-without-building"#
+                case .macos:
+                    #warning("TODO")
+                    testWithoutBuilding = #"xcodebuild -parallel-testing-enabled NO -disable-concurrent-destination-testing -xctestrun \#(testRun) -destination 'platform=iOS TestRunner,id=\#(testRunner.id)' -derivedDataPath '\#(destinationPath)' \#(onlyTesting) -enableCodeCoverage YES test-without-building"#
+                }
                 testWithoutBuilding += " || true"
                 
                 var partialProgress = ""

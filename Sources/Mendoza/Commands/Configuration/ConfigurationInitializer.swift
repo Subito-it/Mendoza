@@ -48,23 +48,30 @@ struct ConfigurationInitializer {
         let selectedBuildConfiguration = Bariloche.ask(title: "Select build configuration used to run UI Tests:", array: buildConfigurations)
 
         let bundleIdentifiers = try project.getTargetsBundleIdentifiers(for: selectedScheme.value.name)
+        let sdk = try project.getBuildSDK(for: selectedScheme.value.name)
         
-        let appleIdCredentials = Bariloche.ask(title: "Do you want required simulators to be installed automatically?", array: ["Yes, requires AppleID username/password (stored in Keychain)", "No"])
-        let storeAppleIdCredentials = appleIdCredentials.index == 0
-        if storeAppleIdCredentials {
-            let username: String = Bariloche.ask("\nAppleID username:".underline) { guard !$0.isEmpty else { throw Error("Invalid value") }; return $0 }
-            let password: String = Bariloche.ask("\nAppleID password:".underline, secure: true) { guard !$0.isEmpty else { throw Error("Invalid value") }; return $0 }
-            
-            let keychain = KeychainAccess.Keychain(service: Environment.bundle)
-            try! keychain.set(try! JSONEncoder().encode(Credentials(username: username, password: password)), key: "appleID")
+        var storeAppleIdCredentials = false
+        switch sdk {
+        case .macos:
+            break
+        case .ios:
+            let appleIdCredentials = Bariloche.ask(title: "Do you want required simulators to be installed automatically?", array: ["Yes, requires AppleID username/password (stored in Keychain)", "No"])
+            storeAppleIdCredentials = appleIdCredentials.index == 0
+            if storeAppleIdCredentials {
+                let username: String = Bariloche.ask("\nAppleID username:".underline) { guard !$0.isEmpty else { throw Error("Invalid value") }; return $0 }
+                let password: String = Bariloche.ask("\nAppleID password:".underline, secure: true) { guard !$0.isEmpty else { throw Error("Invalid value") }; return $0 }
+                
+                let keychain = KeychainAccess.Keychain(service: Environment.bundle)
+                try! keychain.set(try! JSONEncoder().encode(Credentials(username: username, password: password)), key: "appleID")
+            }
         }
         
-        let nodes = try askNodes()
+        let nodes = try askNodes(sdk: sdk)
         
         let destinationNode: Node
         let resultDestinationNodeName = Bariloche.ask(title: "Please select which node should collect test results:", array: nodes.map { $0.name } + ["Other"])
         if resultDestinationNodeName.value == "Other" {
-            destinationNode = try askNode()
+            destinationNode = try askNode(sdk: sdk)
         } else {
             destinationNode = nodes.first(where: { $0.name == resultDestinationNodeName.value})!
         }
@@ -85,7 +92,8 @@ struct ConfigurationInitializer {
                                           storeAppleIdCredentials: storeAppleIdCredentials,
                                           resultDestination: resultDestination,
                                           nodes: nodes,
-                                          compilation: Configuration.Compilation())
+                                          compilation: Configuration.Compilation(),
+                                          sdk: sdk.rawValue)
         
         let encoder = JSONEncoder()
         encoder.outputFormatting = .prettyPrinted
@@ -95,12 +103,12 @@ struct ConfigurationInitializer {
         print("\n\n🎉 Done!".green)
     }
     
-    func askNodes() throws -> [Node] {
+    func askNodes(sdk: XcodeProject.SDK) throws -> [Node] {
         print("\n* Configure nodes".magenta)
         
         var ret = [Node]()
         while (true) {
-            let node = try askNode()
+            let node = try askNode(sdk: sdk)
             
             guard Bariloche.ask(title: "Add node?\n".underline + node.description.lightGreen, array: ["Yes", "No"]).index == 0 else {
                 continue
@@ -114,31 +122,44 @@ struct ConfigurationInitializer {
         }
     }
     
-    func askNode() throws -> Node {
+    func askNode(sdk: XcodeProject.SDK) throws -> Node {
         let name: String = Bariloche.ask("\nName (identifier that will be used in logging):".underline) { guard !$0.isEmpty else { throw Error("Invalid value") }; return $0 }
         
         let administratorPassword: String??
         let sshAuthentication: SSHAuthentication
-        let concurrentSimulators: Node.ConcurrentSimulators
+        let concurrentInstances: Node.ConcurrentInstances
         var ramDiskSize: UInt? = nil
         
         let address = try askAddress()
         if ["127.0.0.1", "localhost"].contains(address) {
             let currentUser = try! LocalExecuter().execute("whoami")
             sshAuthentication = .none(username: currentUser)
-            administratorPassword = askAdministratorPassword(username: sshAuthentication.username)
-            concurrentSimulators = .autodetect
+
+            switch sdk {
+            case .macos:
+                administratorPassword = nil
+                concurrentInstances = .manual(count: 1)
+            case .ios:
+                administratorPassword = askAdministratorPassword(username: sshAuthentication.username)
+                concurrentInstances = .autodetect
+            }
         } else {
             sshAuthentication = askSSHAuthentication()
             
-            switch sshAuthentication {
-            case .credentials(_, let password):
-                administratorPassword = password
-            default:
-                administratorPassword = askAdministratorPassword(username: sshAuthentication.username)
+            switch sdk {
+            case .macos:
+                concurrentInstances = .manual(count: 1)
+                administratorPassword = nil
+            case .ios:
+                concurrentInstances = askConcurrentSimulators()
+                
+                switch sshAuthentication {
+                case .credentials(_, let password):
+                    administratorPassword = password
+                default:
+                    administratorPassword = askAdministratorPassword(username: sshAuthentication.username)
+                }
             }
-            
-            concurrentSimulators = askConcurrentSimulators()
             
             Bariloche.ask("\nRam disk size in MB (useful for nodes without SSDs). Suggested 1024MB, not used if empty".underline) { (answer: String) in
                 if answer.isEmpty {
@@ -157,7 +178,7 @@ struct ConfigurationInitializer {
                     address: address,
                     authentication: sshAuthentication,
                     administratorPassword: administratorPassword,
-                    concurrentSimulators: concurrentSimulators,
+                    concurrentInstances: concurrentInstances,
                     ramDiskSizeMB: ramDiskSize)
     }
     
@@ -175,7 +196,7 @@ struct ConfigurationInitializer {
         return address
     }
     
-    func askConcurrentSimulators() -> Node.ConcurrentSimulators {
+    func askConcurrentSimulators() -> Node.ConcurrentInstances {
         let result = Bariloche.ask(title: "How many simulators should run concurrently?", array: ["Autodetect", "Manual"])
         switch result.index {
         case 0:
