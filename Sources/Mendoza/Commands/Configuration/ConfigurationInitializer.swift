@@ -127,7 +127,7 @@ struct ConfigurationInitializer {
         
         let administratorPassword: String??
         let sshAuthentication: SSHAuthentication
-        let concurrentInstances: Node.ConcurrentInstances
+        let concurrentTestRunners: Node.ConcurrentTestRunners
         var ramDiskSize: UInt? = nil
         
         let address = try askAddress()
@@ -138,20 +138,20 @@ struct ConfigurationInitializer {
             switch sdk {
             case .macos:
                 administratorPassword = nil
-                concurrentInstances = .manual(count: 1)
+                concurrentTestRunners = .manual(count: 1)
             case .ios:
                 administratorPassword = askAdministratorPassword(username: sshAuthentication.username)
-                concurrentInstances = .autodetect
+                concurrentTestRunners = .autodetect
             }
         } else {
             sshAuthentication = askSSHAuthentication()
             
             switch sdk {
             case .macos:
-                concurrentInstances = .manual(count: 1)
+                concurrentTestRunners = .manual(count: 1)
                 administratorPassword = nil
             case .ios:
-                concurrentInstances = askConcurrentSimulators()
+                concurrentTestRunners = askConcurrentSimulators()
                 
                 switch sshAuthentication {
                 case .credentials(_, let password):
@@ -178,7 +178,7 @@ struct ConfigurationInitializer {
                     address: address,
                     authentication: sshAuthentication,
                     administratorPassword: administratorPassword,
-                    concurrentInstances: concurrentInstances,
+                    concurrentTestRunners: concurrentTestRunners,
                     ramDiskSizeMB: ramDiskSize)
     }
     
@@ -196,7 +196,7 @@ struct ConfigurationInitializer {
         return address
     }
     
-    func askConcurrentSimulators() -> Node.ConcurrentInstances {
+    func askConcurrentSimulators() -> Node.ConcurrentTestRunners {
         let result = Bariloche.ask(title: "How many simulators should run concurrently?", array: ["Autodetect", "Manual"])
         switch result.index {
         case 0:

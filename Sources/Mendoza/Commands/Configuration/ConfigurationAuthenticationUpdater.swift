@@ -53,7 +53,7 @@ struct ConfigurationAuthenticationUpdater {
                 case .remote:
                     if let lastNode = lastNode, AddressType(node: lastNode) == .remote {
                         if Bariloche.ask(title: "Use the same credentials provided for `\(lastNode.name)`?", array: ["Yes", "No"]).index == 0 {
-                            let updatedNode = Node(name: node.name, address: node.address, authentication: lastNode.authentication, administratorPassword: lastNode.administratorPassword, concurrentSimulators: node.concurrentSimulators, ramDiskSizeMB: node.ramDiskSizeMB)
+                            let updatedNode = Node(name: node.name, address: node.address, authentication: lastNode.authentication, administratorPassword: lastNode.administratorPassword, concurrentTestRunners: node.concurrentTestRunners, ramDiskSizeMB: node.ramDiskSizeMB)
                             updatedNodes.append(updatedNode)
                             continue
                         }
@@ -71,11 +71,11 @@ struct ConfigurationAuthenticationUpdater {
                 modified = true
             }
             
-            lastNode = Node(name: node.name, address: node.address, authentication: authentication, administratorPassword: password, concurrentSimulators: node.concurrentSimulators, ramDiskSizeMB: node.ramDiskSizeMB)
+            lastNode = Node(name: node.name, address: node.address, authentication: authentication, administratorPassword: password, concurrentTestRunners: node.concurrentTestRunners, ramDiskSizeMB: node.ramDiskSizeMB)
             updatedNodes.append(lastNode!)
         }
         
-        let updatedConfiguration = Configuration(projectPath: configuration.projectPath, workspacePath: configuration.workspacePath, buildBundleIdentifier: configuration.buildBundleIdentifier, testBundleIdentifier: configuration.testBundleIdentifier, scheme: configuration.scheme, buildConfiguration: configuration.buildConfiguration, storeAppleIdCredentials: configuration.storeAppleIdCredentials, resultDestination: configuration.resultDestination, nodes: updatedNodes, compilation: configuration.compilation)
+        let updatedConfiguration = Configuration(projectPath: configuration.projectPath, workspacePath: configuration.workspacePath, buildBundleIdentifier: configuration.buildBundleIdentifier, testBundleIdentifier: configuration.testBundleIdentifier, scheme: configuration.scheme, buildConfiguration: configuration.buildConfiguration, storeAppleIdCredentials: configuration.storeAppleIdCredentials, resultDestination: configuration.resultDestination, nodes: updatedNodes, compilation: configuration.compilation, sdk: configuration.sdk)
         
         let encoder = JSONEncoder()
         encoder.outputFormatting = .prettyPrinted

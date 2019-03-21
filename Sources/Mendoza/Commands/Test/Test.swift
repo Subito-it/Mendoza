@@ -26,7 +26,7 @@ class Test {
         
         if dispatchOnLocalHost && configuration.nodes.first(where: { AddressType(node: $0) == .local }) == nil { // add localhost
             let updatedNodes = configuration.nodes + [Node.localhost()]
-            let updatedConfiguration = Configuration(projectPath: configuration.projectPath, workspacePath: configuration.workspacePath, buildBundleIdentifier: configuration.buildBundleIdentifier, testBundleIdentifier: configuration.testBundleIdentifier, scheme: configuration.scheme, buildConfiguration: configuration.buildConfiguration, storeAppleIdCredentials: configuration.storeAppleIdCredentials, resultDestination: configuration.resultDestination, nodes: updatedNodes, compilation: configuration.compilation)
+            let updatedConfiguration = Configuration(projectPath: configuration.projectPath, workspacePath: configuration.workspacePath, buildBundleIdentifier: configuration.buildBundleIdentifier, testBundleIdentifier: configuration.testBundleIdentifier, scheme: configuration.scheme, buildConfiguration: configuration.buildConfiguration, storeAppleIdCredentials: configuration.storeAppleIdCredentials, resultDestination: configuration.resultDestination, nodes: updatedNodes, compilation: configuration.compilation, sdk: configuration.sdk)
             configuration = updatedConfiguration
         }
         
@@ -197,9 +197,9 @@ class Test {
         }
         
         simulatorSetupOperation.didEnd = { simulators in
-            testDistributionOperation.simulatorCount = simulators.count
+            testDistributionOperation.testRunnersCount = simulators.count
             simulatorBootOperation.simulators = simulators
-            testRunnerOperation.simulators = simulators
+            testRunnerOperation.testRunners = simulators.map { (testRunner: $0.0, node: $0.1) }
         }
         
         testDistributionOperation.didEnd = { distributedTestCases in

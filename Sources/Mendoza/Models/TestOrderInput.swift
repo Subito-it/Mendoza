@@ -9,12 +9,12 @@ import Foundation
 
 struct TestOrderInput: Codable {
     let tests: [TestCase]
-    let simulatorCount: Int
+    let testRunnersCount: Int
     let device: Device
 }
 
 extension TestOrderInput: DefaultInitializable {
     static func defaultInit() -> TestOrderInput {
-        return TestOrderInput(tests: [], simulatorCount: 0, device: Device.defaultInit())
+        return TestOrderInput(tests: [], testRunnersCount: 0, device: Device.defaultInit())
     }
 }
