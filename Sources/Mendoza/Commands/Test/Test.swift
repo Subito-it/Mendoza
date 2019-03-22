@@ -86,7 +86,7 @@ class Test {
         let localSetupOperation = LocalSetupOperation()
         let wakeupOperation = WakeupOperation(nodes: uniqueNodes)
         let setupOperation = SetupOperation(nodes: uniqueNodes)
-        let compileOperation = CompileOperation(configuration: configuration, baseUrl: gitBaseUrl, project: project, scheme: configuration.scheme, preCompilationPlugin: preCompilationPlugin, postCompilationPlugin: postCompilationPlugin)
+        let compileOperation = CompileOperation(configuration: configuration, baseUrl: gitBaseUrl, project: project, scheme: configuration.scheme, preCompilationPlugin: preCompilationPlugin, postCompilationPlugin: postCompilationPlugin, sdk: sdk)
         let testExtractionOperation = TestExtractionOperation(configuration: configuration, baseUrl: gitBaseUrl, testTargetSourceFiles: testTargetSourceFiles, filePatterns: filePatterns, device: device, plugin: testExtractionPlugin)
         let testDistributionOperation = TestDistributionOperation(device: device, plugin: testDistributionPlugin)
         let simulatorSetupOperation = SimulatorSetupOperation(configuration: configuration, nodes: uniqueNodes, device: device)
