@@ -200,10 +200,16 @@ class Test {
             try? self.eventPlugin.run(event: Event(kind: .stopCompiling, info: [:]), device: device)
         }
         
-        simulatorSetupOperation.didEnd = { simulators in
-            testDistributionOperation.testRunnersCount = simulators.count
-            simulatorBootOperation.simulators = simulators
-            testRunnerOperation.testRunners = simulators.map { (testRunner: $0.0, node: $0.1) }
+        switch sdk {
+        case .macos:
+            testDistributionOperation.testRunnersCount = uniqueNodes.count
+            testRunnerOperation.testRunners = uniqueNodes.map { (testRunner: $0, node: $0) }
+        case .ios:
+            simulatorSetupOperation.didEnd = { simulators in
+                testDistributionOperation.testRunnersCount = simulators.count
+                simulatorBootOperation.simulators = simulators
+                testRunnerOperation.testRunners = simulators.map { (testRunner: $0.0, node: $0.1) }
+            }
         }
         
         testDistributionOperation.didEnd = { distributedTestCases in
