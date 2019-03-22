@@ -92,7 +92,12 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                     partialProgress = lines.last ?? ""
                 }
                 
-                let output = try executer.execute(testWithoutBuilding, progress: progressHandler)
+                let output = try executer.execute(testWithoutBuilding, progress: progressHandler) { result, originalError in
+                    try self.assertAccessibilityPermissiong(in: result.output)
+                    throw originalError
+                }
+                // xcodebuild returns 0 even on ** TEST EXECUTE FAILED ** when missing accessivility
+                try self.assertAccessibilityPermissiong(in: output)
                 
                 let summaryPlistUrl = try self.findTestSummaryPlistUrl(executer: executer, testRunner: testRunner)
                 let testResults = try self.parseTestResults(output, candidates: testCases, node: source.node.address, summaryPlistPath: summaryPlistUrl.path)
@@ -209,5 +214,11 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
         }
         
         return result
+    }
+    
+    private func assertAccessibilityPermissiong(in output: String) throws {
+        if output.contains("does not have permission to use Accessibility") {
+            throw Error("Unable to run UI Tests because Xcode Helper does not have permission to use Accessibility. To enable UI testing, go to the Security & Privacy pane in System Preferences, select the Privacy tab, then select Accessibility, and add Xcode Helper to the list of applications allowed to use Accessibility")
+        }
     }
 }
