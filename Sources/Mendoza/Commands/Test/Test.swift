@@ -150,7 +150,6 @@ class Test {
         
         setupOperation.addDependency(localSetupOperation)
         testExtractionOperation.addDependency(localSetupOperation)
-        wakeupOperation.addDependency(localSetupOperation)
         
         compileOperation.addDependency(setupOperation)
         simulatorSetupOperation.addDependencies([setupOperation, wakeupOperation])
