@@ -55,13 +55,13 @@ this will prompt you with a series of (fairly self-explanatory) questions and pr
 #### iOS project
 
 ```
-mendoza test ios configuration.json --device_name="iPhone 8" --device_runtime="12.1"
+mendoza test configuration.json --device_name="iPhone 8" --device_runtime="12.1"
 ```
 
 #### macOS project
 
 ```
-mendoza test macos configuration.json
+mendoza test configuration.json
 ```
 
 This will compile your project, distribute the test bundles, execute the tests, collect the results together on the _destination_ node that was specified during setup and generate a set of [output files](#test-output).
@@ -112,10 +112,12 @@ This command allows to create a plugin template script that will be used during 
 Will launch tests as specified in the configuration files.
 
 #### Required parameters
-- platform=[iOS|macOS]
+
 - path to the configuration file
-- --device_name=name: device name to use to run tests. e.g. 'iPhone 8' *(iOS projects only)*
-- --device_runtime=version: device runtime to use to run tests. e.g. '12.1' *(iOS projects only)*
+
+*iOS projects only*
+- --device_name=name: device name to use to run tests. e.g. 'iPhone 8'
+- --device_runtime=version: device runtime to use to run tests. e.g. '12.1'
 
 #### Optional parameters
 
