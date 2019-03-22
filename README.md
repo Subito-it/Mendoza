@@ -1,6 +1,6 @@
 # 🍷 Mendoza 
 
-Mendoza allows to parallelize Apple's UI Tests over multiple physical machines. While Xcode recently introduced parallelization it is limited to a single local machine requiring top-notch hardware to run tests on several simulators at once. 
+Mendoza allows to parallelize Apple's UI Tests over multiple physical machines. While Xcode recently introduced parallelization it is limited to a single local machine requiring top-notch hardware to run tests on several instances at once. Both macOS and iOS projects are supported.
 
 Mendoza is designed to parallelize tests on an unlimited number of different machines offering a scalable solution to reduce UI Testing's execution times. There are no particular contraints on the hardware that can be used, as an example we use rather oldish 2013 i5 MacBooks.
 
@@ -19,11 +19,12 @@ A snapshot of a session running on 8 concurrent nodes (each running 2 simulators
 👨🏻‍💻 | Written in Swift  |
 🔌 | Supports plugins (written in Swift!) |
 🔍 | Wide set of result formats |
+🤖 | Supports both iOS and macOS projects |
 
 
 # How does it work
 
-The basic idea is simple: you compile a project on one machine, distribute the compiled package (test bundle) to a number of specified remote nodes, execute a subset of tests on each node and collect the results back together as if they were run on a single machine. Depending on the node hardware configuration you can also run multiple simulators at once.
+The basic idea is simple: you compile a project on one machine, distribute the compiled package (test bundle) to a number of specified remote nodes, execute a subset of tests on each node and collect the results back together as if they were run on a single machine. On iOS projects, depending on the node hardware configuration, you can also run multiple simulators at once.
 
 Mendoza hides all the complexity behind a single `test` command by leveraging built in command line tools to perform each of the aforementioned steps. To get an idea of what’s under the hood take a look [here](md/under-the-hood.md).
 
@@ -50,8 +51,17 @@ mendoza configure init
 
 this will prompt you with a series of (fairly self-explanatory) questions and produce a configuration file that you will feed to the `test` command as follows:
 
+
+#### iOS project
+
 ```
-mendoza test configuration.json --device_name="iPhone 8" --device_runtime="12.1"
+mendoza test ios configuration.json --device_name="iPhone 8" --device_runtime="12.1"
+```
+
+#### macOS project
+
+```
+mendoza test macos configuration.json
 ```
 
 This will compile your project, distribute the test bundles, execute the tests, collect the results together on the _destination_ node that was specified during setup and generate a set of [output files](#test-output).
@@ -66,7 +76,7 @@ Generates a new configuration file required to execute tests. you will be prompt
 
 ### Concepts
 
-#### AppleID
+#### AppleID (iOS projects only)
 
 During initialization you will be prompted for an Apple ID account that will be used to install new runtimes on testing nodes. Any low priviledge Apple ID account will work.
 
@@ -74,11 +84,16 @@ When not provided test dispatch will fail if the requested simulator runtime isn
 
 #### Nodes configuration
 
-When setting up nodes you'll be asked to specify a label that identifies the node, the address, an authentication method and the administrator password that will be required to install new runtimes if needed. When not providing the administrator password test dispatch will fail if the requested simulator runtime isn't properly installed.
+When setting up nodes you'll be asked:
 
-You'll be asked how many simulators to run at once, the rule of thumb is that you can run 1 simulator per physical CPU core. Specifying more that one simulator per core will work but this will result in slower total execution time because the node will be over-utilized.
+- label that identifies the node
+- address
+- authentication method
+- ram disk: you can optionally specify if the node should use a ram disk. This has a significant benefit in performances on older machines that have no SSD disk. 
 
-Optionally you can specify if the node should use a ram disk. This has a significant benefit in performances on older machines that have no SSD disk.
+*iOS projects only*
+- administator password: providing an administrator password will allow to automatically install new runtimes if needed
+- concurrent simulators: manually enter the number of concurrent simulators to use at once. The rule of thumb is that you can run 1 simulator per physical CPU core. Specifying more that one simulator per core will work but this will result in slower total execution time because the node will be over-utilized.
 
 #### Destination node
 
@@ -97,9 +112,10 @@ This command allows to create a plugin template script that will be used during 
 Will launch tests as specified in the configuration files.
 
 #### Required parameters
+- platform=[iOS|macOS]
 - path to the configuration file
-- --device_name=name: device name to use to run tests. e.g. 'iPhone 8'
-- --device_runtime=version: device runtime to use to run tests. e.g. '12.1'
+- --device_name=name: device name to use to run tests. e.g. 'iPhone 8' *(iOS projects only)*
+- --device_runtime=version: device runtime to use to run tests. e.g. '12.1' *(iOS projects only)*
 
 #### Optional parameters
 
