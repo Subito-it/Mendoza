@@ -96,7 +96,7 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                     try self.assertAccessibilityPermissiong(in: result.output)
                     throw originalError
                 }
-                // xcodebuild returns 0 even on ** TEST EXECUTE FAILED ** when missing accessivility
+                // xcodebuild returns 0 even on ** TEST EXECUTE FAILED ** when missing accessibility
                 try self.assertAccessibilityPermissiong(in: output)
                 
                 let summaryPlistUrl = try self.findTestSummaryPlistUrl(executer: executer, testRunner: testRunner)
