@@ -74,7 +74,7 @@ When not provided test dispatch will fail if the requested simulator runtime isn
 
 #### Nodes configuration
 
-When setting up nodes you'll be asked to specify a label that identifies the node, the address, an authentication method and the administrator password that will be required to install new runtimes if needed. When not provideding administrator password the test dispatch will fail if the requested simulator runtime isn't properly installed.
+When setting up nodes you'll be asked to specify a label that identifies the node, the address, an authentication method and the administrator password that will be required to install new runtimes if needed. When not providing the administrator password test dispatch will fail if the requested simulator runtime isn't properly installed.
 
 You'll be asked how many simulators to run at once, the rule of thumb is that you can run 1 simulator per physical CPU core. Specifying more that one simulator per core will work but this will result in slower total execution time because the node will be over-utilized.
 
