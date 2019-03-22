@@ -54,6 +54,18 @@ extension Executer {
 // MARK: - Default parameters
 
 extension Executer {
+    func execute(_ command: String, progress: ((String) -> Void)?, rethrow: @escaping ((status: Int32, output: String), Error) throws -> Void) throws -> String {
+        return try capture(command, currentUrl: nil, progress: progress, rethrow: rethrow).output
+    }
+    
+    func capture(_ command: String, progress: ((String) -> Void)?, rethrow: @escaping ((status: Int32, output: String), Error) throws -> Void) throws -> (status: Int32, output: String) {
+        return try capture(command, currentUrl: nil, progress: progress, rethrow: rethrow)
+    }
+}
+
+// MARK: - Default parameters
+
+extension Executer {
     func execute(_ command: String, rethrow: @escaping ((status: Int32, output: String), Error) throws -> Void) throws -> String {
         return try capture(command, currentUrl: nil, progress: nil, rethrow: rethrow).output
     }
