@@ -21,6 +21,21 @@ struct Scheme: CustomStringConvertible {
 }
 
 class XcodeProject: NSObject {
+    enum SDK: String, RawRepresentable {
+        case macos, ios
+        
+        init?(rawValue: String) {
+            switch rawValue {
+            case "macosx":
+                self = .macos
+            case "iphoneos":
+                self = .ios
+            default:
+                return nil
+            }
+        }
+    }
+    
     private let project: XcodeProj
     private let path: PathKit.Path
     
@@ -143,5 +158,27 @@ class XcodeProject: NSObject {
         guard let buildBundleIdentifier = buildBuildConfiguration.buildSettings["PRODUCT_BUNDLE_IDENTIFIER"] as? String else { throw Error("Failed to extract bundle identifier from build target") }
         
         return (build: buildBundleIdentifier, test: testBundleIdentifier)
+    }
+    
+    func getBuildSDK(for schemeName: String) throws -> SDK {
+        let (buildTarget, _) = try getTargetsInScheme(schemeName)
+        
+        guard let buildProject = project.pbxproj.projects.filter({ project in project.targets.map { $0.name }.contains(buildTarget.name) }).first else {
+            throw Error("Failed to extract build project")
+        }
+        
+        guard let buildConfiguration = buildProject.buildConfigurationList?.buildConfigurations.first else {
+            throw Error("No build configuration found in \(buildProject.uuid)")
+        }
+        
+        guard let rawSdk = buildConfiguration.buildSettings["SDKROOT"] as? String else {
+            throw Error("No SDKROOT in \(buildConfiguration.uuid)")
+        }
+        
+        guard let sdk = SDK(rawValue: rawSdk) else {
+            throw Error("Unsupported SDKROOT \(rawSdk)")
+        }
+        
+        return sdk
     }
 }

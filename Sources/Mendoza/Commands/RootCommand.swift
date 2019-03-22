@@ -16,7 +16,6 @@ class RootCommand: Command {
     func run() -> Bool {
         if versionFlag.value {
             print(Mendoza.version)
-            return false
         }
         
         return true

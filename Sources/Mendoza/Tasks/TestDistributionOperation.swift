@@ -8,7 +8,7 @@
 import Foundation
 
 class TestDistributionOperation: BaseOperation<[[TestCase]]> {
-    var simulatorCount: Int?
+    var testRunnersCount: Int?
     var testCases: [TestCase]?
     
     private let device: Device
@@ -25,23 +25,23 @@ class TestDistributionOperation: BaseOperation<[[TestCase]]> {
         guard !isCancelled else { return }
         
         do {
-            guard let simulatorCount = simulatorCount
-                , simulatorCount > 0
+            guard let testRunnersCount = testRunnersCount
+                , testRunnersCount > 0
                 , let testCases = testCases else { fatalError("💣 Required fields not set") }
             
             didStart?()
             
-            let input = TestOrderInput(tests: testCases, simulatorCount: simulatorCount, device: device)
+            let input = TestOrderInput(tests: testCases, testRunnersCount: testRunnersCount, device: device)
             
             var distributedTestCases: [[TestCase]]
             if plugin.isInstalled {
                 distributedTestCases = try plugin.run(input: input)
-                distributedTestCases += Array(repeating: [], count: simulatorCount - distributedTestCases.count)
+                distributedTestCases += Array(repeating: [], count: testRunnersCount - distributedTestCases.count)
             } else {
-                distributedTestCases = input.tests.split(in: simulatorCount)
+                distributedTestCases = input.tests.split(in: testRunnersCount)
             }
             
-            assert(distributedTestCases.count == input.simulatorCount)
+            assert(distributedTestCases.count == input.testRunnersCount)
             
             for (index, nodeTests) in distributedTestCases.enumerated() {
                 logger.log(command: "Node \(index + 1) will launch \(nodeTests.count) test cases")

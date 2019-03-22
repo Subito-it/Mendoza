@@ -19,6 +19,7 @@ struct Configuration: Codable {
     let resultDestination: ResultDestination
     let nodes: [Node]
     let compilation: Compilation
+    let sdk: String
 }
 
 extension Configuration {

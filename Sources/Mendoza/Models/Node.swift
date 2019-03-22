@@ -9,7 +9,7 @@ import Foundation
 import KeychainAccess
 
 struct Node: Codable, Equatable, Hashable {
-    enum ConcurrentSimulators: Codable, Hashable {
+    enum ConcurrentTestRunners: Codable, Hashable {
         case manual(count: UInt)
         case autodetect
     }
@@ -18,7 +18,7 @@ struct Node: Codable, Equatable, Hashable {
     let address: String
     let authentication: SSHAuthentication?
     let administratorPassword: String?? // Required to perform tasks such as simulator runtime installation (e.g. `xcversion simulators --install='iOS X.X'`)
-    let concurrentSimulators: ConcurrentSimulators
+    let concurrentTestRunners: ConcurrentTestRunners
     let ramDiskSizeMB: UInt?
     
     static func ==(lhs: Node, rhs: Node) -> Bool {
@@ -55,7 +55,7 @@ extension Node {
     private enum CodingKeys: String, CodingKey {
         case name
         case address
-        case concurrentSimulators
+        case concurrentTestRunners
         case ramDiskSizeMB
         case storeAdministratorPassword
     }
@@ -65,7 +65,7 @@ extension Node {
         
         name = try container.decode(String.self, forKey: .name)
         address = try container.decode(String.self, forKey: .address)
-        concurrentSimulators = try container.decode(ConcurrentSimulators.self, forKey: .concurrentSimulators)
+        concurrentTestRunners = try container.decode(ConcurrentTestRunners.self, forKey: .concurrentTestRunners)
         ramDiskSizeMB = try container.decodeIfPresent(UInt.self, forKey: .ramDiskSizeMB)
         
         let keychain = KeychainAccess.Keychain(service: Environment.bundle)
@@ -91,7 +91,7 @@ extension Node {
     }
     
     static func localhost() -> Node {
-        return Node(name: "localhost", address: "localhost", authentication: .none, administratorPassword: nil, concurrentSimulators: .autodetect, ramDiskSizeMB: nil)
+        return Node(name: "localhost", address: "localhost", authentication: .none, administratorPassword: nil, concurrentTestRunners: .autodetect, ramDiskSizeMB: nil)
     }
     
     func encode(to encoder: Encoder) throws {
@@ -99,7 +99,7 @@ extension Node {
         
         try container.encode(name, forKey: .name)
         try container.encode(address, forKey: .address)
-        try container.encode(concurrentSimulators, forKey: .concurrentSimulators)
+        try container.encode(concurrentTestRunners, forKey: .concurrentTestRunners)
         try container.encodeIfPresent(ramDiskSizeMB, forKey: .ramDiskSizeMB)
         
         if let authentication = authentication {
@@ -112,7 +112,7 @@ extension Node {
     }
 }
 
-extension Node.ConcurrentSimulators {
+extension Node.ConcurrentTestRunners {
     private enum CodingKeys: String, CodingKey {
         case manualCount
     }

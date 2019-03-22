@@ -26,7 +26,7 @@ class Test {
         
         if dispatchOnLocalHost && configuration.nodes.first(where: { AddressType(node: $0) == .local }) == nil { // add localhost
             let updatedNodes = configuration.nodes + [Node.localhost()]
-            let updatedConfiguration = Configuration(projectPath: configuration.projectPath, workspacePath: configuration.workspacePath, buildBundleIdentifier: configuration.buildBundleIdentifier, testBundleIdentifier: configuration.testBundleIdentifier, scheme: configuration.scheme, buildConfiguration: configuration.buildConfiguration, storeAppleIdCredentials: configuration.storeAppleIdCredentials, resultDestination: configuration.resultDestination, nodes: updatedNodes, compilation: configuration.compilation)
+            let updatedConfiguration = Configuration(projectPath: configuration.projectPath, workspacePath: configuration.workspacePath, buildBundleIdentifier: configuration.buildBundleIdentifier, testBundleIdentifier: configuration.testBundleIdentifier, scheme: configuration.scheme, buildConfiguration: configuration.buildConfiguration, storeAppleIdCredentials: configuration.storeAppleIdCredentials, resultDestination: configuration.resultDestination, nodes: updatedNodes, compilation: configuration.compilation, sdk: configuration.sdk)
             configuration = updatedConfiguration
         }
         
@@ -39,6 +39,23 @@ class Test {
     }
     
     func run() throws -> Void {
+        guard let sdk = XcodeProject.SDK(rawValue: userOptions.configuration.sdk) else {
+            throw Error("Invalid sdk \(userOptions.configuration.sdk)")
+        }
+
+        switch sdk {
+        case .ios:
+            if userOptions.device.name.isEmpty, userOptions.device.name.isEmpty {
+                throw Error("Missing required arguments `--device_name=name, --device_runtime=version`".red)
+            } else if userOptions.device.name.isEmpty {
+                throw Error("Missing required arguments `--device_name=name`".red)
+            } else if userOptions.device.runtime.isEmpty {
+                throw Error("Missing required arguments `--device_runtime=version`".red)
+            }
+        case .macos:
+            break
+        }
+        
         print("ℹ️  Dispatching on".magenta.bold)
         let nodes = Array(Set(userOptions.configuration.nodes.map { $0.address } + (userOptions.dispatchOnLocalHost ? ["localhost"] : []))).sorted()
         print(nodes.joined(separator: "\n").magenta)
@@ -53,21 +70,21 @@ class Test {
         
         let testSessionResult = TestSessionResult()
 
-        let operations = try makeOperations(gitStatus: gitStatus, testSessionResult: testSessionResult)
+        let operations = try makeOperations(gitStatus: gitStatus, testSessionResult: testSessionResult, sdk: sdk)
         
         queue.addOperations(operations, waitUntilFinished: true)
         
         tearDown(operations: operations, testSessionResult: testSessionResult, error: nil)
     }
     
-    private func makeOperations(gitStatus: GitStatus, testSessionResult: TestSessionResult) throws -> [Operation & LoggedOperation] {
+    private func makeOperations(gitStatus: GitStatus, testSessionResult: TestSessionResult, sdk: XcodeProject.SDK) throws -> [Operation & LoggedOperation] {
         let configuration = userOptions.configuration
         let device = userOptions.device
         let filePatterns = userOptions.filePatterns
         
         let gitBaseUrl = gitStatus.url
         let project = try localProject(baseUrl: gitBaseUrl, path: configuration.projectPath)
-
+        
         let uniqueNodes = configuration.nodes.unique()
         let targets = try project.getTargetsInScheme(configuration.scheme)
         let testTargetSourceFiles = try project.testTargetSourceFilePaths(scheme: configuration.scheme)
@@ -79,25 +96,28 @@ class Test {
         let tearDownPlugin = TearDownPlugin(baseUrl: pluginUrl, plugin: plugin)
         
         let validationOperation = ValidationOperation(configuration: configuration)
+        let macOsValidationOperation = MacOsValidationOperation(configuration: configuration)
         let localSetupOperation = LocalSetupOperation()
         let wakeupOperation = WakeupOperation(nodes: uniqueNodes)
         let setupOperation = SetupOperation(nodes: uniqueNodes)
-        let compileOperation = CompileOperation(configuration: configuration, baseUrl: gitBaseUrl, project: project, scheme: configuration.scheme, preCompilationPlugin: preCompilationPlugin, postCompilationPlugin: postCompilationPlugin)
+        let compileOperation = CompileOperation(configuration: configuration, baseUrl: gitBaseUrl, project: project, scheme: configuration.scheme, preCompilationPlugin: preCompilationPlugin, postCompilationPlugin: postCompilationPlugin, sdk: sdk)
         let testExtractionOperation = TestExtractionOperation(configuration: configuration, baseUrl: gitBaseUrl, testTargetSourceFiles: testTargetSourceFiles, filePatterns: filePatterns, device: device, plugin: testExtractionPlugin)
         let testDistributionOperation = TestDistributionOperation(device: device, plugin: testDistributionPlugin)
         let simulatorSetupOperation = SimulatorSetupOperation(configuration: configuration, nodes: uniqueNodes, device: device)
         let simulatorBootOperation = SimulatorBootOperation()
         let simulatorWakeupOperation = SimulatorWakeupOperation(nodes: uniqueNodes)
         let distributeTestBundleOperation = DistributeTestBundleOperation(nodes: uniqueNodes)
-        let testRunnerOperation = TestRunnerOperation(configuration: configuration, buildTarget: targets.build.name, testTarget: targets.test.name)
+        let testRunnerOperation = TestRunnerOperation(configuration: configuration, buildTarget: targets.build.name, testTarget: targets.test.name, sdk: sdk)
         let testCollectorOperation = TestCollectorOperation(configuration: configuration, timestamp: timestamp, buildTarget: targets.build.name, testTarget: targets.test.name)
         let codeCoverageCollectionOperation = CodeCoverageCollectionOperation(configuration: configuration, baseUrl: gitBaseUrl, timestamp: timestamp)
         let testTearDownOperation = TestTearDownOperation(configuration: configuration, timestamp: timestamp)
         let cleanupOperation = CleanupOperation(configuration: configuration, timestamp: timestamp)
+        let simulatorTearDownOperation = SimulatorTearDownOperation(configuration: configuration, nodes: uniqueNodes)
         let tearDownOperation = TearDownOperation(configuration: configuration, plugin: tearDownPlugin)
         
         let operations: [Operation & LoggedOperation] =
             [validationOperation,
+             macOsValidationOperation,
              localSetupOperation,
              setupOperation,
              wakeupOperation,
@@ -112,14 +132,24 @@ class Test {
              testCollectorOperation,
              codeCoverageCollectionOperation,
              testTearDownOperation,
+             simulatorTearDownOperation,
              cleanupOperation,
              tearDownOperation]
         
-        localSetupOperation.addDependency(validationOperation)
+        switch sdk {
+        case .ios:
+            macOsValidationOperation.cancel()
+        case .macos:
+            simulatorSetupOperation.cancel()
+            simulatorBootOperation.cancel()
+            simulatorWakeupOperation.cancel()
+            simulatorTearDownOperation.cancel()
+        }
+
+        localSetupOperation.addDependencies([validationOperation, macOsValidationOperation])
         
         setupOperation.addDependency(localSetupOperation)
         testExtractionOperation.addDependency(localSetupOperation)
-        wakeupOperation.addDependency(localSetupOperation)
         
         compileOperation.addDependency(setupOperation)
         simulatorSetupOperation.addDependencies([setupOperation, wakeupOperation])
@@ -138,10 +168,11 @@ class Test {
         
         codeCoverageCollectionOperation.addDependency(testCollectorOperation)
         testTearDownOperation.addDependency(testCollectorOperation)
+        simulatorTearDownOperation.addDependency(testCollectorOperation)
         
         cleanupOperation.addDependencies([codeCoverageCollectionOperation, testTearDownOperation])
         
-        tearDownOperation.addDependency(cleanupOperation)
+        tearDownOperation.addDependencies([cleanupOperation, simulatorTearDownOperation])
         
         testSessionResult.device = device
         testSessionResult.destination.username = configuration.resultDestination.node.authentication?.username ?? ""
@@ -182,10 +213,16 @@ class Test {
             try? self.eventPlugin.run(event: Event(kind: .stopCompiling, info: [:]), device: device)
         }
         
-        simulatorSetupOperation.didEnd = { simulators in
-            testDistributionOperation.simulatorCount = simulators.count
-            simulatorBootOperation.simulators = simulators
-            testRunnerOperation.simulators = simulators
+        switch sdk {
+        case .macos:
+            testDistributionOperation.testRunnersCount = uniqueNodes.count
+            testRunnerOperation.testRunners = uniqueNodes.map { (testRunner: $0, node: $0) }
+        case .ios:
+            simulatorSetupOperation.didEnd = { simulators in
+                testDistributionOperation.testRunnersCount = simulators.count
+                simulatorBootOperation.simulators = simulators
+                testRunnerOperation.testRunners = simulators.map { (testRunner: $0.0, node: $0.1) }
+            }
         }
         
         testDistributionOperation.didEnd = { distributedTestCases in

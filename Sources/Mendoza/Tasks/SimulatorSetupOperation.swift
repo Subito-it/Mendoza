@@ -36,11 +36,12 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
                 let node = source.node
                 
                 let proxy = CommandLineProxy.Simulators(executer: executer)
+
                 try proxy.reset()
                 try proxy.installRuntimeIfNeeded(self.device.runtime, nodeAddress: node.address, appleIdCredentials: appleIdCredentials, administratorPassword: node.administratorPassword ?? nil)
                 
-                let concurrentSimulators = try self.physicalCPUs(executer: executer, node: node)
-                let simulatorNames = (1...concurrentSimulators).map { "\(self.device.name)-\($0)" }
+                let concurrentTestRunners = try self.physicalCPUs(executer: executer, node: node)
+                let simulatorNames = (1...concurrentTestRunners).map { "\(self.device.name)-\($0)" }
                 
                 let nodeSimulators = try simulatorNames.compactMap { try proxy.makeSimulatorIfNeeded(name: $0, device: self.device) }
                 
@@ -65,11 +66,11 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
     }
     
     private func physicalCPUs(executer: Executer, node: Node) throws -> Int {
-        guard let concurrentSimulators = Int(try executer.execute("sysctl -n hw.physicalcpu")) else {
+        guard let concurrentTestRunners = Int(try executer.execute("sysctl -n hw.physicalcpu")) else {
             throw Error("Failed getting concurrent simulators", logger: executer.logger)
         }
 
-        return concurrentSimulators
+        return concurrentTestRunners
     }
     
     /// This method arranges the simulators so that the do not overlap. For simplicity they're arranged on a single row

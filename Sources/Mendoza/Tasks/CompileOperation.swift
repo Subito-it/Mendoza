@@ -14,17 +14,19 @@ class CompileOperation: BaseOperation<Void> {
     private let scheme: String
     private let preCompilationPlugin: PreCompilationPlugin
     private let postCompilationPlugin: PostCompilationPlugin
+    private let sdk: XcodeProject.SDK
     private lazy var executer: Executer = {
         return self.makeLocalExecuter()
     }()
         
-    init(configuration: Configuration, baseUrl: URL, project: XcodeProject, scheme: String, preCompilationPlugin: PreCompilationPlugin, postCompilationPlugin: PostCompilationPlugin) {
+    init(configuration: Configuration, baseUrl: URL, project: XcodeProject, scheme: String, preCompilationPlugin: PreCompilationPlugin, postCompilationPlugin: PostCompilationPlugin, sdk: XcodeProject.SDK) {
         self.configuration = configuration
         self.baseUrl = baseUrl
         self.project = project
         self.scheme = scheme
         self.preCompilationPlugin = preCompilationPlugin
         self.postCompilationPlugin = postCompilationPlugin
+        self.sdk = sdk
         super.init()
         loggers = loggers.union([preCompilationPlugin.logger, postCompilationPlugin.logger])
     }
@@ -57,8 +59,14 @@ class CompileOperation: BaseOperation<Void> {
 
                 didEnd?(())
             }
-
-            let command = "$(xcode-select -p)/usr/bin/xcodebuild \(projectFlag) -scheme \(configuration.scheme) -configuration \(configuration.buildConfiguration) -derivedDataPath '\(Path.build.rawValue)' -sdk 'iphonesimulator' COMPILER_INDEX_STORE_ENABLE=NO ONLY_ACTIVE_ARCH=\(configuration.compilation.onlyActiveArchitecture) VALID_ARCHS='\(configuration.compilation.architectures)' \(configuration.compilation.buildSettings) -UseNewBuildSystem=\(configuration.compilation.useNewBuildSystem) -enableCodeCoverage YES build-for-testing"
+            
+            let command: String
+            switch sdk {
+            case .ios:
+                command = "$(xcode-select -p)/usr/bin/xcodebuild \(projectFlag) -scheme \(configuration.scheme) -configuration \(configuration.buildConfiguration) -derivedDataPath '\(Path.build.rawValue)' -sdk 'iphonesimulator' COMPILER_INDEX_STORE_ENABLE=NO ONLY_ACTIVE_ARCH=\(configuration.compilation.onlyActiveArchitecture) VALID_ARCHS='\(configuration.compilation.architectures)' \(configuration.compilation.buildSettings) -UseNewBuildSystem=\(configuration.compilation.useNewBuildSystem) -enableCodeCoverage YES build-for-testing"
+            case .macos:
+                command = "$(xcode-select -p)/usr/bin/xcodebuild \(projectFlag) -scheme \(configuration.scheme) -configuration \(configuration.buildConfiguration) -derivedDataPath '\(Path.build.rawValue)' -sdk 'macosx' COMPILER_INDEX_STORE_ENABLE=NO ONLY_ACTIVE_ARCH=\(configuration.compilation.onlyActiveArchitecture) VALID_ARCHS='\(configuration.compilation.architectures)' \(configuration.compilation.buildSettings) -UseNewBuildSystem=\(configuration.compilation.useNewBuildSystem) -enableCodeCoverage YES build-for-testing"
+            }
             
             _ = try executer.execute(command, currentUrl: baseUrl) { result, originalError in
                 if result.output.contains("** TEST BUILD FAILED **") {

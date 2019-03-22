@@ -90,13 +90,19 @@ class CodeCoverageCollectionOperation: BaseOperation<Void> {
     }
     
     private func findExecutablePath() throws -> String {
-        let plistPaths = try executer.execute("find '\(Path.build.rawValue)' -type f -name 'Info.plist' | grep '.app/Info.plist'").components(separatedBy: "\n")
+        let plistPaths = try executer.execute("find '\(Path.build.rawValue)' -type f -name 'Info.plist' | grep -Ei '.app(/.*)?/Info.plist'").components(separatedBy: "\n")
         for plistPath in plistPaths {
             guard let data = try? Data(contentsOf: URL(fileURLWithPath: plistPath)) else { continue }
-            let plistInfo = try PropertyListDecoder().decode(InfoPlist.self, from: data)
+            guard let plistInfo = try? PropertyListDecoder().decode(InfoPlist.self, from: data) else { continue }
             
             if plistInfo.bundleIdentifier == configuration.buildBundleIdentifier {
-                return URL(fileURLWithPath: plistPath).deletingLastPathComponent().appendingPathComponent(plistInfo.executableName).path
+                let executablePath: String
+                if plistInfo.supportedPlatforms?.contains("MacOSX") == true {
+                    executablePath = URL(fileURLWithPath: plistPath).deletingLastPathComponent().appendingPathComponent("MacOS").appendingPathComponent(plistInfo.executableName).path
+                } else {
+                    executablePath = URL(fileURLWithPath: plistPath).deletingLastPathComponent().appendingPathComponent(plistInfo.executableName).path
+                }
+                return executablePath
             }
         }
 

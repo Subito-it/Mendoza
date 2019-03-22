@@ -10,6 +10,10 @@ The architecture of Mendoza is based on a set of NSOperations orchestrated by a 
 
 Validate configuration file checking for missing credentials, passwords, network reachability and dependencies.
 
+### macValidationOperation (macOS projects only)
+
+For macOS projects we validate that the all testing nodes are running the same OS version.
+
 ### localSetupOperation
 
 Prepares filesystem on the compiling node.
@@ -34,15 +38,15 @@ Compile project using xcodebuild's `build-for-testing` which will produce a test
 
 Distributes test methods over available nodes. Can be overridden by plugin implementation to achieve a more balanced total execution time per node.
 
-### simulatorSetupOperation
+### simulatorSetupOperation (iOS projects only)
 
 Prepares simulators on testing nodes by installing missing runtimes or simulator devices.
 
-### simulatorBootOperation
+### simulatorBootOperation (iOS projects only)
 
 Simulators are booted to allow tests to start as soon as compilation ends
 
-### simulatorWakeupOperation
+### simulatorWakeupOperation (iOS projects only)
 
 Open simulator.app to avoid using headless simulators.
 
@@ -70,6 +74,10 @@ Write test result summary files (json, html)
 
 Reclaim disk space by removing unneeded files
 
+### simulatorsTearDownOperation  (iOS projects only)
+
+Reset simulators cleanup.
+
 ### tearDownOperation
 
-Reset simulators and filesystem cleanup. Can be extended by the TearDown plugin
+Reset filesystem cleanup. Can be extended by the TearDown plugin

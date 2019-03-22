@@ -20,16 +20,12 @@ extension CommandLineProxy {
         func wakeUp() throws {
             _ = try executer.execute("open -a \"$(xcode-select -p)/Applications/Simulator.app\"")
         }
-        
-        func kill() throws {
-            let commands = ["killall -9 com.apple.CoreSimulator.CoreSimulatorService",
-                            "pkill Simulator"]
-            
-            try commands.forEach { _ = try executer.execute("\($0) 2>/dev/null || true") }
-        }
-        
+                
         func reset() throws {
-            let commands = ["open -a \"$(xcode-select -p)/Applications/Simulator.app\"",
+            let commands = ["killall -9 com.apple.CoreSimulator.CoreSimulatorService",
+                            "pkill Simulator",
+                            "sleep 5",
+                            "open -a \"$(xcode-select -p)/Applications/Simulator.app\"",
                             "sleep 15",
                             "killall -9 com.apple.CoreSimulator.CoreSimulatorService",
                             "pkill Simulator",
