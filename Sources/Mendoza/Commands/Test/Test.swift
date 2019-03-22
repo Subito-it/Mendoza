@@ -39,6 +39,23 @@ class Test {
     }
     
     func run() throws -> Void {
+        guard let sdk = XcodeProject.SDK(rawValue: userOptions.configuration.sdk) else {
+            throw Error("Invalid sdk \(userOptions.configuration.sdk)")
+        }
+
+        switch sdk {
+        case .ios:
+            if userOptions.device.name.isEmpty, userOptions.device.name.isEmpty {
+                throw Error("Missing required arguments `--device_name=name, --device_runtime=version`".red)
+            } else if userOptions.device.name.isEmpty {
+                throw Error("Missing required arguments `--device_name=name`".red)
+            } else if userOptions.device.runtime.isEmpty {
+                throw Error("Missing required arguments `--device_runtime=version`".red)
+            }
+        case .macos:
+            break
+        }
+        
         print("ℹ️  Dispatching on".magenta.bold)
         let nodes = Array(Set(userOptions.configuration.nodes.map { $0.address } + (userOptions.dispatchOnLocalHost ? ["localhost"] : []))).sorted()
         print(nodes.joined(separator: "\n").magenta)
@@ -53,24 +70,21 @@ class Test {
         
         let testSessionResult = TestSessionResult()
 
-        let operations = try makeOperations(gitStatus: gitStatus, testSessionResult: testSessionResult)
+        let operations = try makeOperations(gitStatus: gitStatus, testSessionResult: testSessionResult, sdk: sdk)
         
         queue.addOperations(operations, waitUntilFinished: true)
         
         tearDown(operations: operations, testSessionResult: testSessionResult, error: nil)
     }
     
-    private func makeOperations(gitStatus: GitStatus, testSessionResult: TestSessionResult) throws -> [Operation & LoggedOperation] {
+    private func makeOperations(gitStatus: GitStatus, testSessionResult: TestSessionResult, sdk: XcodeProject.SDK) throws -> [Operation & LoggedOperation] {
         let configuration = userOptions.configuration
         let device = userOptions.device
         let filePatterns = userOptions.filePatterns
         
         let gitBaseUrl = gitStatus.url
         let project = try localProject(baseUrl: gitBaseUrl, path: configuration.projectPath)
-        guard let sdk = XcodeProject.SDK(rawValue: configuration.sdk) else {
-            throw Error("Invalid sdk \(configuration.sdk)")
-        }
-
+        
         let uniqueNodes = configuration.nodes.unique()
         let targets = try project.getTargetsInScheme(configuration.scheme)
         let testTargetSourceFiles = try project.testTargetSourceFilePaths(scheme: configuration.scheme)
