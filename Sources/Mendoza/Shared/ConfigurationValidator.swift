@@ -17,11 +17,24 @@ class ConfigurationValidator {
     }
     
     func validate() throws {
+        try validateNodes()
         try validateReachability()
         try validateConnections()
         try validateAuthentication()
         try validateAdministratorPassword()
         try validateAppleIdCredentials()
+    }
+    
+    func validateNodes() throws {
+        for node in configuration.nodes {
+            guard configuration.nodes.filter({ $0.name == node.name }).count == 1 else {
+                throw Error("Node name `\(node.name)` repeated more than once in configuration")
+            }
+            
+            guard configuration.nodes.filter({ $0.address == node.address }).count == 1 else {
+                throw Error("Node address `\(node.address)` repeated more than once in configuration")
+            }
+        }
     }
     
     func validAuthentication(node: Node) -> Bool {
