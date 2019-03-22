@@ -10,9 +10,11 @@ import Foundation
 struct InfoPlist: Codable {
     let bundleIdentifier: String
     let executableName: String
+    let supportedPlatforms: [String]?
     
     private enum CodingKeys: String, CodingKey {
         case bundleIdentifier = "CFBundleIdentifier"
         case executableName = "CFBundleExecutable"
+        case supportedPlatforms = "CFBundleSupportedPlatforms"
     }
 }
