@@ -82,6 +82,7 @@ class Test {
         let tearDownPlugin = TearDownPlugin(baseUrl: pluginUrl, plugin: plugin)
         
         let validationOperation = ValidationOperation(configuration: configuration)
+        let macOsValidationOperation = MacOsValidationOperation(configuration: configuration)
         let localSetupOperation = LocalSetupOperation()
         let wakeupOperation = WakeupOperation(nodes: uniqueNodes)
         let setupOperation = SetupOperation(nodes: uniqueNodes)
@@ -102,6 +103,7 @@ class Test {
         
         let operations: [Operation & LoggedOperation] =
             [validationOperation,
+             macOsValidationOperation,
              localSetupOperation,
              setupOperation,
              wakeupOperation,
@@ -119,16 +121,18 @@ class Test {
              simulatorTearDownOperation,
              cleanupOperation,
              tearDownOperation]
+        
         switch sdk {
         case .ios:
-            break
+            macOsValidationOperation.cancel()
         case .macos:
             simulatorSetupOperation.cancel()
             simulatorBootOperation.cancel()
             simulatorWakeupOperation.cancel()
+            simulatorTearDownOperation.cancel()
         }
 
-        localSetupOperation.addDependency(validationOperation)
+        localSetupOperation.addDependencies([validationOperation, macOsValidationOperation])
         
         setupOperation.addDependency(localSetupOperation)
         testExtractionOperation.addDependency(localSetupOperation)
