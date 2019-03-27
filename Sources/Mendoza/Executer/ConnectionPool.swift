@@ -35,7 +35,7 @@ class ConnectionPool<SourceValue> {
                 
                 do {
                     let executer = try source.node.makeExecuter(logger: source.logger)
-                    self.syncQueue.sync { self.executers.append(executer) }
+                    self.syncQueue.sync { [unowned self] in self.executers.append(executer) }
                     
                     try block(executer, source)
                 } catch {

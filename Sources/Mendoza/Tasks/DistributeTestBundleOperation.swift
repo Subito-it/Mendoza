@@ -43,7 +43,7 @@ class DistributeTestBundleOperation: BaseOperation<Void> {
                 var missingNodes = Set<Node>()
                 var distributionCompleted = false
                 
-                syncQueue.sync {
+                syncQueue.sync { [unowned self] in
                     readyNodes = distributedNodes.subtracting(sendingNodes)
                     missingNodes = self.nodes.subtracting(distributedNodes).subtracting(receivingNodes)
                     

@@ -47,7 +47,7 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
                 
                 try self.updateSimulatorsArrangement(executer: executer, simulators: nodeSimulators)
                 
-                self.syncQueue.sync {
+                self.syncQueue.sync { [unowned self] in
                     self.simulators += nodeSimulators.map { (simulator: $0, node: source.node) }
                 }
             }
