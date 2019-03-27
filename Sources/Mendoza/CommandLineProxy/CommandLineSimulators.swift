@@ -237,7 +237,7 @@ extension CommandLineProxy {
         private func waitForBoot(executer: Executer, simulator: Simulator) throws {
             let logPath = "\(Path.temp.rawValue)/boot_\(simulator.id)"
             let pidPath = "\(Path.temp.rawValue)/pid_\(simulator.id)"
-            let timeout = 45
+            let timeout = 60
             
             Thread.sleep(forTimeInterval: 1.0)
             
