@@ -8,8 +8,15 @@
 import Foundation
 
 class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
-    var distributedTestCases: [[TestCase]]?
-    var testRunners: [(testRunner: TestRunner, node: Node)]? // TODO: rename to destinations
+    var distributedTestCases: [[TestCase]]? {
+        didSet {
+            testCasesCount = distributedTestCases?.reduce(0, { $0 + $1.count }) ?? 0
+        }
+    }
+    var testRunners: [(testRunner: TestRunner, node: Node)]?
+    
+    private var testCasesCount = 0
+    private var completedCount = 0
     
     private let configuration: Configuration
     private let buildTarget: String
@@ -41,9 +48,6 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
             
             var result = [TestCaseResult]()
             
-            let testCasesCount = distributedTestCases?.reduce(0, { $0 + $1.count }) ?? 0
-            var completedCount = 0
-            
             try pool.execute { [unowned self] (executer, source) in
                 let testRunner = source.value.0
                 let testCases = source.value.1
@@ -55,49 +59,7 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                 executer.logger?.log(command: "Will launch \(testCases.count) test cases")
                 executer.logger?.log(output: testCases.map { $0.testIdentifier }.joined(separator: "\n"), statusCode: 0)
                 
-                let testRun = try self.findTestRun(executer: executer)
-                let onlyTesting = testCases.map { "-only-testing:\(self.configuration.scheme)/\($0.testIdentifier)" }.joined(separator: " ")
-                let destinationPath = Path.logs.url.appendingPathComponent(testRunner.id).path
-                
-                var testWithoutBuilding: String
-                    
-                switch self.sdk {
-                case .ios:
-                    testWithoutBuilding = #"xcodebuild -parallel-testing-enabled NO -disable-concurrent-destination-testing -xctestrun \#(testRun) -destination 'platform=iOS Simulator,id=\#(testRunner.id)' -derivedDataPath '\#(destinationPath)' \#(onlyTesting) -enableCodeCoverage YES -destination-timeout 60 test-without-building"#
-                case .macos:
-                    testWithoutBuilding = #"xcodebuild -parallel-testing-enabled NO -disable-concurrent-destination-testing -xctestrun \#(testRun) -destination 'platform=OS X,arch=x86_64' -derivedDataPath '\#(destinationPath)' \#(onlyTesting) -enableCodeCoverage YES test-without-building"#
-                }
-                testWithoutBuilding += " || true"
-                
-                var partialProgress = ""
-                let progressHandler: ((String) -> Void) = { progress in
-                    partialProgress += progress
-                    let lines = partialProgress.components(separatedBy: "\n")
-                    
-                    for line in lines.dropLast() { // last line might not be completely received
-                        let regex = #"Test Case '-\[\#(self.testTarget)\.(.*)\]' (passed|failed)"#
-                        if let tests = try? line.capturedGroups(withRegexString: regex), tests.count == 2 {
-                            self.syncQueue.sync {
-                                completedCount += 1
-                                
-                                if tests[1] == "passed" {
-                                    print("✓ \(tests[0]) passed [\(completedCount)/\(testCasesCount)]".green)
-                                } else {
-                                    print("𝘅 \(tests[0]) failed [\(completedCount)/\(testCasesCount)]".red)
-                                }
-                            }
-                        }
-                    }
-                    
-                    partialProgress = lines.last ?? ""
-                }
-                
-                let output = try executer.execute(testWithoutBuilding, progress: progressHandler) { result, originalError in
-                    try self.assertAccessibilityPermissiong(in: result.output)
-                    throw originalError
-                }
-                // xcodebuild returns 0 even on ** TEST EXECUTE FAILED ** when missing accessibility
-                try self.assertAccessibilityPermissiong(in: output)
+                let output = try self.testWithoutBuilding(executer: executer, testCases: testCases, testRunner: testRunner)
                 
                 let summaryPlistUrl = try self.findTestSummaryPlistUrl(executer: executer, testRunner: testRunner)
                 let testResults = try self.parseTestResults(output, candidates: testCases, node: source.node.address, summaryPlistPath: summaryPlistUrl.path)
@@ -125,6 +87,72 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
             pool.terminate()
         }
         super.cancel()
+    }
+    
+    private func testWithoutBuilding(executer: Executer, testCases: [TestCase], testRunner: TestRunner) throws -> String {
+        let testRun = try findTestRun(executer: executer)
+        let onlyTesting = testCases.map { "-only-testing:\(configuration.scheme)/\($0.testIdentifier)" }.joined(separator: " ")
+        let destinationPath = Path.logs.url.appendingPathComponent(testRunner.id).path
+        
+        var testWithoutBuilding: String
+        
+        switch sdk {
+        case .ios:
+            testWithoutBuilding = #"xcodebuild -parallel-testing-enabled NO -disable-concurrent-destination-testing -xctestrun \#(testRun) -destination 'platform=iOS Simulator,id=\#(testRunner.id)' -derivedDataPath '\#(destinationPath)' \#(onlyTesting) -enableCodeCoverage YES -destination-timeout 60 test-without-building"#
+        case .macos:
+            testWithoutBuilding = #"xcodebuild -parallel-testing-enabled NO -disable-concurrent-destination-testing -xctestrun \#(testRun) -destination 'platform=OS X,arch=x86_64' -derivedDataPath '\#(destinationPath)' \#(onlyTesting) -enableCodeCoverage YES test-without-building"#
+        }
+        testWithoutBuilding += " || true"
+        
+        var partialProgress = ""
+        let progressHandler: ((String) -> Void) = { [unowned self] progress in
+            partialProgress += progress
+            let lines = partialProgress.components(separatedBy: "\n")
+            
+            for line in lines.dropLast() { // last line might not be completely received
+                let regex = #"Test Case '-\[\#(self.testTarget)\.(.*)\]' (passed|failed)"#
+                if let tests = try? line.capturedGroups(withRegexString: regex), tests.count == 2 {
+                    self.syncQueue.sync { [unowned self] in
+                        self.completedCount += 1
+                        
+                        if tests[1] == "passed" {
+                            print("✓ \(tests[0]) passed [\(self.completedCount)/\(self.testCasesCount)]".green)
+                        } else {
+                            print("𝘅 \(tests[0]) failed [\(self.completedCount)/\(self.testCasesCount)]".red)
+                        }
+                    }
+                }
+            }
+            
+            partialProgress = lines.last ?? ""
+        }
+        
+        var output = ""
+        for shouldRetry in [true, false] {
+            output = try executer.execute(testWithoutBuilding, progress: progressHandler) { result, originalError in
+                try self.assertAccessibilityPermissiong(in: result.output)
+                throw originalError
+            }
+            
+            // xcodebuild returns 0 even on ** TEST EXECUTE FAILED ** when missing
+            // accessibility permissions or other errors like the bootstrapping onese we check in testsDidFailToStart
+            try self.assertAccessibilityPermissiong(in: output)
+            
+            guard !testsDidFailBootstrapping(in: output) else {
+                Thread.sleep(forTimeInterval: 5.0)
+                partialProgress = ""
+
+                guard shouldRetry else {
+                    throw Error("Tests failed boostrapping on node \(testRunner.name)-\(testRunner.id)")
+                }
+                
+                continue
+            }
+            
+            break
+        }
+
+        return output
     }
     
     private func findTestRun(executer: Executer) throws -> String {
@@ -220,5 +248,9 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
         if output.contains("does not have permission to use Accessibility") {
             throw Error("Unable to run UI Tests because Xcode Helper does not have permission to use Accessibility. To enable UI testing, go to the Security & Privacy pane in System Preferences, select the Privacy tab, then select Accessibility, and add Xcode Helper to the list of applications allowed to use Accessibility")
         }
+    }
+    
+    private func testsDidFailBootstrapping(in output: String) -> Bool {
+        return output.contains("Test runner exited before starting test execution")
     }
 }
