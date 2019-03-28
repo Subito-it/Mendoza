@@ -44,9 +44,9 @@ class BaseOperation<Output: Any>: Operation, Starting, Ending, Throwing, LoggedO
             guard !op.isCancelled else { return }
             
             if op.isExecuting {
-                print("🏃‍♀️ `\(op.className)` did start".bold)
+                print("🏃‍♀️ `\(op.className.components(separatedBy: ".").last ?? op.className)` did start".bold)
             } else {
-                print("🏁 `\(op.className)` did complete".bold)
+                print("🏁 `\(op.className.components(separatedBy: ".").last ?? op.className)` did complete".bold)
             }
         }
         loggers.insert(logger)
