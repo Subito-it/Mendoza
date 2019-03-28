@@ -140,10 +140,10 @@ class Test {
         case .ios:
             macOsValidationOperation.cancel()
         case .macos:
-            simulatorSetupOperation.cancel()
-            simulatorBootOperation.cancel()
-            simulatorWakeupOperation.cancel()
             simulatorTearDownOperation.cancel()
+            simulatorWakeupOperation.cancel()
+            simulatorBootOperation.cancel()
+            simulatorSetupOperation.cancel()
         }
 
         wakeupOperation.addDependency(validationOperation)
