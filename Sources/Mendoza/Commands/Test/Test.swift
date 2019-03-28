@@ -268,7 +268,7 @@ class Test {
     }
     
     private func tearDown(operations: [Operation & LoggedOperation], testSessionResult: TestSessionResult, error: Error?) {
-        operations.forEach { $0.cancel() }
+        cancelOperation(operations)
 
         let logger = ExecuterLogger(name: "Test", address: "localhost")
         
@@ -296,6 +296,27 @@ class Test {
             try? dumpOperationLogs(operations)
             try? eventPlugin.run(event: Event(kind: .error, info: ["error": error.localizedDescription]), device: userOptions.device)
             didFail?(error)
+        }
+    }
+    
+    private func cancelOperation(_ operations: [Operation & LoggedOperation]) {
+        // To avoid that during cancellation an operation (that wasn't still cancelled) starts because all its dependencies where cancelled
+        // we need to cancel from leafs to root
+        var cancelledOperation = Set<Operation>()
+        
+        while true {
+            for operation in operations {
+                guard !cancelledOperation.contains(operation) else { continue }
+                
+                let dependingOperations = operations.filter { $0.dependencies.contains(operation) }
+                
+                if dependingOperations.allSatisfy({ $0.isCancelled }) {
+                    operation.cancel()
+                    cancelledOperation.insert(operation)
+                    break
+                }
+            }
+            guard cancelledOperation.count != operations.count else { break }
         }
     }
     
