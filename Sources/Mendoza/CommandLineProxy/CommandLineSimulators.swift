@@ -61,9 +61,13 @@ extension CommandLineProxy {
         }
         
         func installRuntimeIfNeeded(_ runtime: String, nodeAddress: String, appleIdCredentials: Credentials?, administratorPassword: String?) throws {
-            let installedRuntimes = try executer.execute("xcrun simctl list runtimes")
-            let escapedRuntime = runtime.replacingOccurrences(of: ".", with: "-")
-            guard !installedRuntimes.contains("com.apple.CoreSimulator.SimRuntime.iOS-\(escapedRuntime)") else { return }
+            let isRuntimeInstalled: () throws -> Bool = { [unowned self] in
+                let installedRuntimes = try self.executer.execute("xcrun simctl list runtimes")
+                let escapedRuntime = runtime.replacingOccurrences(of: ".", with: "-")
+                return installedRuntimes.contains("com.apple.CoreSimulator.SimRuntime.iOS-\(escapedRuntime)")
+            }
+
+            guard try !isRuntimeInstalled() else { return }
             
             guard let appleIdCredentials = appleIdCredentials
                 , let password = administratorPassword else {
@@ -86,10 +90,16 @@ extension CommandLineProxy {
                         "echo '\(password)' | sudo -S xcversion simulators --install='iOS \(runtime)'",
                         "killall -9 com.apple.CoreSimulator.CoreSimulatorService"]
             
-            let status = try executer.capture(cmds.joined(separator: "; ")).status
-            guard status == 0 else {
+            let result = try executer.capture(cmds.joined(separator: "; "))
+            guard result.status == 0 else {
                 _ = try executer.execute("rm -rf \(executer.homePath)/Library/Caches/XcodeInstall/*.dmg")
                 throw Error("Failed installing runtime!", logger: executer.logger)
+            }
+            guard !result.output.contains("specified Apple developer account credentials are incorrect") else {
+                throw Error("The provided Apple developer account credentials are incorrect. Please run `\(ConfigurationRootCommand().name!) \(ConfigurationAuthententicationUpdateCommand().name!)` command", logger: executer.logger)
+            }
+            guard try isRuntimeInstalled() else {
+                throw Error("Failed installing runtime, after install simulator runtime still not installed!", logger: executer.logger)
             }
         }
 

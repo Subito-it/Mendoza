@@ -29,9 +29,9 @@ struct ConfigurationAuthenticationUpdater {
         var lastNode: Node?
         
         if configuration.storeAppleIdCredentials, configuration.appleIdCredentials() == nil {
-            print("\n* AppleID credentials to automatically install simulators".magenta)
+            print("\n* AppleID credentials to automatically install simulators runtimes".magenta)
             
-            let username: String = Bariloche.ask("\nusername:".underline) { guard !$0.isEmpty else { throw Error("Invalid value") }; return $0 }
+            let username: String = Bariloche.ask("\nappleID:".underline) { guard !$0.isEmpty else { throw Error("Invalid value") }; return $0 }
             let password: String = Bariloche.ask("\npassword:".underline, secure: true) { guard !$0.isEmpty else { throw Error("Invalid value") }; return $0 }
             
             let keychain = KeychainAccess.Keychain(service: Environment.bundle)
