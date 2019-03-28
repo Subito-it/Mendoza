@@ -146,6 +146,7 @@ class Test {
             simulatorTearDownOperation.cancel()
         }
 
+        wakeupOperation.addDependency(validationOperation)
         localSetupOperation.addDependencies([validationOperation, macOsValidationOperation])
         
         setupOperation.addDependency(localSetupOperation)
