@@ -80,7 +80,7 @@ Generates a new configuration file required to execute tests. you will be prompt
 
 During initialization you will be prompted for an Apple ID account that will be used to install new runtimes on testing nodes. Any low priviledge Apple ID account will work.
 
-When not provided test dispatch will fail if the requested simulator runtime isn't properly installed.
+It is not mandatory to provide one, but test dispatching will fail if the requested simulator runtime isn't properly installed.
 
 #### Nodes configuration
 
