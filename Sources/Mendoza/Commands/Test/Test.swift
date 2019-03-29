@@ -302,21 +302,21 @@ class Test {
     private func cancelOperation(_ operations: [Operation & LoggedOperation]) {
         // To avoid that during cancellation an operation (that wasn't still cancelled) starts because all its dependencies where cancelled
         // we need to cancel from leafs to root
-        var cancelledOperation = Set<Operation>()
+        var completedOperations: Set<Operation> = Set(operations.filter { $0.isCancelled || $0.isFinished })
         
         while true {
             for operation in operations {
-                guard !cancelledOperation.contains(operation) else { continue }
+                guard !completedOperations.contains(operation) else { continue }
                 
                 let dependingOperations = operations.filter { $0.dependencies.contains(operation) }
                 
                 if dependingOperations.allSatisfy({ $0.isCancelled }) {
                     operation.cancel()
-                    cancelledOperation.insert(operation)
+                    completedOperations.insert(operation)
                     break
                 }
             }
-            guard cancelledOperation.count != operations.count else { break }
+            guard completedOperations.count != operations.count else { break }
         }
     }
     
