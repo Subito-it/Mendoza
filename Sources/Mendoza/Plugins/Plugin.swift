@@ -56,8 +56,16 @@ class Plugin<Input: DefaultInitializable, Output: DefaultInitializable> {
             let inputJson = try JSONEncoder().encode(input)
             inputString = String(data: inputJson, encoding: .utf8)!
         }
-                
-        let command = "\(pluginRunUrl.path) '\(inputString)' '\(plugin.data ?? "")'"
+        
+        let escape: (String?) -> String = { input in
+            return input?
+                .replacingOccurrences(of: "'", with: "’")
+                .replacingOccurrences(of: #"\"#, with: #"\\"#)
+                .replacingOccurrences(of: #"\\/"#, with: #"\/"#)
+                ?? ""
+        }
+
+        let command = "\(pluginRunUrl.path) $'\(escape(inputString))' $'\(escape(plugin.data))'"
         if plugin.debug {
             let timestamp = Int(Date().timeIntervalSince1970)
             try command.data(using: .utf8)?.write(to: baseUrl.appendingPathComponent(filename + ".debug-\(timestamp)"))
