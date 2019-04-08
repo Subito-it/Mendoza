@@ -189,7 +189,7 @@ class Test {
                     op.logger.log(exception: opError.localizedDescription)
                 }
                 
-                print("\n💥 \(op.className.components(separatedBy: ".").last ?? op.className) did throw exception\n")
+                print("\n💥 \(op.className.components(separatedBy: ".").last ?? op.className) did throw exception, see session logs for details on what went wrong\n")
                 
                 self.tearDown(operations: operations, testSessionResult: testSessionResult, error: opError as? Error)
             }
