@@ -148,6 +148,18 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                 
                 continue
             }
+            guard !testDidFailBecauseOfDamagedBuild(in: output) else {
+                switch AddressType(address: executer.address) {
+                case .local:
+                    _ = try executer.execute("rm -rf '\(Path.build.rawValue)' || true")
+                    // To be improved
+                    throw Error("Tests failed because of damaged build folder, please try rerunning the build again")
+                case .remote:
+                    break
+                }
+                
+                break
+            }
             
             break
         }
@@ -252,5 +264,9 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
     
     private func testsDidFailBootstrapping(in output: String) -> Bool {
         return output.contains("Test runner exited before starting test execution")
+    }
+    
+    private func testDidFailBecauseOfDamagedBuild(in output: String) -> Bool {
+        return output.contains("The application may be damaged or incomplete")
     }
 }
