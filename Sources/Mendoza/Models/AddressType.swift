@@ -22,4 +22,8 @@ enum AddressType {
     init(node: Node) {
         self = AddressType.localAddresses.contains(node.address) ? .local : .remote
     }
+    
+    init(address: String) {
+        self = AddressType.localAddresses.contains(address) ? .local : .remote
+    }
 }
