@@ -83,8 +83,7 @@ extension CommandLineProxy {
             executer.logger?.addBlackList(appleIdCredentials.username)
             executer.logger?.addBlackList(appleIdCredentials.password)
             
-            let cmds = ["export PATH=/usr/bin:/usr/local/bin:/usr/sbin:/sbin:/bin",
-                        "export FASTLANE_USER=\(appleIdCredentials.username)",
+            let cmds = ["export FASTLANE_USER=\(appleIdCredentials.username)",
                         "export FASTLANE_PASSWORD=\(appleIdCredentials.password)",
                         "rm -f ~/Library/Caches/XcodeInstall/com.apple.pkg.iPhoneSimulatorSDK\(runtime.replacingOccurrences(of: ".", with: "_"))*.dmg",
                         "xcversion update",

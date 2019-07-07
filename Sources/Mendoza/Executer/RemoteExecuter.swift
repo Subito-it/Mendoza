@@ -81,7 +81,7 @@ final class RemoteExecuter: Executer {
         
         var result = (status: Int32(-999), output: "")
         do {
-            result = try connection.capture("\(cmd) 2>&1") { localProgress in
+            result = try connection.capture("\(RemoteExecuter.executablePathExport()) \(cmd) 2>&1") { localProgress in
                 progress?(localProgress)
             }
             

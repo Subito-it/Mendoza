@@ -82,9 +82,9 @@ private extension Process {
         
         logger?.log(command: cmd)
         
-        let exports = (environment ?? [:]).map({ k, v in "export \(k)=\(v)" }).joined(separator: "; ")
+        let exports = (environment ?? [:]).map({ k, v in "; export \(k)=\(v)" }).joined(separator: "; ")
                 
-        arguments = ["-c", "source ~/.bash_profile; shopt -s huponexit; \(exports)\(cmd) 2>&1"]
+        arguments = ["-c", "source ~/.bash_profile; shopt -s huponexit; \(LocalExecuter.executablePathExport()) \(exports)\(cmd) 2>&1"]
         
         let pipe = Pipe()
         standardOutput = pipe

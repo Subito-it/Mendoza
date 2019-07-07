@@ -27,6 +27,12 @@ protocol Executer {
     func terminate()
 }
 
+extension Executer {
+    static func executablePathExport() -> String {
+        return "export PATH=/usr/bin:/usr/local/bin:/usr/sbin:/sbin:/bin;"
+    }
+}
+
 // MARK: - Default parameters
 
 extension Executer {
