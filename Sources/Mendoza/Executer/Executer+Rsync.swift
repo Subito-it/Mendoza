@@ -26,7 +26,7 @@ extension Executer {
             username = user
         case .credentials(let user, let password):
             logger?.addBlackList(password)
-            rsyncCommand = "sshpass -p '\(password)'" + rsyncCommand
+            rsyncCommand = "sshpass -p '\(password)' " + rsyncCommand
             username = user
         case .none:
             fatalError("Unexpected localhost destination")
