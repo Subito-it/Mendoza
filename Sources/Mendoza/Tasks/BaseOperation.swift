@@ -107,7 +107,7 @@ class BaseOperation<Output: Any>: Operation, Starting, Ending, Throwing, LoggedO
 }
 
 enum Path: String, CaseIterable {
-    case base, build, testBundle, logs, temp
+    case base, build, testBundle, logs, results, temp
 
     var rawValue: String {
         switch self {
@@ -115,6 +115,7 @@ enum Path: String, CaseIterable {
         case .build: return Path.base.rawValue.appending("/build")
         case .testBundle: return Path.build.rawValue.appending("/Build/Products")
         case .logs: return Path.base.rawValue.appending("/logs")
+        case .results: return Path.base.rawValue.appending("/results")
         case .temp: return Path.base.rawValue.appending("/tmp")
         }
     }

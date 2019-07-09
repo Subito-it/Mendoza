@@ -30,7 +30,7 @@ class LocalSetupOperation: BaseOperation<Void> {
                 switch path {
                 case .base, .build:
                     break
-                case .logs, .temp, .testBundle:
+                case .logs, .temp, .testBundle, .results:
                     _ = try executer.execute("rm -rf '\(path.rawValue)' || true")
                 }
 
