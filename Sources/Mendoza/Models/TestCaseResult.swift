@@ -7,7 +7,7 @@
 
 import Foundation
 
-struct TestCaseResult: Codable, CustomStringConvertible {
+struct TestCaseResult: Codable, CustomStringConvertible, Hashable {
     enum Status: Int, Codable {
         case passed, failed
     }
