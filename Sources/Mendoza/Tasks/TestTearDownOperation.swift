@@ -32,6 +32,9 @@ class TestTearDownOperation: BaseOperation<Void> {
             
             guard let executer = executer else { fatalError("💣 Failed making executer") }
             
+            
+            try writeHtmlRepeatedTestResultSummary(executer: executer)
+            try writeJsonRepeatedTestResultSummary(executer: executer)
             try writeHtmlTestResultSummary(executer: executer)
             try writeJsonTestResultSummary(executer: executer)
             
@@ -48,8 +51,65 @@ class TestTearDownOperation: BaseOperation<Void> {
         super.cancel()
     }
     
-    private func writeHtmlTestResultSummary(executer: Executer) throws {
+    private func filterRetriedTestsFromCaseResults(_ testCaseResults: [TestCaseResult]?) -> [TestCaseResult]? {
+        guard let testCaseResults = testCaseResults else { return nil }
+        
+        var filteredTestCaseResults = [TestCaseResult]()
+        for (_, values) in Dictionary(grouping: testCaseResults, by: { "\($0.suite)_\($0.name)" }) {
+            guard let testCaseResult = values.first(where: { $0.status == .passed }) ?? values.first else { continue }
+            
+            filteredTestCaseResults.append(testCaseResult)
+        }
+        
+        return filteredTestCaseResults
+    }
+    
         guard let testCaseResults = testCaseResults else { return }
+    
+    private func writeHtmlRepeatedTestResultSummary(executer: Executer) throws {
+        guard let testCaseResults = testCaseResults else { return }
+        
+        let repeatedTestCases = Dictionary(grouping: testCaseResults, by: { "\($0.suite)_\($0.name)" }).filter { $1.count > 1 }.keys
+        
+        let destinationPath = "\(self.configuration.resultDestination.path)/\(self.timestamp)/\(Environment.htmlRepeatedTestSummaryFilename)"
+        
+        var content = "<h2>Result - repeated tests</h2>\n"
+        
+        for testCase in Array(repeatedTestCases).sorted() {
+            content += "<p class='failed'>\(testCase)</p>\n"
+        }
+        
+        let tempUrl = Path.temp.url.appendingPathComponent("\(UUID().uuidString).html")
+        
+        guard let contentData = TestCaseResult.html(content: content).data(using: .utf8) else {
+            throw Error("Failed writing html repeated test summary data")
+        }
+        
+        try contentData.write(to: tempUrl)
+        try executer.upload(localUrl: tempUrl, remotePath: destinationPath)
+    }
+    
+    private func writeJsonRepeatedTestResultSummary(executer: Executer) throws {
+        guard let testCaseResults = testCaseResults else { return }
+        
+        let repeatedTestCases = Dictionary(grouping: testCaseResults, by: { "\($0.suite)_\($0.name)" }).filter { $1.count > 1 }.keys
+        
+        let destinationPath = "\(self.configuration.resultDestination.path)/\(self.timestamp)/\(Environment.jsonRepeatedTestSummaryFilename)"
+        
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = .prettyPrinted
+        guard let contentData = try? encoder.encode(Array(repeatedTestCases).sorted()) else {
+            throw Error("Failed writing json repeated test summary data")
+        }
+        
+        let tempUrl = Path.temp.url.appendingPathComponent("\(UUID().uuidString).json")
+        
+        try contentData.write(to: tempUrl)
+        try executer.upload(localUrl: tempUrl, remotePath: destinationPath)
+    }
+
+    private func writeHtmlTestResultSummary(executer: Executer) throws {
+        guard let testCaseResults = filterRetriedTestsFromCaseResults(testCaseResults) else { return }
 
         let destinationPath = "\(self.configuration.resultDestination.path)/\(self.timestamp)/\(Environment.htmlTestSummaryFilename)"
 
@@ -75,7 +135,7 @@ class TestTearDownOperation: BaseOperation<Void> {
     }
     
     private func writeJsonTestResultSummary(executer: Executer) throws {
-        guard let testCaseResults = testCaseResults else { return }
+        guard let testCaseResults = filterRetriedTestsFromCaseResults(testCaseResults) else { return }
         
         let destinationPath = "\(self.configuration.resultDestination.path)/\(self.timestamp)/\(Environment.jsonTestSummaryFilename)"
 
