@@ -78,6 +78,8 @@ class Test {
     }
     
     private func makeOperations(gitStatus: GitStatus, testSessionResult: TestSessionResult, sdk: XcodeProject.SDK) throws -> [Operation & LoggedOperation] {
+        let retryFailingTestsIterations = 2
+        
         let configuration = userOptions.configuration
         let device = userOptions.device
         let filePatterns = userOptions.filePatterns
@@ -108,6 +110,13 @@ class Test {
         let simulatorWakeupOperation = SimulatorWakeupOperation(nodes: uniqueNodes)
         let distributeTestBundleOperation = DistributeTestBundleOperation(nodes: uniqueNodes)
         let testRunnerOperation = TestRunnerOperation(configuration: configuration, buildTarget: targets.build.name, testTarget: targets.test.name, sdk: sdk)
+        
+        var retryTestDistributionOperations = [TestDistributionOperation]()
+        var retryTestRunnerOperations = [TestRunnerOperation]()
+        for _ in 0..<retryFailingTestsIterations {
+            retryTestDistributionOperations.append(.init(device: device, plugin: testDistributionPlugin))
+            retryTestRunnerOperations.append(.init(configuration: configuration, buildTarget: targets.build.name, testTarget: targets.test.name, sdk: sdk))
+        }
         let testCollectorOperation = TestCollectorOperation(configuration: configuration, timestamp: timestamp, buildTarget: targets.build.name, testTarget: targets.test.name)
         let codeCoverageCollectionOperation = CodeCoverageCollectionOperation(configuration: configuration, baseUrl: gitBaseUrl, timestamp: timestamp)
         let testTearDownOperation = TestTearDownOperation(configuration: configuration, timestamp: timestamp)
@@ -134,7 +143,7 @@ class Test {
              testTearDownOperation,
              simulatorTearDownOperation,
              cleanupOperation,
-             tearDownOperation]
+             tearDownOperation] + retryTestDistributionOperations + retryTestRunnerOperations
         
         switch sdk {
         case .ios:
@@ -165,7 +174,15 @@ class Test {
         
         testRunnerOperation.addDependencies([simulatorWakeupOperation, distributeTestBundleOperation, testDistributionOperation])
         
-        testCollectorOperation.addDependency(testRunnerOperation)
+        var lastTestRunnerOperation = testRunnerOperation
+        for index in 0..<retryFailingTestsIterations {
+            retryTestDistributionOperations[index].addDependency(lastTestRunnerOperation)
+            retryTestRunnerOperations[index].addDependency(retryTestDistributionOperations[index])
+            
+            lastTestRunnerOperation = retryTestRunnerOperations[index]
+        }
+        
+        testCollectorOperation.addDependency(lastTestRunnerOperation)
         
         codeCoverageCollectionOperation.addDependency(testCollectorOperation)
         testTearDownOperation.addDependency(testCollectorOperation)
@@ -218,11 +235,18 @@ class Test {
         case .macos:
             testDistributionOperation.testRunnersCount = uniqueNodes.count
             testRunnerOperation.testRunners = uniqueNodes.map { (testRunner: $0, node: $0) }
+            
+            retryTestDistributionOperations.forEach { $0.testRunnersCount = testDistributionOperation.testRunnersCount }
+            retryTestRunnerOperations.forEach { $0.testRunners = testRunnerOperation.testRunners }
         case .ios:
             simulatorSetupOperation.didEnd = { simulators in
-                testDistributionOperation.testRunnersCount = simulators.count
                 simulatorBootOperation.simulators = simulators
+                
+                testDistributionOperation.testRunnersCount = simulators.count
                 testRunnerOperation.testRunners = simulators.map { (testRunner: $0.0, node: $0.1) }
+                
+                retryTestDistributionOperations.forEach { $0.testRunnersCount = testDistributionOperation.testRunnersCount }
+                retryTestRunnerOperations.forEach { $0.testRunners = testRunnerOperation.testRunners }
             }
         }
         
@@ -255,6 +279,39 @@ class Test {
             testCollectorOperation.testCaseResults = testCaseResults
             testTearDownOperation.testCaseResults = testCaseResults
             try? self.eventPlugin.run(event: Event(kind: .stopTesting, info: [:]), device: device)
+        }
+        
+        if retryFailingTestsIterations > 0 {
+            retryTestRunnerOperations.last?.didEnd = testRunnerOperation.didEnd
+            retryTestRunnerOperations.insert(testRunnerOperation, at: 0)
+            
+            for index in 0..<retryTestRunnerOperations.count {
+                retryTestRunnerOperations[index].didStart = { [unowned self] in
+                    if index > 0 {
+                        print("\nℹ️  Repeating failing tests\n".magenta)
+                    }
+                    
+                    try? self.eventPlugin.run(event: Event(kind: .startTesting, info: ["retry_indx": "\(index)"]), device: device)
+                }
+            }
+            for index in 0..<retryTestRunnerOperations.count - 1 {
+                retryTestRunnerOperations[index].didEnd = { [unowned self] testCaseResults in
+                    let failingTestCases = testCaseResults.filter { $0.status == .failed }.map { TestCase(name: $0.name, suite: $0.suite) }
+                    retryTestDistributionOperations[index].testCases = failingTestCases
+                    
+                    for index2 in index + 1..<retryTestRunnerOperations.count {
+                        retryTestRunnerOperations[index2].currentResult = testCaseResults
+                    }
+                    
+                    try? self.eventPlugin.run(event: Event(kind: .stopTesting, info: ["retry_indx": "\(index)"]), device: device)
+                }
+            }
+            assert(retryTestDistributionOperations.count == retryTestRunnerOperations.count - 1, "💣 Wrong sizing")
+            for index in 0..<retryTestDistributionOperations.count {
+                retryTestDistributionOperations[index].didEnd = { distributedTestCases in
+                    retryTestRunnerOperations[index + 1].distributedTestCases = distributedTestCases
+                }
+            }
         }
         
         tearDownOperation.didStart = { [unowned tearDownOperation] in
