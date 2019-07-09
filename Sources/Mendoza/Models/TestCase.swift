@@ -7,7 +7,7 @@
 
 import Foundation
 
-struct TestCase: Codable {
+struct TestCase: Codable, Hashable {
     let name: String
     let suite: String
     

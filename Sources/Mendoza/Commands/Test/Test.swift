@@ -297,7 +297,7 @@ class Test {
             for index in 0..<retryTestRunnerOperations.count - 1 {
                 retryTestRunnerOperations[index].didEnd = { [unowned self] testCaseResults in
                     let failingTestCases = testCaseResults.filter { $0.status == .failed }.map { TestCase(name: $0.name, suite: $0.suite) }
-                    retryTestDistributionOperations[index].testCases = failingTestCases
+                    retryTestDistributionOperations[index].testCases = Array(Set(failingTestCases))
                     
                     for index2 in index + 1..<retryTestRunnerOperations.count {
                         retryTestRunnerOperations[index2].currentResult = testCaseResults
