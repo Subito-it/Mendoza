@@ -51,6 +51,7 @@ final class LocalExecuter: Executer {
         return fileManager.fileExists(atPath: atPath)
     }
     
+    // When it throws check that remotePath exists
     func download(remotePath: String, localUrl: URL) throws {
         logger?.log(command: "Copying `\(remotePath)` -> `\(localUrl.path)`")
         defer { logger?.log(output: "done", statusCode: 0) }
