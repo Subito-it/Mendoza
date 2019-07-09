@@ -33,7 +33,6 @@ class TestCollectorOperation: BaseOperation<Void> {
             
             let destinationNode = configuration.resultDestination.node
             
-            let logPath = "\(Path.logs.rawValue)/*"
             let destinationPath = "\(self.configuration.resultDestination.path)/\(self.timestamp)"
             
             guard let testCaseResults = testCaseResults else { fatalError("💣 Required field `testCaseResults` not set") }
@@ -44,8 +43,11 @@ class TestCollectorOperation: BaseOperation<Void> {
                     return
                 }
                 
+                let logPath = "\(Path.logs.rawValue)/*"
                 try executer.rsync(sourcePath: logPath, destinationPath: destinationPath, on: destinationNode)
-                
+                let resultsPath = "\(Path.results.rawValue)/*"
+                try executer.rsync(sourcePath: resultsPath, destinationPath: destinationPath, on: destinationNode)
+
                 try self.clearDiagnosticReports(executer: executer)
             }
             

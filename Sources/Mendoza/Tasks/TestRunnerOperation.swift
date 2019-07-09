@@ -62,20 +62,26 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                 
                 let output = try self.testWithoutBuilding(executer: executer, testCases: testCases, testRunner: testRunner)
                 
-                let summaryPlistUrls = try self.findTestSummaryPlistUrl(executer: executer, testRunner: testRunner)
+                let xcResultUrl = try self.findTestResultUrl(executer: executer, testRunner: testRunner)
                 
-                for summaryPlistUrl in summaryPlistUrls {
-                    let testResults = try self.parseTestResults(output, candidates: testCases, node: source.node.address, summaryPlistPath: summaryPlistUrl.path)
-                    self.syncQueue.sync { result += testResults }
-                    
-                    try self.copyDiagnosticReports(executer: executer, summaryPlistUrl: summaryPlistUrl, testRunner: testRunner)
-                }
+                // We need to move results for 2 reasons that occurr when retrying to execute failing tests
+                // 1. to ensure that findTestSummariesUrl only finds 1 result
+                // 2. xcodebuild test-without-building shows a weird behaviour not allowing more than 2 xcresults in the same folder. Repeatedly performing 'xcodebuild test-without-building' results in older xcresults being deleted
+                let resultUrl = Path.results.url.appendingPathComponent(testRunner.id)
+                try executer.capture("mkdir -p '\(resultUrl.path)'; mv '\(xcResultUrl.path)' '\(resultUrl.path)'")
+                
+                let basePath = resultUrl.appendingPathComponent(xcResultUrl.lastPathComponent).path
+                let summaryPlistUrl = try self.findTestSummariesUrl(executer: executer, basePath: basePath)
+                
+                let testResults = try self.parseTestResults(output, candidates: testCases, node: source.node.address, summaryPlistPath: summaryPlistUrl.path)
+                self.syncQueue.sync { result += testResults }
 
+                try self.copyDiagnosticReports(executer: executer, summaryPlistUrl: summaryPlistUrl, testRunner: testRunner)
                 try self.copyStandardOutputLogs(executer: executer, testRunner: testRunner)
                 try self.copySessionLogs(executer: executer, testRunner: testRunner)
-                
+
                 try self.reclaimDiskSpace(executer: executer, testRunner: testRunner)
-                
+
                 #if DEBUG
                     print("ℹ️  Node \(source.node.address) did execute tests on \(testRunner.name)".magenta)
                 #endif
@@ -182,12 +188,21 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
         return testRun
     }
     
-    private func findTestSummaryPlistUrl(executer: Executer, testRunner: TestRunner) throws -> [URL] {
+    private func findTestResultUrl(executer: Executer, testRunner: TestRunner) throws -> URL {
         let resultPath = Path.logs.url.appendingPathComponent(testRunner.id).path
-        let testResults = try executer.execute("find '\(resultPath)' -type f -name 'TestSummaries.plist'").components(separatedBy: "\n")
-        guard testResults.count > 0 else { throw Error("No test result found", logger: executer.logger) }
+        let testResults = try executer.execute("find '\(resultPath)' -type d -name '*.xcresult'").components(separatedBy: "\n")
+        guard let testResult = testResults.first, testResult.count > 0 else { throw Error("No test result found", logger: executer.logger) }
+        guard testResults.count == 1 else { throw Error("Too many test results found", logger: executer.logger) }
+        
+        return URL(fileURLWithPath: testResult)
+    }
     
-        return testResults.map { URL(fileURLWithPath: $0) }
+    private func findTestSummariesUrl(executer: Executer, basePath: String) throws -> URL {
+        let testResults = try executer.execute("find '\(basePath)' -type f -name 'TestSummaries.plist'").components(separatedBy: "\n")
+        guard let testResult = testResults.first, testResult.count > 0 else { throw Error("No test result found", logger: executer.logger) }
+        guard testResults.count == 1 else { throw Error("Too many test results found", logger: executer.logger) }
+        
+        return URL(fileURLWithPath: testResult)
     }
     
     private func copyDiagnosticReports(executer: Executer, summaryPlistUrl: URL, testRunner: TestRunner) throws {
@@ -226,7 +241,10 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
         var sourcePaths = try executer.execute("find \(testRunnerLogUrl.path) -type d -name 'Diagnostics'").components(separatedBy: "\n")
         sourcePaths = sourcePaths.filter { $0.contains(".xcresult/") }
         
-        try sourcePaths.forEach { _ = try executer.execute(#"rm -rf "\#($0)""#) }
+        try sourcePaths.forEach {
+            print(#"rm -rf "\#($0)"#)
+            _ = try executer.execute(#"rm -rf "\#($0)""#)
+        }
     }
 
     private func parseTestResults(_ output: String, candidates: [TestCase], node: String, summaryPlistPath: String) throws -> [TestCaseResult] {
@@ -240,7 +258,7 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                     let outputResult = try line.capturedGroups(withRegexString: #"(passed|failed) \((.*) seconds\)"#)
                     if outputResult.count == 2 {
                         let duration: Double = Double(outputResult[1]) ?? -1.0
-                        let plistPath = summaryPlistPath.replacingOccurrences(of: "\(Path.logs.rawValue)/", with: "")
+                        let plistPath = summaryPlistPath.replacingOccurrences(of: "\(Path.results.rawValue)/", with: "")
                         let testCaseResults = TestCaseResult(node: node, summaryPlistPath: plistPath, suite: candidate.suite, name: candidate.name, status: outputResult[0] == "passed" ? .passed : .failed, duration: duration)
                         result.append(testCaseResults)
                         mCandidates.remove(at: index)
