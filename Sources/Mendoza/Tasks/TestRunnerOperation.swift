@@ -53,6 +53,11 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                 didEnd?(result)
                 return
             }
+            
+            if result.count > 0 {
+                print("\nℹ️  Repeating failing tests\n".magenta)
+            }
+
             try pool.execute { [unowned self] (executer, source) in
                 let testRunner = source.value.0
                 let testCases = source.value.1

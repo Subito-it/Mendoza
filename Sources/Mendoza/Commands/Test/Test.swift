@@ -284,11 +284,7 @@ class Test {
             retryTestRunnerOperations.insert(testRunnerOperation, at: 0)
             
             for index in 0..<retryTestRunnerOperations.count {
-                retryTestRunnerOperations[index].didStart = { [unowned self] in
-                    if index > 0 {
-                        print("\nℹ️  Repeating failing tests\n".magenta)
-                    }
-                    
+                retryTestRunnerOperations[index].didStart = { [unowned self] in                    
                     try? self.eventPlugin.run(event: Event(kind: .startTesting, info: ["retry_indx": "\(index)"]), device: device)
                 }
             }
