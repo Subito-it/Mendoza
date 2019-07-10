@@ -181,7 +181,7 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
     private func findTestRun(executer: Executer) throws -> String {
         let testBundlePath = Path.testBundle.rawValue
         
-        let testRuns = try executer.execute("find '\(testBundlePath)' -type f -name '*.xctestrun'").components(separatedBy: "\n")
+        let testRuns = try executer.execute("find '\(testBundlePath)' -type f -name '\(configuration.scheme)*.xctestrun'").components(separatedBy: "\n")
         guard let testRun = testRuns.first, testRun.count > 0 else { throw Error("No test bundle found", logger: executer.logger) }
         guard testRuns.count == 1 else { throw Error("Too many xctestrun bundles found:\n\(testRuns)", logger: executer.logger) }
 
