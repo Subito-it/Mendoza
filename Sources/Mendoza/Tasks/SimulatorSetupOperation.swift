@@ -146,7 +146,7 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
             executer.logger?.log(output: "", statusCode: 0)
             
             #if DEBUG
-                print("🔎 Arranging simulator \(simulator.id) on \(executer.address) at location (\(center))".bold)
+                print("⚠️ Arranging simulator \(simulator.id) on \(executer.address) at location (\(center))".bold)
             #endif
         }
         
