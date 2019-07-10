@@ -32,6 +32,7 @@ class TestTearDownOperation: BaseOperation<Void> {
             
             guard let executer = executer else { fatalError("💣 Failed making executer") }
             
+            try cleanupRetriedTestsFromTestResultSummary(executer: executer)
             
             try writeHtmlRepeatedTestResultSummary(executer: executer)
             try writeJsonRepeatedTestResultSummary(executer: executer)
@@ -64,7 +65,69 @@ class TestTearDownOperation: BaseOperation<Void> {
         return filteredTestCaseResults
     }
     
+    private func cleanupRetriedTestsFromTestResultSummary(executer: Executer) throws {
         guard let testCaseResults = testCaseResults else { return }
+        
+        let repeatedTestCases = Dictionary(grouping: testCaseResults, by: { "\($0.suite)_\($0.name)" }).filter { $1.count > 1 }.values
+        
+        guard repeatedTestCases.count > 0 else { return }
+        
+        let uniquePlistTestCases = Dictionary(grouping: testCaseResults, by: { $0.summaryPlistPath }).values.compactMap { $0.first }
+        
+        var testsToDelete = [TestCaseResult]()
+        
+        for repeatedTestCase in repeatedTestCases {
+            guard let testToKeep = (repeatedTestCase.first { $0.status == .passed } ?? repeatedTestCase.first) else { continue }
+            
+            testsToDelete += repeatedTestCase.filter { $0 != testToKeep }
+        }
+
+        for uniquePlistTestCase in uniquePlistTestCases {
+            let tempUrl = Path.temp.url.appendingPathComponent("\(UUID().uuidString).plist")
+            
+            let remotePath = "\(self.configuration.resultDestination.path)/\(self.timestamp)/\(uniquePlistTestCase.summaryPlistPath)"
+            
+            try executer.download(remotePath: remotePath, localUrl: tempUrl)
+            
+            guard let tempUrlContent = try? Data(contentsOf: tempUrl) else {
+                throw Error("Failed copying \(remotePath) to \(tempUrl.absoluteString)")
+            }
+
+            guard var testResultDictionary = (try? PropertyListSerialization.propertyList(from: tempUrlContent, options: .mutableContainers, format: nil) as? [String: Any]) else {
+                throw Error("Failed decoding \(tempUrl.absoluteString)")
+            }
+
+            for testToDelete in testsToDelete {
+                guard testToDelete.summaryPlistPath == uniquePlistTestCase.summaryPlistPath else { continue }
+
+                let keyPath = testResultDictionary.firstKeyPath { key, value in
+                    return key.hasSuffix("TestIdentifier") && (value as? String) == "\(testToDelete.suite)/\(testToDelete.name)()"
+                }
+                
+                var segments = keyPath.components(separatedBy: ".").dropLast()
+                
+                let durationKeyPath = segments.joined(separator: ".") + ".Duration"
+                let removedDuration = testResultDictionary[keyPath: durationKeyPath] as? Double
+                testResultDictionary[keyPath: segments.joined(separator: ".")] = nil
+                
+                if let removedDuration = removedDuration {
+                    while segments.count > 0 {
+                        segments = segments.dropLast(2)
+                        
+                        let durationKeyPath = segments.joined(separator: ".") + ".Duration"
+                        guard let duration = testResultDictionary[keyPath: durationKeyPath] as? Double else { break }
+                        
+                        testResultDictionary[keyPath: durationKeyPath] = duration - removedDuration
+                    }
+                }
+            }
+            
+            let data = try PropertyListSerialization.data(fromPropertyList: testResultDictionary, format: .xml, options: 0)
+            try data.write(to: tempUrl)
+            
+            try executer.upload(localUrl: tempUrl, remotePath: remotePath)
+        }
+    }
     
     private func writeHtmlRepeatedTestResultSummary(executer: Executer) throws {
         guard let testCaseResults = testCaseResults else { return }
