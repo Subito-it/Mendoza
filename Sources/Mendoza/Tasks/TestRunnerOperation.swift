@@ -64,14 +64,19 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                 let testRunner = source.value.0
                 let testCases = source.value.1
                 
+                var runnerIndex = 0
+                self.syncQueue.sync { [unowned self] in
+                    runnerIndex = self.testRunners?.firstIndex { $0.0.id == testRunner.id && $0.0.name == testRunner.name } ?? 0
+                }
+                
                 guard testCases.count > 0 else { return }
                 
-                print("ℹ️  Node \(source.node.address) will execute \(testCases.count) tests on \(testRunner.name)".magenta)
+                print("ℹ️  Node \(source.node.address) will execute \(testCases.count) tests on \(testRunner.name) {\(runnerIndex)}".magenta)
                 
                 executer.logger?.log(command: "Will launch \(testCases.count) test cases")
                 executer.logger?.log(output: testCases.map { $0.testIdentifier }.joined(separator: "\n"), statusCode: 0)
                 
-                let output = try self.testWithoutBuilding(executer: executer, testCases: testCases, testRunner: testRunner)
+                let output = try self.testWithoutBuilding(executer: executer, testCases: testCases, testRunner: testRunner, runnerIndex: runnerIndex)
                 
                 let xcResultUrl = try self.findTestResultUrl(executer: executer, testRunner: testRunner)
                 
@@ -118,7 +123,7 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
         super.cancel()
     }
     
-    private func testWithoutBuilding(executer: Executer, testCases: [TestCase], testRunner: TestRunner) throws -> String {
+    private func testWithoutBuilding(executer: Executer, testCases: [TestCase], testRunner: TestRunner, runnerIndex: Int) throws -> String {
         let testRun = try findTestRun(executer: executer)
         let onlyTesting = testCases.map { "-only-testing:\(configuration.scheme)/\($0.testIdentifier)" }.joined(separator: " ")
         let destinationPath = Path.logs.url.appendingPathComponent(testRunner.id).path
@@ -145,9 +150,9 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                         self.completedCount += 1
                         
                         if tests[1] == "passed" {
-                            print("✓ \(tests[0]) passed [\(self.completedCount)/\(self.testCasesCount)]".green)
+                            print("✓ \(tests[0]) passed [\(self.completedCount)/\(self.testCasesCount)] {\(runnerIndex)}".green)
                         } else {
-                            print("𝘅 \(tests[0]) failed [\(self.completedCount)/\(self.testCasesCount)]".red)
+                            print("𝘅 \(tests[0]) failed [\(self.completedCount)/\(self.testCasesCount)] {\(runnerIndex)}".red)
                         }
                     }
                 }
@@ -157,7 +162,7 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                     self.syncQueue.sync { [unowned self] in
                         self.completedCount += 1
                         
-                        print("𝘅 \(tests[0]) \(tests[1]) failed [\(self.completedCount)/\(self.testCasesCount)]".red)
+                        print("𝘅 \(tests[0]) \(tests[1]) failed [\(self.completedCount)/\(self.testCasesCount)] {\(runnerIndex)}".red)
                     }
                 }
             }
