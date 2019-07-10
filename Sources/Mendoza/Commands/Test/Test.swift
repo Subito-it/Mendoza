@@ -258,7 +258,7 @@ class Test {
         testRunnerOperation.didEnd = { [unowned self] testCaseResults in
             self.syncQueue.sync {
                 testSessionResult.passedTests = testCaseResults.filter { $0.status == .passed }
-                testSessionResult.failedTests = testCaseResults.filter { $0.status == .failed }
+                testSessionResult.failedTests = testCaseResults.filter { $0.status == .failed && testSessionResult.passedTests.contains($0) }
             
                 let nodes = Set(testCaseResults.map { $0.node })
                 for node in nodes {
@@ -290,8 +290,10 @@ class Test {
             }
             for index in 0..<retryTestRunnerOperations.count - 1 {
                 retryTestRunnerOperations[index].didEnd = { [unowned self] testCaseResults in
-                    let failingTestCases = testCaseResults.filter { $0.status == .failed }.map { TestCase(name: $0.name, suite: $0.suite) }
-                    retryTestDistributionOperations[index].testCases = Array(Set(failingTestCases))
+                    let failingGroups = Dictionary(grouping: testCaseResults, by: { "\($0.suite)/\($0.name)" }).values.filter { $0.allSatisfy { $0.status == .failed }}
+                    
+                    let failingTestCases = failingGroups.compactMap { $0.first }.map { TestCase(name: $0.name, suite: $0.suite) }
+                    retryTestDistributionOperations[index].testCases = failingTestCases
                     
                     for index2 in index + 1..<retryTestRunnerOperations.count {
                         retryTestRunnerOperations[index2].currentResult = testCaseResults
