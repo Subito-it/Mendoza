@@ -84,6 +84,13 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                 let basePath = resultUrl.appendingPathComponent(xcResultUrl.lastPathComponent).path
                 let summaryPlistUrl = try self.findTestSummariesUrl(executer: executer, basePath: basePath)
                 
+                if self.verbose {
+                    print("[⚠️ Candidates for \(summaryPlistUrl.path) on node \(source.node.address)\n\(testCases)\n")
+                    if output.contains("Restarting after unexpected exit or crash") {
+                        print("⚠️ Seems to contain a crash!")
+                    }
+                }
+                
                 let testResults = try self.parseTestResults(output, candidates: testCases, node: source.node.address, summaryPlistPath: summaryPlistUrl.path)
                 self.syncQueue.sync { result += testResults }
 
@@ -93,9 +100,9 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
 
                 try self.reclaimDiskSpace(executer: executer, testRunner: testRunner)
 
-                #if DEBUG
-                    print("ℹ️  Node \(source.node.address) did execute tests on \(testRunner.name)".magenta)
-                #endif
+                if self.verbose {
+                    print("⚠️  Node \(source.node.address) did execute tests on \(testRunner.name)".magenta)
+                }
             }
             
             didEnd?(result)
@@ -301,9 +308,9 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
         
         if mCandidates.count > 0 {
             let missingTestCases = mCandidates.map { $0.testIdentifier }.joined(separator: ", ")
-            #if DEBUG
+            if verbose {
                 print("⚠️  did not find test results for `\(missingTestCases)`")
-            #endif
+            }
         }
         
         return result
