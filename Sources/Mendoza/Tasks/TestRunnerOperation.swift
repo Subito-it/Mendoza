@@ -24,6 +24,7 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
     private let testTarget: String
     private let sdk: XcodeProject.SDK
     private let syncQueue = DispatchQueue(label: String(describing: TestRunnerOperation.self))
+    private let verbose: Bool
     
     private lazy var pool: ConnectionPool<(TestRunner, [TestCase])> = {
         guard let distributedTestCases = distributedTestCases else { fatalError("💣 Required field `distributedTestCases` not set") }
@@ -34,11 +35,12 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
         return makeConnectionPool(sources: input.map { (node: $0.0.node, value: ($0.0.testRunner, $0.1)) })
     }()
     
-    init(configuration: Configuration, buildTarget: String, testTarget: String, sdk: XcodeProject.SDK) {
+    init(configuration: Configuration, buildTarget: String, testTarget: String, sdk: XcodeProject.SDK, verbose: Bool) {
         self.configuration = configuration
         self.buildTarget = buildTarget
         self.testTarget = testTarget
         self.sdk = sdk
+        self.verbose = verbose
     }
     
     override func main() {

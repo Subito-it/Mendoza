@@ -10,7 +10,7 @@ import Foundation
 class Test {
     var didFail: ((Swift.Error) -> Void)?
     
-    private let userOptions: (configuration: Configuration, device: Device, filePatterns: FilePatterns, timeoutMinutes: Int, failingTestsRetryCount: Int, dispatchOnLocalHost: Bool)
+    private let userOptions: (configuration: Configuration, device: Device, filePatterns: FilePatterns, timeoutMinutes: Int, failingTestsRetryCount: Int, dispatchOnLocalHost: Bool, verbose: Bool)
     private let plugin: (data: String?, debug: Bool)
     private let eventPlugin: EventPlugin
     private let pluginUrl: URL
@@ -18,7 +18,7 @@ class Test {
     private let timestamp: String
     private var observers = [NSKeyValueObservation]()
     
-    init(configurationUrl: URL, device: Device, filePatterns: FilePatterns, timeoutMinutes: Int, failingTestsRetryCount: Int, dispatchOnLocalHost: Bool, pluginData: String?, debugPlugins: Bool) throws {
+    init(configurationUrl: URL, device: Device, filePatterns: FilePatterns, timeoutMinutes: Int, failingTestsRetryCount: Int, dispatchOnLocalHost: Bool, pluginData: String?, debugPlugins: Bool, verbose: Bool) throws {
         self.plugin = (data: pluginData, debug: debugPlugins)
         
         let configurationData = try Data(contentsOf: configurationUrl)
@@ -30,7 +30,7 @@ class Test {
             configuration = updatedConfiguration
         }
         
-        self.userOptions = (configuration: configuration, device: device, filePatterns: filePatterns, timeoutMinutes: timeoutMinutes, failingTestsRetryCount: failingTestsRetryCount, dispatchOnLocalHost: dispatchOnLocalHost)
+        self.userOptions = (configuration: configuration, device: device, filePatterns: filePatterns, timeoutMinutes: timeoutMinutes, failingTestsRetryCount: failingTestsRetryCount, dispatchOnLocalHost: dispatchOnLocalHost, verbose: verbose)
         
         self.pluginUrl = configurationUrl.deletingLastPathComponent()
         self.eventPlugin = EventPlugin(baseUrl: pluginUrl, plugin: plugin)
@@ -107,13 +107,13 @@ class Test {
         let simulatorBootOperation = SimulatorBootOperation()
         let simulatorWakeupOperation = SimulatorWakeupOperation(nodes: uniqueNodes)
         let distributeTestBundleOperation = DistributeTestBundleOperation(nodes: uniqueNodes)
-        let testRunnerOperation = TestRunnerOperation(configuration: configuration, buildTarget: targets.build.name, testTarget: targets.test.name, sdk: sdk)
+        let testRunnerOperation = TestRunnerOperation(configuration: configuration, buildTarget: targets.build.name, testTarget: targets.test.name, sdk: sdk, verbose: userOptions.verbose)
         
         var retryTestDistributionOperations = [TestDistributionOperation]()
         var retryTestRunnerOperations = [TestRunnerOperation]()
         for _ in 0..<userOptions.failingTestsRetryCount {
             retryTestDistributionOperations.append(.init(device: device, plugin: testDistributionPlugin))
-            retryTestRunnerOperations.append(.init(configuration: configuration, buildTarget: targets.build.name, testTarget: targets.test.name, sdk: sdk))
+            retryTestRunnerOperations.append(.init(configuration: configuration, buildTarget: targets.build.name, testTarget: targets.test.name, sdk: sdk, verbose: userOptions.verbose))
         }
         let testCollectorOperation = TestCollectorOperation(configuration: configuration, timestamp: timestamp, buildTarget: targets.build.name, testTarget: targets.test.name)
         let codeCoverageCollectionOperation = CodeCoverageCollectionOperation(configuration: configuration, baseUrl: gitBaseUrl, timestamp: timestamp)

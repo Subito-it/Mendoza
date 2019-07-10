@@ -15,6 +15,7 @@ class TestCommand: Command {
     
     let debugPluginsFlag = Flag(short: nil, long: "plugin_debug", help: "Dump plugin invocation commands")
     let dispatchOnLocalHostFlag = Flag(short: "l", long: "use_localhost", help: "Distribute tests on localhost as well")
+    let verboseFlag = Flag(short: nil, long: "verbose", help: "Dump debug messages")
     
     let configurationPathField = Argument<URL>(name: "configuration_file", kind: .positional, optional: false, help: "Mendoza's configuration file path", autocomplete: .files("json"))
     let includePatternField = Argument<String>(name: "files", kind: .named(short: "f", long: "include_files"), optional: true, help: "Specify from which files UI tests should be extracted. Accepts wildcards and comma separated. e.g SBTA*.swift,SBTF*.swift. Default: '*.swift'", autocomplete: .files("swift"))
@@ -44,7 +45,8 @@ class TestCommand: Command {
                                 failingTestsRetryCount: failingTestsRetryCount,
                                 dispatchOnLocalHost: dispatchOnLocalHostFlag.value,
                                 pluginData: pluginCustomField.value,
-                                debugPlugins: debugPluginsFlag.value)
+                                debugPlugins: debugPluginsFlag.value,
+                                verbose: verboseFlag.value)
             
             test.didFail = { [weak self] in self?.handleError($0) }
             try test.run()
