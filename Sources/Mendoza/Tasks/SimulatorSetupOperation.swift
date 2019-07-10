@@ -14,14 +14,16 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
     private let configuration: Configuration
     private let nodes: [Node]
     private let device: Device
+    private let verbose: Bool
     private lazy var pool: ConnectionPool = {
         return makeConnectionPool(sources: nodes)
     }()
     
-    init(configuration: Configuration, nodes: [Node], device: Device) {
+    init(configuration: Configuration, nodes: [Node], device: Device, verbose: Bool) {
         self.nodes = nodes
         self.configuration = configuration
         self.device = device
+        self.verbose = verbose
     }
     
     override func main() {
@@ -35,7 +37,7 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
             try pool.execute { (executer, source) in
                 let node = source.node
                 
-                let proxy = CommandLineProxy.Simulators(executer: executer)
+                let proxy = CommandLineProxy.Simulators(executer: executer, verbose: self.verbose)
 
                 try proxy.reset()
                 try proxy.installRuntimeIfNeeded(self.device.runtime, nodeAddress: node.address, appleIdCredentials: appleIdCredentials, administratorPassword: node.administratorPassword ?? nil)
@@ -93,7 +95,7 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
     /// - Parameters:
     ///   - param1: simulators to arrange
     private func updateSimulatorsArrangement(executer: Executer, simulators: [Simulator]) throws {
-        let simulatorProxy = CommandLineProxy.Simulators(executer: executer)
+        let simulatorProxy = CommandLineProxy.Simulators(executer: executer, verbose: verbose)
         
         let settings = try simulatorProxy.fetchSimulatorSettings()
         guard let screenConfiguration = settings.ScreenConfigurations

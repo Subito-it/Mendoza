@@ -103,9 +103,9 @@ class Test {
         let compileOperation = CompileOperation(configuration: configuration, baseUrl: gitBaseUrl, project: project, scheme: configuration.scheme, preCompilationPlugin: preCompilationPlugin, postCompilationPlugin: postCompilationPlugin, sdk: sdk)
         let testExtractionOperation = TestExtractionOperation(configuration: configuration, baseUrl: gitBaseUrl, testTargetSourceFiles: testTargetSourceFiles, filePatterns: filePatterns, device: device, plugin: testExtractionPlugin)
         let testDistributionOperation = TestDistributionOperation(device: device, plugin: testDistributionPlugin)
-        let simulatorSetupOperation = SimulatorSetupOperation(configuration: configuration, nodes: uniqueNodes, device: device)
-        let simulatorBootOperation = SimulatorBootOperation()
-        let simulatorWakeupOperation = SimulatorWakeupOperation(nodes: uniqueNodes)
+        let simulatorSetupOperation = SimulatorSetupOperation(configuration: configuration, nodes: uniqueNodes, device: device, verbose: userOptions.verbose)
+        let simulatorBootOperation = SimulatorBootOperation(verbose: userOptions.verbose)
+        let simulatorWakeupOperation = SimulatorWakeupOperation(nodes: uniqueNodes, verbose: userOptions.verbose)
         let distributeTestBundleOperation = DistributeTestBundleOperation(nodes: uniqueNodes)
         let testRunnerOperation = TestRunnerOperation(configuration: configuration, buildTarget: targets.build.name, testTarget: targets.test.name, sdk: sdk, verbose: userOptions.verbose)
         
@@ -119,7 +119,7 @@ class Test {
         let codeCoverageCollectionOperation = CodeCoverageCollectionOperation(configuration: configuration, baseUrl: gitBaseUrl, timestamp: timestamp)
         let testTearDownOperation = TestTearDownOperation(configuration: configuration, timestamp: timestamp)
         let cleanupOperation = CleanupOperation(configuration: configuration, timestamp: timestamp)
-        let simulatorTearDownOperation = SimulatorTearDownOperation(configuration: configuration, nodes: uniqueNodes)
+        let simulatorTearDownOperation = SimulatorTearDownOperation(configuration: configuration, nodes: uniqueNodes, verbose: userOptions.verbose)
         let tearDownOperation = TearDownOperation(configuration: configuration, plugin: tearDownPlugin)
         
         let operations: [Operation & LoggedOperation] =

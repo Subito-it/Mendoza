@@ -12,9 +12,11 @@ extension CommandLineProxy {
         var settingsPath: String { return "\(executer.homePath)/Library/Preferences/com.apple.iphonesimulator.plist" }
         
         private var executer: Executer
+        private let verbose: Bool
         
-        init(executer: Executer) {
+        init(executer: Executer, verbose: Bool) {
             self.executer = executer
+            self.verbose = verbose
         }
         
         func wakeUp() throws {
@@ -216,7 +218,7 @@ extension CommandLineProxy {
             }
             
             if settings?.ScreenConfigurations?.keys.count == 0 {
-                try CommandLineProxy.Simulators(executer: executer).forceSettingsRewrite()
+                try CommandLineProxy.Simulators(executer: executer, verbose: verbose).forceSettingsRewrite()
                 settings = try? loadSettings()
                 
                 if settings?.ScreenConfigurations?.keys.count == 0 {
@@ -247,7 +249,7 @@ extension CommandLineProxy {
         private func waitForBoot(executer: Executer, simulator: Simulator) throws {
             let logPath = "\(Path.temp.rawValue)/boot_\(simulator.id)"
             let pidPath = "\(Path.temp.rawValue)/pid_\(simulator.id)"
-            let timeout = 60
+            let timeout = 5
             
             Thread.sleep(forTimeInterval: 1.0)
             
@@ -267,7 +269,7 @@ extension CommandLineProxy {
                 Thread.sleep(forTimeInterval: 1.0)
             }
             
-            if !didFoundBootKeyword {
+            if !didFoundBootKeyword && verbose {
                 print("⚠️  did not find boot keywork in time")
             }
             

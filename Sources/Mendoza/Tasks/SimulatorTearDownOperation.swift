@@ -10,13 +10,15 @@ import Foundation
 class SimulatorTearDownOperation: BaseOperation<Void> {
     private let configuration: Configuration
     private let nodes: [Node]
+    private let verbose: Bool
     private lazy var pool: ConnectionPool = {
         return makeConnectionPool(sources: nodes)
     }()
     
-    init(configuration: Configuration, nodes: [Node]) {
+    init(configuration: Configuration, nodes: [Node], verbose: Bool) {
         self.configuration = configuration
         self.nodes = nodes
+        self.verbose = verbose
     }
     
     override func main() {
@@ -26,7 +28,7 @@ class SimulatorTearDownOperation: BaseOperation<Void> {
             didStart?()
             
             try pool.execute { (executer, source) in
-                let proxy = CommandLineProxy.Simulators(executer: executer)
+                let proxy = CommandLineProxy.Simulators(executer: executer, verbose: self.verbose)
                 
                 let bootedSimulators = try proxy.bootedSimulators()
                 for simulator in bootedSimulators {

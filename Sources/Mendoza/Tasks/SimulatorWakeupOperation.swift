@@ -9,12 +9,14 @@ import Foundation
 
 class SimulatorWakeupOperation: BaseOperation<Void> {
     private let nodes: [Node]
+    private let verbose: Bool
     private lazy var pool: ConnectionPool = {
         return makeConnectionPool(sources: nodes)
     }()
     
-    init(nodes: [Node]) {
+    init(nodes: [Node], verbose: Bool) {
         self.nodes = nodes
+        self.verbose = verbose
     }
     
     override func main() {
@@ -24,7 +26,7 @@ class SimulatorWakeupOperation: BaseOperation<Void> {
             didStart?()
             
             try pool.execute { (executer, node) in
-                let simulators = CommandLineProxy.Simulators(executer: executer)
+                let simulators = CommandLineProxy.Simulators(executer: executer, verbose: self.verbose)
                 try simulators.wakeUp()
             }
             
