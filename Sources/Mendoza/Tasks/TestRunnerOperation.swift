@@ -77,7 +77,7 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                 // 1. to ensure that findTestSummariesUrl only finds 1 result
                 // 2. xcodebuild test-without-building shows a weird behaviour not allowing more than 2 xcresults in the same folder. Repeatedly performing 'xcodebuild test-without-building' results in older xcresults being deleted
                 let resultUrl = Path.results.url.appendingPathComponent(testRunner.id)
-                try executer.capture("mkdir -p '\(resultUrl.path)'; mv '\(xcResultUrl.path)' '\(resultUrl.path)'")
+                _ = try executer.capture("mkdir -p '\(resultUrl.path)'; mv '\(xcResultUrl.path)' '\(resultUrl.path)'")
                 
                 let basePath = resultUrl.appendingPathComponent(xcResultUrl.lastPathComponent).path
                 let summaryPlistUrl = try self.findTestSummariesUrl(executer: executer, basePath: basePath)
@@ -143,7 +143,7 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                     }
                 }
                 
-                let crashRegex = #"Restarting after unexpected exit or crash in (.*)/(.*)\(\); summary will include totals from previous launches."#
+                let crashRegex = #"Restarting after unexpected exit or crash in (.*)/(.*)"#
                 if let tests = try? line.capturedGroups(withRegexString: crashRegex), tests.count == 2 {
                     self.syncQueue.sync { [unowned self] in
                         self.completedCount += 1
@@ -268,6 +268,8 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
     private func parseTestResults(_ output: String, candidates: [TestCase], node: String, summaryPlistPath: String) throws -> [TestCaseResult] {
         let filteredOutput = output.components(separatedBy: "\n").filter { $0.hasPrefix("Test Case") }
 
+        let plistPath = summaryPlistPath.replacingOccurrences(of: "\(Path.results.rawValue)/", with: "")
+        
         var result = [TestCaseResult]()
         var mCandidates = candidates
         for line in filteredOutput {
@@ -276,12 +278,21 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                     let outputResult = try line.capturedGroups(withRegexString: #"(passed|failed) \((.*) seconds\)"#)
                     if outputResult.count == 2 {
                         let duration: Double = Double(outputResult[1]) ?? -1.0
-                        let plistPath = summaryPlistPath.replacingOccurrences(of: "\(Path.results.rawValue)/", with: "")
+                        
                         let testCaseResults = TestCaseResult(node: node, summaryPlistPath: plistPath, suite: candidate.suite, name: candidate.name, status: outputResult[0] == "passed" ? .passed : .failed, duration: duration)
                         result.append(testCaseResults)
                         mCandidates.remove(at: index)
+                        
                         break
                     }
+                } else if line.contains("Restarting after unexpected exit or crash in \(candidate.suite)/\(candidate.name)") {
+                    let duration: Double = -1.0
+
+                    let testCaseResults = TestCaseResult(node: node, summaryPlistPath: plistPath, suite: candidate.suite, name: candidate.name, status: .failed, duration: duration)
+                    result.append(testCaseResults)
+                    mCandidates.remove(at: index)
+                    
+                    break
                 }
             }
         }
