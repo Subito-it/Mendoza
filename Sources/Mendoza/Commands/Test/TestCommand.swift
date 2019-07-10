@@ -23,6 +23,7 @@ class TestCommand: Command {
     let deviceRuntime = Argument<String>(name: "version", kind: .named(short: "v", long: "device_runtime"), optional: true, help: "Device runtime to use to run tests. e.g. '12.1'")
     let timeoutField = Argument<Int>(name: "minutes", kind: .named(short: nil, long: "timeout"), optional: true, help: "Maximum allowed time (in minutes) before dispatch process is automatically terminated")
     let pluginCustomField = Argument<String>(name: "data", kind: .named(short: nil, long: "plugin_data"), optional: true, help: "A custom string that can be used to inject data to plugins")
+    let failingTestsRetryCountField = Argument<Int>(name: "count", kind: .named(short: "r", long: "failure_retry"), optional: true, help: "Number of times a failing tests should be repeated")
 
     func run() -> Bool {
         do {
@@ -34,11 +35,13 @@ class TestCommand: Command {
             }
             let timeout = timeoutField.value ?? 180
             let filePatterns = FilePatterns(commaSeparatedIncludePattern: includePattern.value, commaSeparatedExcludePattern: excludePattern.value)
+            let failingTestsRetryCount = failingTestsRetryCountField.value ?? 0
 
             let test = try Test(configurationUrl: configuration.value!,
                                 device: device,
                                 filePatterns: filePatterns,
                                 timeoutMinutes: timeout,
+                                failingTestsRetryCount: failingTestsRetryCount,
                                 dispatchOnLocalHost: dispatchOnLocalHost.value,
                                 pluginData: pluginCustomField.value,
                                 debugPlugins: debugPlugins.value)
