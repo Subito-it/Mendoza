@@ -49,6 +49,10 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
             
             var result = currentResult ?? [TestCaseResult]()
             
+            guard distributedTestCases?.contains(where: { $0.count > 0 }) == true else {
+                didEnd?(result)
+                return
+            }
             try pool.execute { [unowned self] (executer, source) in
                 let testRunner = source.value.0
                 let testCases = source.value.1
