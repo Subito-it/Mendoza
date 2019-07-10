@@ -142,6 +142,15 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                         }
                     }
                 }
+                
+                let crashRegex = #"Restarting after unexpected exit or crash in (.*)/(.*)\(\); summary will include totals from previous launches."#
+                if let tests = try? line.capturedGroups(withRegexString: crashRegex), tests.count == 2 {
+                    self.syncQueue.sync { [unowned self] in
+                        self.completedCount += 1
+                        
+                        print("𝘅 \(tests[0]) \(tests[1]) failed [\(self.completedCount)/\(self.testCasesCount)]".red)
+                    }
+                }
             }
             
             partialProgress = lines.last ?? ""
