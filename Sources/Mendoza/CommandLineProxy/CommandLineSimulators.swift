@@ -270,7 +270,7 @@ extension CommandLineProxy {
             }
             
             if !didFoundBootKeyword && verbose {
-                print("⚠️  did not find boot keywork in time")
+                print("⚠️  did not find boot keywork in time\n")
             }
             
             _ = try executer.execute("kill -SIGINT $(cat \(pidPath)) || true")

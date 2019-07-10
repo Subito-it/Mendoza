@@ -91,8 +91,10 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                 
                 if self.verbose {
                     print("[⚠️ Candidates for \(summaryPlistUrl.path) on node \(source.node.address)\n\(testCases)\n")
-                    if output.contains("Restarting after unexpected exit or crash") {
-                        print("⚠️ Seems to contain a crash!")
+                    for line in output.components(separatedBy: "\n") {
+                        if line.contains("Restarting after unexpected exit or crash") {
+                            print("⚠️ Seems to contain a crash!\n`\(line)`\n")
+                        }
                     }
                 }
                 
@@ -288,6 +290,12 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
         var mCandidates = candidates
         for line in filteredOutput {
             for (index, candidate) in mCandidates.enumerated() {
+                if verbose {
+                    if line.contains("Restarting after unexpected exit or crash") {
+                        let didMatch = line.contains("Restarting after unexpected exit or crash in \(candidate.suite)/\(candidate.name)")
+                        print("⚠️ Looking for `Restarting after unexpected exit or crash in \(candidate.suite)/\(candidate.name)` and didMatch: \(didMatch)")
+                    }
+                }
                 if line.contains("\(testTarget).\(candidate.suite) \(candidate.name)") {
                     let outputResult = try line.capturedGroups(withRegexString: #"(passed|failed) \((.*) seconds\)"#)
                     if outputResult.count == 2 {
@@ -314,7 +322,7 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
         if mCandidates.count > 0 {
             let missingTestCases = mCandidates.map { $0.testIdentifier }.joined(separator: ", ")
             if verbose {
-                print("⚠️  did not find test results for `\(missingTestCases)`")
+                print("⚠️  did not find test results for `\(missingTestCases)`\n")
             }
         }
         
