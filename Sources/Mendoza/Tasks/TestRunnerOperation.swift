@@ -145,7 +145,7 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                     }
                 }
                 
-                let crashRegex = #"Restarting after unexpected exit or crash in (.*)/(.*)"#
+                let crashRegex = #"Restarting after unexpected exit or crash in (.*)/(.*)\(\)"#
                 if let tests = try? line.capturedGroups(withRegexString: crashRegex), tests.count == 2 {
                     self.syncQueue.sync { [unowned self] in
                         self.completedCount += 1
