@@ -19,6 +19,8 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
     private var testCasesCount = 0
     private var completedCount = 0
     
+    private static let testResultCrashMarker = "Restarting after unexpected exit or crash in"
+    
     private let configuration: Configuration
     private let buildTarget: String
     private let testTarget: String
@@ -92,7 +94,7 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                 if self.verbose {
                     print("[⚠️ Candidates for \(summaryPlistUrl.path) on node \(source.node.address)\n\(testCases)\n")
                     for line in output.components(separatedBy: "\n") {
-                        if line.contains("Restarting after unexpected exit or crash") {
+                        if line.contains(Self.testResultCrashMarker) {
                             print("⚠️ Seems to contain a crash!\n`\(line)`\n")
                         }
                     }
@@ -159,7 +161,7 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                     }
                 }
                 
-                let crashRegex = #"Restarting after unexpected exit or crash in (.*)/(.*)\(\)"#
+                let crashRegex = #"\(Self.testResultCrashMarker) (.*)/(.*)\(\)"#
                 if let tests = try? line.capturedGroups(withRegexString: crashRegex), tests.count == 2 {
                     self.syncQueue.sync { [unowned self] in
                         self.completedCount += 1
@@ -282,7 +284,7 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
     }
 
     private func parseTestResults(_ output: String, candidates: [TestCase], node: String, summaryPlistPath: String) throws -> [TestCaseResult] {
-        let filteredOutput = output.components(separatedBy: "\n").filter { $0.hasPrefix("Test Case") }
+        let filteredOutput = output.components(separatedBy: "\n").filter { $0.hasPrefix("Test Case") || $0.contains(Self.testResultCrashMarker) }
 
         let plistPath = summaryPlistPath.replacingOccurrences(of: "\(Path.results.rawValue)/", with: "")
         
@@ -290,12 +292,6 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
         var mCandidates = candidates
         for line in filteredOutput {
             for (index, candidate) in mCandidates.enumerated() {
-                if verbose {
-                    if line.contains("Restarting after unexpected exit or crash") {
-                        let didMatch = line.contains("Restarting after unexpected exit or crash in \(candidate.suite)/\(candidate.name)")
-                        print("⚠️ Looking for `Restarting after unexpected exit or crash in \(candidate.suite)/\(candidate.name)` and didMatch: \(didMatch)")
-                    }
-                }
                 if line.contains("\(testTarget).\(candidate.suite) \(candidate.name)") {
                     let outputResult = try line.capturedGroups(withRegexString: #"(passed|failed) \((.*) seconds\)"#)
                     if outputResult.count == 2 {
@@ -307,7 +303,7 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                         
                         break
                     }
-                } else if line.contains("Restarting after unexpected exit or crash in \(candidate.suite)/\(candidate.name)") {
+                } else if line.contains("\(Self.testResultCrashMarker) \(candidate.testIdentifier)") {
                     let duration: Double = -1.0
 
                     let testCaseResults = TestCaseResult(node: node, summaryPlistPath: plistPath, suite: candidate.suite, name: candidate.name, status: .failed, duration: duration)
