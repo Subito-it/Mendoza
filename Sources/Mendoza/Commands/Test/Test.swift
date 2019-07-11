@@ -258,7 +258,7 @@ class Test {
         testRunnerOperation.didEnd = { [unowned self] testCaseResults in
             self.syncQueue.sync {
                 testSessionResult.passedTests = testCaseResults.filter { $0.status == .passed }
-                testSessionResult.failedTests = testCaseResults.filter { $0.status == .failed && testSessionResult.passedTests.contains($0) }
+                testSessionResult.failedTests = testCaseResults.filter { $0.status == .failed && testSessionResult.passedTests.contains($0) == false }
             
                 let nodes = Set(testCaseResults.map { $0.node })
                 for node in nodes {
