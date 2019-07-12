@@ -19,7 +19,8 @@ struct TestCaseResult: Codable, CustomStringConvertible, Hashable {
     let status: Status
     let duration: Double
     
-    var description: String { return "\(suite)/\(name) (\(duration) seconds)" }
+    var description: String { return "\(testCaseIdentifier) (\(duration) seconds)" }
+    var testCaseIdentifier: String { "\(suite)/\(name)" }
 }
 
 extension TestCaseResult: DefaultInitializable {

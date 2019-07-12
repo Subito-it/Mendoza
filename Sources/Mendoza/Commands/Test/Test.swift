@@ -262,7 +262,7 @@ class Test {
                 // Failed test results are those that failed even after retrying
                 testSessionResult.failedTests = testCaseResults.filter { result in
                     let passedOnRepeat = testSessionResult.passedTests.contains { successResult in
-                        return result.name == successResult.name && result.suite == successResult.suite
+                        return result.testCaseIdentifier == successResult.testCaseIdentifier
                     }
                     
                     return result.status == .failed && passedOnRepeat == false
@@ -270,7 +270,7 @@ class Test {
                 // We should keep only one failure per test.suite + test.name
                 var uniqueFailedSessions = Set<String>()
                 testSessionResult.failedTests = testSessionResult.failedTests.filter {
-                    uniqueFailedSessions.update(with: "\($0.suite)/\($0.name)") == nil
+                    uniqueFailedSessions.update(with: $0.testCaseIdentifier) == nil
                 }
 
                 let nodes = Set(testCaseResults.map { $0.node })
