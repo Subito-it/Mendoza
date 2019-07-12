@@ -258,8 +258,21 @@ class Test {
         testRunnerOperation.didEnd = { [unowned self] testCaseResults in
             self.syncQueue.sync {
                 testSessionResult.passedTests = testCaseResults.filter { $0.status == .passed }
-                testSessionResult.failedTests = testCaseResults.filter { $0.status == .failed && testSessionResult.passedTests.contains($0) == false }
-            
+                
+                // Failed test results are those that failed even after retrying
+                testSessionResult.failedTests = testCaseResults.filter { result in
+                    let passedOnRepeat = testSessionResult.passedTests.contains { successResult in
+                        return result.name == successResult.name && result.suite == successResult.suite
+                    }
+                    
+                    return result.status == .failed && passedOnRepeat == false
+                }
+                // We should keep only one failure per test.suite + test.name
+                var uniqueFailedSessions = Set<String>()
+                testSessionResult.failedTests = testSessionResult.failedTests.filter {
+                    uniqueFailedSessions.update(with: "\($0.suite)/\($0.name)") == nil
+                }
+
                 let nodes = Set(testCaseResults.map { $0.node })
                 for node in nodes {
                     let testCases = testCaseResults.filter { $0.node == node }
