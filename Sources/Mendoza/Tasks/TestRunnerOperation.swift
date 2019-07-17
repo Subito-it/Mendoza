@@ -59,7 +59,7 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
             }
             
             if result.count > 0 {
-                print("\nℹ️  Repeating failing tests\n".magenta)
+                print("\n\nℹ️  Repeating failing tests".magenta)
             }
 
             try pool.execute { [unowned self] (executer, source) in
