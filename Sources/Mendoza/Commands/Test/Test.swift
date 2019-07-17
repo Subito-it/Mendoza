@@ -276,14 +276,13 @@ class Test {
                 let nodes = Set(testCaseResults.map { $0.node })
                 for node in nodes {
                     let testCases = testCaseResults.filter { $0.node == node }
+                    for summaryPlist in Set(testCases.map { $0.summaryPlistPath }) {
+                        testSessionResult.summaryPlistPath[summaryPlist] = node
+                    }
                     guard testCases.count > 0 else { continue }
                     
                     let executionTime = testCases.reduce(0.0, { $0 + $1.duration })
                     testSessionResult.nodes[node] = .init(executionTime: executionTime, totalTests: testCases.count)
-                    
-                    for summaryPlist in Set(testCases.map { $0.summaryPlistPath }) {
-                        testSessionResult.summaryPlistPath[summaryPlist] = node
-                    }
                 }
             }
             
@@ -310,6 +309,17 @@ class Test {
                     
                     for index2 in index + 1..<retryTestRunnerOperations.count {
                         retryTestRunnerOperations[index2].currentResult = testCaseResults
+                    }
+                    
+                    let nodes = Set(testCaseResults.map { $0.node })
+                    for node in nodes {
+                        let testCases = testCaseResults.filter { $0.node == node }
+                        for summaryPlist in Set(testCases.map { $0.summaryPlistPath }) {
+                            testSessionResult.summaryPlistPath[summaryPlist] = node
+                        }
+                        
+                        let executionTime = testCases.reduce(0.0, { $0 + $1.duration })
+                        testSessionResult.nodes["\(node)-r\(index)"] = .init(executionTime: executionTime, totalTests: testCases.count)
                     }
                     
                     try? self.eventPlugin.run(event: Event(kind: .stopTesting, info: ["retry_indx": "\(index)"]), device: device)
