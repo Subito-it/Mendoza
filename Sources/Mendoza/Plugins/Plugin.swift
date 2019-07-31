@@ -78,6 +78,9 @@ class Plugin<Input: DefaultInitializable, Output: DefaultInitializable> {
                 , let ret = try? JSONDecoder().decode(Output.self, from: resultData) else {
                     throw Error("Failed running plugin `\(filename)`, got \(output)", logger: executer.logger)
             }
+            if plugin.debug {
+                print("⚠️ plugin output:\n\(output)")
+            }
             
             return ret
         } catch {
