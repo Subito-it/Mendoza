@@ -56,18 +56,26 @@ final class LocalExecuter: Executer {
         logger?.log(command: "Copying `\(remotePath)` -> `\(localUrl.path)`")
         defer { logger?.log(output: "done", statusCode: 0) }
         
-        try fileManager.copyItem(atPath: remotePath, toPath: localUrl.path)
+        try fileManager.copyItem(atPath: expandingTildeInPath(remotePath), toPath: localUrl.path)
     }
     
     func upload(localUrl: URL, remotePath: String) throws {
         logger?.log(command: "Copying `\(localUrl.path)` -> `\(remotePath)`")
         defer { logger?.log(output: "done", statusCode: 0) }
 
-        try fileManager.copyItem(atPath: localUrl.path, toPath: remotePath)
+        try fileManager.copyItem(atPath: localUrl.path, toPath: expandingTildeInPath(remotePath))
     }
     
     func terminate() {
         running?.terminate()
+    }
+    
+    func expandingTildeInPath(_ path: String) -> String {
+        if #available(OSX 10.12, *) {
+            return path.replacingOccurrences(of: "~", with: FileManager.default.homeDirectoryForCurrentUser.path)
+        } else {
+            return path.replacingOccurrences(of: "~", with: URL(fileURLWithPath: NSHomeDirectory()).path)
+        }
     }
 }
 
