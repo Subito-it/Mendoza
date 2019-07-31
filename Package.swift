@@ -7,7 +7,6 @@ let package = Package(
     name: "Mendoza",
     dependencies: [
       .package(url: "https://github.com/tcamin/KeychainAccess.git", .branch("master")),
-      .package(url: "https://github.com/apple/swift-package-manager.git", from: "0.1.0"),
       .package(url: "https://github.com/Subito-it/Bariloche", .branch("master")),
       .package(url: "https://github.com/tcamin/Shout.git", .branch("subito")),
       .package(url: "https://github.com/tuist/xcodeproj.git", .upToNextMajor(from: "6.4.0")),
@@ -16,6 +15,6 @@ let package = Package(
     targets: [
       .target(
           name: "Mendoza",
-          dependencies: ["Utility", "Bariloche", "Shout", "xcodeproj", "KeychainAccess", "SourceKittenFramework"])
+          dependencies: ["Bariloche", "Shout", "xcodeproj", "KeychainAccess", "SourceKittenFramework"])
     ]
 )
