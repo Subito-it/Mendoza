@@ -31,6 +31,7 @@ class ConnectionPool<SourceValue> {
             group.enter()
             
             DispatchQueue.global(qos: .userInteractive).async { [weak self] in
+                defer { group.leave() }
                 guard let self = self else { return }
                 
                 do {
@@ -41,8 +42,6 @@ class ConnectionPool<SourceValue> {
                 } catch {
                     self.syncQueue.sync { errors.append(error) }
                 }
-                
-                group.leave()
             }
         }
         
