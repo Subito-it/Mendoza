@@ -62,6 +62,7 @@ class ExecuterLogger: Logger, CustomDebugStringConvertible {
     var hasErrors: Bool { return logs.first(where: { $0.isError }) != nil }
     var filename: String { return "\(address)-\(name).html" }
     var isEmpty: Bool { return logs.count == 0 }
+    var dumpToStandardOutput: Bool = false
 
     private var logs = [LoggerEvent]()
     private var blackList = [String]()
@@ -73,6 +74,7 @@ class ExecuterLogger: Logger, CustomDebugStringConvertible {
     
     func log(command: String) {
         logs.append(.start(command: redact(command)))
+        if dumpToStandardOutput { print(redact(command)) }
     }
     
     func log(output: String, statusCode: Int32) {
