@@ -53,17 +53,23 @@ final class LocalExecuter: Executer {
     
     // When it throws check that remotePath exists
     func download(remotePath: String, localUrl: URL) throws {
+        let escapedRemotePath = expandingTildeInPath(remotePath)
+        guard escapedRemotePath != localUrl.path else { return }
+        
         logger?.log(command: "Copying `\(remotePath)` -> `\(localUrl.path)`")
         defer { logger?.log(output: "done", statusCode: 0) }
         
-        try fileManager.copyItem(atPath: expandingTildeInPath(remotePath), toPath: localUrl.path)
+        try fileManager.copyItem(atPath: escapedRemotePath, toPath: localUrl.path)
     }
     
     func upload(localUrl: URL, remotePath: String) throws {
+        let escapedRemotePath = expandingTildeInPath(remotePath)
+        guard escapedRemotePath != localUrl.path else { return }
+
         logger?.log(command: "Copying `\(localUrl.path)` -> `\(remotePath)`")
         defer { logger?.log(output: "done", statusCode: 0) }
 
-        try fileManager.copyItem(atPath: localUrl.path, toPath: expandingTildeInPath(remotePath))
+        try fileManager.copyItem(atPath: localUrl.path, toPath: escapedRemotePath)
     }
     
     func terminate() {
