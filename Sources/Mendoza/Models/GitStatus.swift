@@ -10,12 +10,12 @@ import Foundation
 struct GitStatus: Codable {
     let url: URL
     let branch: String
-    let lastMessage: String
-    let lastHash: String
+    let commitMessage: String
+    let commitHash: String
 }
 
 extension GitStatus: DefaultInitializable {
     static func defaultInit() -> GitStatus {
-        return GitStatus(url: URL(fileURLWithPath: ""), branch: "", lastMessage: "", lastHash: "")
+        return GitStatus(url: URL(fileURLWithPath: ""), branch: "", commitMessage: "", commitHash: "")
     }
 }

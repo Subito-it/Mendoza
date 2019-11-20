@@ -141,7 +141,7 @@ struct ConfigurationInitializer {
                 concurrentTestRunners = .manual(count: 1)
             case .ios:
                 administratorPassword = askAdministratorPassword(username: sshAuthentication.username)
-                concurrentTestRunners = .autodetect
+                concurrentTestRunners = askConcurrentSimulators()
             }
         } else {
             sshAuthentication = askSSHAuthentication()

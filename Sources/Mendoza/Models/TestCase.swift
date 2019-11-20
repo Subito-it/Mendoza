@@ -19,3 +19,7 @@ extension TestCase: DefaultInitializable {
         return TestCase(name: "", suite: "")
     }
 }
+
+extension TestCase: CustomStringConvertible {
+    var description: String { suite + " " + name }
+}

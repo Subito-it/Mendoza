@@ -6,7 +6,7 @@ Mendoza is designed to parallelize tests on an unlimited number of different mac
 
 The tool is flexible thanks to [plugins](#Plugins) (that you can write in Swift 😎) allowing to heavily customize several steps in the dispatching pipeline.
 
-The outcome of a test session will be a set of log files (.json, .html) that will merge result together as if all tests were run on a single machine.
+The outcome of a test session will be a set of log files (.json, .html) and a single .xcresult bunble that will contain all results as if all tests were run on a single machine.
 
 A snapshot of a session running on 8 concurrent nodes (each running 2 simulators at once) can be seen below.
 
@@ -36,10 +36,21 @@ Mendoza hides all the complexity behind a single `test` command by leveraging bu
 brew install Subito-it/made/mendoza
 ```
 
-Or you can build manually using swift build.
+Or you can build manually from sources
 
-Mendoza in written in Swift 5, so if you're on macOS Mojave 10.14.3 or earlier, you may need to install an optional Swift library package that can be downloaded from "More Downloads" for Apple Developers at https://developer.apple.com/download/more/
+## Building from sources
 
+To build Mendoza make sure to install libssh2:
+```
+brew install libssh2
+git clone https://github.com/Subito-it/Mendoza.git
+cd Mendoza
+swift package update
+swift package generate-xcodeproj
+xed .
+```
+
+From the target selection select the Mendoza project and add `/usr/local/include` to 'Header Search Paths' and `/usr/local/lib` to 'Library Search Paths'.
 
 # Quick start
 
@@ -117,16 +128,17 @@ Will launch tests as specified in the configuration files.
 
 *iOS projects only*
 - --device_name=name: device name to use to run tests. e.g. 'iPhone 8'
-- --device_runtime=version: device runtime to use to run tests. e.g. '12.1'
+- --device_runtime=version: device runtime to use to run tests. e.g. '13.1'
 
 #### Optional parameters
 
-- --timeout=[minutes]: maximum allowed time (in minutes) before dispatch process is automatically terminated
+- --timeout=[minutes]: maximum allowed idle time (in seconds) in test standard output before dispatch process is automatically terminated. (default: 60s)
 - --include_files=[files]: specify from which files UI tests should be extracted. Accepts wildcards and comma separated. e.g SBTA*.swift,SBTF*.swift. (default: '*.swift')
 - --exclude_files=[files]: specify which files should be skipped when extracting UI tests. Accepts wildcards and comma separated. e.g SBTA*.swift,SBTF*.swift. (default: '')
 - --plugin_data=[data]: a custom string that can be used to inject data to plugins
-- --plugin_debug: write log files for plugin development. Refer to the [plugins](#Plugins) paragraph. 
-- --use_localhost: 🔥 when passing these flag tests will be dispatched on the localhost as well even if it is not specified in the configuration file. This is useful when launching tests locally leveraging additional simulators of your own development machine.
+- --plugin_debug: write log files for plugin development. Refer to the [plugins](#Plugins) paragraph
+- --run_headless: run simulators headless
+- --use_localhost: 🔥 when passing these flag tests will be dispatched on the localhost as well even if it is not specified in the configuration file. This is useful when launching tests locally leveraging additional simulators of your own development machine
 
 ### Test output
 
@@ -135,10 +147,11 @@ Mendoza will write a set of log files containing information about the test sess
 - test_details.json: provides a detailed insight of the test session
 - test_result.json: the list of tests that passed/failed in json format
 - test_result.html: the list of tests that passed/failed in html format
+- repeated_test_result.json: the list of tests that had to be repeated in json format
+- repeated_test_result.html: the list of tests that had to be repeated in html format
+- merged.xcresult: the result bundle containing all test data. Can be opened with Xcode
 
-If you're interested in seeing the specific actions that made a test fail you may either manually inspect the TestSummaries.plist file associated with the failing test (see _test_details.json_) or more conveniently use [sbtuitestbrowser](https://github.com/Subito-it/sbtuitestbrowser) which is able to parse and present results as you normally do in Xcode directly in a web browser.
-
-
+If you're interested in seeing the specific actions that made a test fail can manually inspect the merged.xcresult using Xcode. Alternatively you may also consider using [Cachi](https://github.com/Subito-it/Cachi) which is able to parse and present results in a web browser.
 
 
 # Plugins

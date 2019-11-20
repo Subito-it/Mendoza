@@ -10,7 +10,7 @@ import Foundation
 class Test {
     var didFail: ((Swift.Error) -> Void)?
     
-    private let userOptions: (configuration: Configuration, device: Device, filePatterns: FilePatterns, timeoutMinutes: Int, failingTestsRetryCount: Int, dispatchOnLocalHost: Bool, verbose: Bool)
+    private let userOptions: (configuration: Configuration, device: Device, runHeadless: Bool, filePatterns: FilePatterns, testTimeoutSeconds: Int, failingTestsRetryCount: Int, dispatchOnLocalHost: Bool, verbose: Bool)
     private let plugin: (data: String?, debug: Bool)
     private let eventPlugin: EventPlugin
     private let pluginUrl: URL
@@ -18,7 +18,7 @@ class Test {
     private let timestamp: String
     private var observers = [NSKeyValueObservation]()
     
-    init(configurationUrl: URL, device: Device, filePatterns: FilePatterns, timeoutMinutes: Int, failingTestsRetryCount: Int, dispatchOnLocalHost: Bool, pluginData: String?, debugPlugins: Bool, verbose: Bool) throws {
+    init(configurationUrl: URL, device: Device, runHeadless: Bool, filePatterns: FilePatterns, testTimeoutSeconds: Int, failingTestsRetryCount: Int, dispatchOnLocalHost: Bool, pluginData: String?, debugPlugins: Bool, verbose: Bool) throws {
         self.plugin = (data: pluginData, debug: debugPlugins)
         
         let configurationData = try Data(contentsOf: configurationUrl)
@@ -30,7 +30,7 @@ class Test {
             configuration = updatedConfiguration
         }
         
-        self.userOptions = (configuration: configuration, device: device, filePatterns: filePatterns, timeoutMinutes: timeoutMinutes, failingTestsRetryCount: failingTestsRetryCount, dispatchOnLocalHost: dispatchOnLocalHost, verbose: verbose)
+        self.userOptions = (configuration: configuration, device: device, runHeadless: runHeadless, filePatterns: filePatterns, testTimeoutSeconds: testTimeoutSeconds, failingTestsRetryCount: failingTestsRetryCount, dispatchOnLocalHost: dispatchOnLocalHost, verbose: verbose)
         
         self.pluginUrl = configurationUrl.deletingLastPathComponent()
         self.eventPlugin = EventPlugin(baseUrl: pluginUrl, plugin: plugin)
@@ -78,6 +78,8 @@ class Test {
     }
     
     private func makeOperations(gitStatus: GitStatus, testSessionResult: TestSessionResult, sdk: XcodeProject.SDK) throws -> [Operation & LoggedOperation] {
+        typealias RunOperation = Operation & LoggedOperation
+        
         let configuration = userOptions.configuration
         let device = userOptions.device
         let filePatterns = userOptions.filePatterns
@@ -102,27 +104,26 @@ class Test {
         let setupOperation = SetupOperation(nodes: uniqueNodes)
         let compileOperation = CompileOperation(configuration: configuration, baseUrl: gitBaseUrl, project: project, scheme: configuration.scheme, preCompilationPlugin: preCompilationPlugin, postCompilationPlugin: postCompilationPlugin, sdk: sdk)
         let testExtractionOperation = TestExtractionOperation(configuration: configuration, baseUrl: gitBaseUrl, testTargetSourceFiles: testTargetSourceFiles, filePatterns: filePatterns, device: device, plugin: testExtractionPlugin)
-        let testDistributionOperation = TestDistributionOperation(device: device, plugin: testDistributionPlugin)
-        let simulatorSetupOperation = SimulatorSetupOperation(configuration: configuration, nodes: uniqueNodes, device: device, verbose: userOptions.verbose)
+        let testDistributionOperation = TestDistributionOperation(device: device, plugin: testDistributionPlugin, verbose: userOptions.verbose)
+        let simulatorSetupOperation = SimulatorSetupOperation(configuration: configuration, nodes: uniqueNodes, device: device, runHeadless: userOptions.runHeadless, verbose: userOptions.verbose)
         let simulatorBootOperation = SimulatorBootOperation(verbose: userOptions.verbose)
-        let simulatorWakeupOperation = SimulatorWakeupOperation(nodes: uniqueNodes, verbose: userOptions.verbose)
+        let simulatorWakeupOperation = SimulatorWakeupOperation(nodes: uniqueNodes, runHeadless: userOptions.runHeadless, verbose: userOptions.verbose)
         let distributeTestBundleOperation = DistributeTestBundleOperation(nodes: uniqueNodes)
-        let testRunnerOperation = TestRunnerOperation(configuration: configuration, buildTarget: targets.build.name, testTarget: targets.test.name, sdk: sdk, verbose: userOptions.verbose)
+        let testRunnerOperation = TestRunnerOperation(configuration: configuration, buildTarget: targets.build.name, testTarget: targets.test.name, sdk: sdk, testTimeoutSeconds: userOptions.testTimeoutSeconds, verbose: userOptions.verbose)
         
         var retryTestDistributionOperations = [TestDistributionOperation]()
         var retryTestRunnerOperations = [TestRunnerOperation]()
         for _ in 0..<userOptions.failingTestsRetryCount {
-            retryTestDistributionOperations.append(.init(device: device, plugin: testDistributionPlugin))
-            retryTestRunnerOperations.append(.init(configuration: configuration, buildTarget: targets.build.name, testTarget: targets.test.name, sdk: sdk, verbose: userOptions.verbose))
+            retryTestDistributionOperations.append(.init(device: device, plugin: testDistributionPlugin, verbose: userOptions.verbose))
+            retryTestRunnerOperations.append(.init(configuration: configuration, buildTarget: targets.build.name, testTarget: targets.test.name, sdk: sdk, testTimeoutSeconds: userOptions.testTimeoutSeconds, verbose: userOptions.verbose))
         }
         let testCollectorOperation = TestCollectorOperation(configuration: configuration, timestamp: timestamp, buildTarget: targets.build.name, testTarget: targets.test.name)
-        let codeCoverageCollectionOperation = CodeCoverageCollectionOperation(configuration: configuration, baseUrl: gitBaseUrl, timestamp: timestamp)
-        let testTearDownOperation = TestTearDownOperation(configuration: configuration, timestamp: timestamp)
+        let testTearDownOperation = TestTearDownOperation(configuration: configuration, git: gitStatus, timestamp: timestamp)
         let cleanupOperation = CleanupOperation(configuration: configuration, timestamp: timestamp)
         let simulatorTearDownOperation = SimulatorTearDownOperation(configuration: configuration, nodes: uniqueNodes, verbose: userOptions.verbose)
         let tearDownOperation = TearDownOperation(configuration: configuration, plugin: tearDownPlugin)
         
-        let operations: [Operation & LoggedOperation] =
+        let operations: [RunOperation] =
             [validationOperation,
              macOsValidationOperation,
              localSetupOperation,
@@ -137,7 +138,6 @@ class Test {
              distributeTestBundleOperation,
              testRunnerOperation,
              testCollectorOperation,
-             codeCoverageCollectionOperation,
              testTearDownOperation,
              simulatorTearDownOperation,
              cleanupOperation,
@@ -182,11 +182,10 @@ class Test {
         
         testCollectorOperation.addDependency(lastTestRunnerOperation)
         
-        codeCoverageCollectionOperation.addDependency(testCollectorOperation)
         testTearDownOperation.addDependency(testCollectorOperation)
         simulatorTearDownOperation.addDependency(testCollectorOperation)
         
-        cleanupOperation.addDependencies([codeCoverageCollectionOperation, testTearDownOperation])
+        cleanupOperation.addDependency(testTearDownOperation)
         
         tearDownOperation.addDependencies([cleanupOperation, simulatorTearDownOperation])
         
@@ -197,7 +196,7 @@ class Test {
         testSessionResult.date = timestamp
         testSessionResult.git = gitStatus
         testSessionResult.startTime = CFAbsoluteTimeGetCurrent()
-        
+                
         operations.compactMap { $0 as? Throwing & LoggedOperation }.forEach { [unowned self] op in
             op.didThrow = { opError in
                 if (opError as? Error)?.didLogError == false {
@@ -279,8 +278,8 @@ class Test {
                 let nodes = Set(testCaseResults.map { $0.node })
                 for node in nodes {
                     let testCases = testCaseResults.filter { $0.node == node }
-                    for summaryPlist in Set(testCases.map { $0.summaryPlistPath }) {
-                        testSessionResult.summaryPlistPath[summaryPlist] = node
+                    for xcResultPath in Set(testCases.map { $0.xcResultPath }) {
+                        testSessionResult.xcResultPath[xcResultPath] = node
                     }
                     guard testCases.count > 0 else { continue }
                     
@@ -293,7 +292,7 @@ class Test {
             testTearDownOperation.testCaseResults = testCaseResults
             try? self.eventPlugin.run(event: Event(kind: .stopTesting, info: [:]), device: device)
         }
-        
+                
         if userOptions.failingTestsRetryCount > 0 {
             retryTestRunnerOperations.last?.didEnd = testRunnerOperation.didEnd
             retryTestRunnerOperations.insert(testRunnerOperation, at: 0)
@@ -317,8 +316,8 @@ class Test {
                     let nodes = Set(testCaseResults.map { $0.node })
                     for node in nodes {
                         let testCases = testCaseResults.filter { $0.node == node }
-                        for summaryPlist in Set(testCases.map { $0.summaryPlistPath }) {
-                            testSessionResult.summaryPlistPath[summaryPlist] = node
+                        for xcResultPath in Set(testCases.map { $0.xcResultPath }) {
+                            testSessionResult.xcResultPath[xcResultPath] = node
                         }
                         
                         let executionTime = testCases.reduce(0.0, { $0 + $1.duration })
@@ -341,7 +340,6 @@ class Test {
         }
         
         monitorOperationsExecutionTime(operations, testSessionResult: testSessionResult)
-        dispatchTimeout(operations: operations, testSessionResult: testSessionResult)
         
         return operations
     }
@@ -350,6 +348,7 @@ class Test {
         cancelOperation(operations)
 
         let logger = ExecuterLogger(name: "Test", address: "localhost")
+        defer { try? logger.dump() }
         
         let destinationNode = userOptions.configuration.resultDestination.node
         let destinationPath = "\(userOptions.configuration.resultDestination.path)/\(timestamp)"
@@ -415,12 +414,6 @@ class Test {
             }
             
             self.observers.append(observer)
-        }
-    }
-    
-    private func dispatchTimeout(operations: [Operation & LoggedOperation], testSessionResult: TestSessionResult) {
-        DispatchQueue.global(qos: .background).asyncAfter(deadline: .now() + TimeInterval(userOptions.timeoutMinutes * 60)) { [unowned self] in
-            self.tearDown(operations: operations, testSessionResult: testSessionResult, error: Error("💥 ⏰ Dispatch did timeout!\n".bold))
         }
     }
 }

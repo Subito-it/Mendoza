@@ -14,6 +14,7 @@ class SimulatorTearDownOperation: BaseOperation<Void> {
     private lazy var pool: ConnectionPool = {
         return makeConnectionPool(sources: nodes)
     }()
+    private let resetSimulatorsOnCompletion = false
     
     init(configuration: Configuration, nodes: [Node], verbose: Bool) {
         self.configuration = configuration
@@ -35,8 +36,10 @@ class SimulatorTearDownOperation: BaseOperation<Void> {
                     try proxy.terminateApp(identifier: self.configuration.buildBundleIdentifier, on: simulator)
                     try proxy.terminateApp(identifier: self.configuration.testBundleIdentifier, on: simulator)
                 }
-                try? proxy.reset()
-
+                
+                if self.resetSimulatorsOnCompletion == true {
+                    try? proxy.reset()
+                }
             }
             
             didEnd?(())

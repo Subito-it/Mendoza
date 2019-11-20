@@ -131,49 +131,39 @@ private extension Process {
         } catch {
             fatalError(error.localizedDescription)
         }
-        
-        let outputHandler = pipe.fileHandleForReading
 
-        let queue = DispatchQueue(label: "handler")
-        
         var outputData = Data()
-        outputHandler.readabilityHandler = { FileHandle in
-            queue.sync {
-                let data = outputHandler.readDataToEndOfFile()
-                outputData.append(data)
-                
-                if let localProgress = String(data: data, encoding: .utf8) {
-                    progress?(localProgress)
-                }
+        while isRunning {
+            let data = pipe.fileHandleForReading.readData(ofLength: 512)
+            guard data.count > 0 else { continue }
+
+            outputData.append(data)
+            progress?(String(decoding: data, as: UTF8.self))
+        }
+        outputData.append(pipe.fileHandleForReading.readDataToEndOfFile())
+        
+        pipe.fileHandleForReading.closeFile()
+        
+        var output = String(decoding: outputData, as: UTF8.self)
+        output = output.replacingOccurrences(of: "\r\n", with: "\n")
+        output = output.trimmingCharacters(in: .whitespacesAndNewlines)
+        let result = (status: terminationStatus, output: output)
+        
+        logger?.log(output: result.output, statusCode: result.status)
+        
+        if terminationStatus != 0 {
+            let redactedCmd = logger?.redact(cmd) ?? cmd
+            let redactedOutput = logger?.redact(output) ?? output
+            let originalError = Error("`\(redactedCmd)` failed with status code: \(result.status), got \(redactedOutput)")
+
+            if let rethrow = rethrow {
+                try rethrow(result, originalError)
+                return result
+            } else {
+                throw originalError
             }
         }
-
-        waitUntilExit()
         
-        outputHandler.closeFile()
-        
-        return try queue.sync {
-            var output = String(data: outputData, encoding: String.Encoding.utf8) ?? ""
-            output = output.replacingOccurrences(of: "\r\n", with: "\n")
-            output = output.trimmingCharacters(in: .whitespacesAndNewlines)
-            let result = (status: terminationStatus, output: output)
-            
-            logger?.log(output: result.output, statusCode: result.status)
-            
-            if terminationStatus != 0 {
-                let redactedCmd = logger?.redact(cmd) ?? cmd
-                let redactedOutput = logger?.redact(output) ?? output
-                let originalError = Error("`\(redactedCmd)` failed with status code: \(result.status), got \(redactedOutput)")
-
-                if let rethrow = rethrow {
-                    try rethrow(result, originalError)
-                    return result
-                } else {
-                    throw originalError
-                }
-            }
-            
-            return result
-        }
+        return result
     }
 }

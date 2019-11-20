@@ -13,7 +13,7 @@ struct TestCaseResult: Codable, CustomStringConvertible, Hashable {
     }
     
     let node: String
-    let summaryPlistPath: String
+    let xcResultPath: String
     let suite: String
     let name: String
     let status: Status
@@ -25,7 +25,7 @@ struct TestCaseResult: Codable, CustomStringConvertible, Hashable {
 
 extension TestCaseResult: DefaultInitializable {
     static func defaultInit() -> TestCaseResult {
-        return TestCaseResult(node: "", summaryPlistPath: "", suite: "", name: "", status: .passed, duration: 0.0)
+        return TestCaseResult(node: "", xcResultPath: "", suite: "", name: "", status: .passed, duration: 0.0)
     }
 }
 

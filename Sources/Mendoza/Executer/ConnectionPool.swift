@@ -18,6 +18,12 @@ class ConnectionPool<SourceValue> {
     private let sources: [Source<SourceValue>]
     private let syncQueue = DispatchQueue(label: String(describing: ConnectionPool.self))
     private var executers = [Executer]()
+    private let operationQueue: OperationQueue = {
+        let queue = OperationQueue()
+        queue.maxConcurrentOperationCount = .max
+        queue.qualityOfService = .default
+        return queue
+    }()
     
     init(sources: [Source<SourceValue>]) {
         self.sources = sources
@@ -26,12 +32,8 @@ class ConnectionPool<SourceValue> {
     func execute(block: @escaping (_ executer: Executer, _ source: Source<SourceValue>) throws -> Void) throws {
         var errors = [Swift.Error]()
         
-        let group = DispatchGroup()
         for source in sources {
-            group.enter()
-            
-            DispatchQueue.global(qos: .userInteractive).async { [weak self] in
-                defer { group.leave() }
+            operationQueue.addOperation { [weak self] in
                 guard let self = self else { return }
                 
                 do {
@@ -45,7 +47,7 @@ class ConnectionPool<SourceValue> {
             }
         }
         
-        group.wait()
+        operationQueue.waitUntilAllOperationsAreFinished()
         
         for error in errors {
             throw error

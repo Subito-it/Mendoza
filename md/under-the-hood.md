@@ -62,10 +62,6 @@ Tests are executed using xcodebuild's `test-without-building` passing the tests 
 
 Collects the results sending them to the destination node.
 
-### codeCoverageCollectionOperation
-
-Collects the single code coverage files merging them together.
-
 ### testTearDownOperation
 
 Write test result summary files (json, html)

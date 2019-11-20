@@ -20,48 +20,45 @@ extension CommandLineProxy {
         }
         
         func wakeUp() throws {
-            _ = try executer.execute("open -a \"$(xcode-select -p)/Applications/Simulator.app\"")
+            _ = try executer.execute("open -a \"$(xcode-select -p)/Applications/Simulator.app\"; sleep 5")
+            let simulatorsBooting = try bootedSimulators()
+            // Be nice to Simulator.app and wait for the default simulator to be booted. Random crashes and error happens doing otherwise
+            for simulatorBooting in simulatorsBooting {
+                try waitForBoot(simulator: simulatorBooting)
+            }
         }
                 
         func reset() throws {
-            let commands = ["killall -9 com.apple.CoreSimulator.CoreSimulatorService",
-                            "pkill Simulator",
-                            "sleep 5",
-                            "open -a \"$(xcode-select -p)/Applications/Simulator.app\"",
-                            "sleep 15",
-                            "killall -9 com.apple.CoreSimulator.CoreSimulatorService",
-                            "pkill Simulator",
-                            "rm -rf '\(executer.homePath)/Library/Saved Application State/com.apple.iphonesimulator.savedState'",
-                            "sleep 5",
-                            "defaults read com.apple.iphonesimulator &>/dev/null"]
+            let commands = ["defaults read com.apple.iphonesimulator",
+                            "sleep 3; pkill -1 Simulator; sleep 3; killall -9 com.apple.CoreSimulator.CoreSimulatorService; sleep 3;"]
             
             try commands.forEach { _ = try executer.execute("\($0) 2>/dev/null || true") }
         }
         
-        func forceSettingsRewrite() throws {
-            let commands = ["open -a \"$(xcode-select -p)/Applications/Simulator.app\"",
-                            "sleep 15",
-                            "killall -9 com.apple.CoreSimulator.CoreSimulatorService",
-                            "pkill Simulator",
+        func rewriteSettings() throws {
+            try reset()
+            
+            let commands = ["rm '\(executer.homePath)/Library/Preferences/com.apple.iphonesimulator.plist' || true", // Delete iphone simulator settings to remove multiple `ScreenConfigurations` if present
                             "rm -rf '\(executer.homePath)/Library/Saved Application State/com.apple.iphonesimulator.savedState'",
-                            "sleep 5",
-                            "open -a \"$(xcode-select -p)/Applications/Simulator.app\"",
-                            "sleep 15",
-                            "killall -9 com.apple.CoreSimulator.CoreSimulatorService",
-                            "pkill Simulator",
                             "defaults read com.apple.iphonesimulator"]
             
             try commands.forEach { _ = try executer.execute("\($0) 2>/dev/null || true") }
+            
+            try wakeUp()
         }
-        
+                
         func shutdown(simulator: Simulator) throws {
             _ = try executer.execute("xcrun simctl shutdown \(simulator.id)")
+        }
+        
+        func launchApp(identifier: String, on simulator: Simulator) throws {
+            _ = try executer.execute("xcrun simctl launch \(simulator.id) \(identifier)")
         }
         
         func terminateApp(identifier: String, on simulator: Simulator) throws {
             _ = try executer.execute("xcrun simctl terminate \(simulator.id) \(identifier)")
         }
-        
+                
         func installRuntimeIfNeeded(_ runtime: String, nodeAddress: String, appleIdCredentials: Credentials?, administratorPassword: String?) throws {
             let isRuntimeInstalled: () throws -> Bool = { [unowned self] in
                 let installedRuntimes = try self.executer.execute("xcrun simctl list runtimes")
@@ -90,7 +87,7 @@ extension CommandLineProxy {
                         "rm -f ~/Library/Caches/XcodeInstall/com.apple.pkg.iPhoneSimulatorSDK\(runtime.replacingOccurrences(of: ".", with: "_"))*.dmg",
                         "xcversion update",
                         "echo '\(password)' | sudo -S xcversion simulators --install='iOS \(runtime)'",
-                        "killall -9 com.apple.CoreSimulator.CoreSimulatorService"]
+                        "pkill -1 Simulator; killall -9 com.apple.CoreSimulator.CoreSimulatorService"]
             
             let result = try executer.capture(cmds.joined(separator: "; "))
             guard result.status == 0 else {
@@ -197,12 +194,16 @@ extension CommandLineProxy {
             
             guard !booted.contains(simulator) else { return }
             
-            _ = try executer.execute("xcrun simctl boot '\(simulator.id)'")
-            
-            try waitForBoot(executer: executer, simulator: simulator)
+            // https://gist.github.com/keith/33d3e28de4217f3baecde15357bfe5f6
+            // boot and synchronously wait for device to boot
+            _ = try executer.execute("xcrun simctl bootstatus '\(simulator.id)' -b")
         }
         
-        func fetchSimulatorSettings() throws -> Simulators.Settings {
+        func waitForBoot(simulator: Simulator) throws {
+            _ = try executer.execute("xcrun simctl bootstatus '\(simulator.id)'")
+        }
+        
+        func loadSimulatorSettings() throws -> Simulators.Settings {
             let loadSettings: () throws -> Simulators.Settings? = {
                 let uniqueUrl = Path.temp.url.appendingPathComponent("\(UUID().uuidString).plist")
                 try self.executer.download(remotePath: self.settingsPath, localUrl: uniqueUrl)
@@ -218,7 +219,7 @@ extension CommandLineProxy {
             }
             
             if settings?.ScreenConfigurations?.keys.count == 0 {
-                try CommandLineProxy.Simulators(executer: executer, verbose: verbose).forceSettingsRewrite()
+                try CommandLineProxy.Simulators(executer: executer, verbose: verbose).rewriteSettings()
                 settings = try? loadSettings()
                 
                 if settings?.ScreenConfigurations?.keys.count == 0 {
@@ -244,36 +245,6 @@ extension CommandLineProxy {
             // Force reload
             _ = try executer.execute("rm -rf '\(executer.homePath)/Library/Saved Application State/com.apple.iphonesimulator.savedState'")
             _ = try executer.execute("defaults read com.apple.iphonesimulator &>/dev/null")
-        }
-        
-        private func waitForBoot(executer: Executer, simulator: Simulator) throws {
-            let logPath = "\(Path.temp.rawValue)/boot_\(simulator.id)"
-            let pidPath = "\(Path.temp.rawValue)/pid_\(simulator.id)"
-            let timeout = 5
-            
-            Thread.sleep(forTimeInterval: 1.0)
-            
-            // This will execute simctl spawn for at most _timeout_ seconds
-            try DispatchQueue.global(qos: .userInitiated).sync {
-                _ = try executer.clone().execute(#"xcrun simctl spawn '\#(simulator.id)' log stream > '\#(logPath)' & echo $! > '\#(pidPath)'; sleep \#(timeout); kill $! || true"#)
-            }
-            
-            var didFoundBootKeyword = false
-            let start = CFAbsoluteTimeGetCurrent()
-            while CFAbsoluteTimeGetCurrent() - start < TimeInterval(timeout) {
-                guard try executer.execute("cat '\(logPath)' | grep 'filecoordinationd' || true").count == 0 else {
-                    didFoundBootKeyword = true
-                    break
-                }
-                
-                Thread.sleep(forTimeInterval: 1.0)
-            }
-            
-            if !didFoundBootKeyword && verbose {
-                print("⚠️  did not find boot keywork in time\n")
-            }
-            
-            _ = try executer.execute("kill -SIGINT $(cat \(pidPath)) || true")
         }
     }
 }

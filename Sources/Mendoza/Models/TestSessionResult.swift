@@ -30,7 +30,7 @@ final class TestSessionResult: Codable {
     var failedTests = [TestCaseResult]()
     var destination = Destination()
     var device = Device.defaultInit()
-    var summaryPlistPath = [String: String]()
+    var xcResultPath = [String: String]()
     var date = ""
     var startTime: TimeInterval = 0.0
 }

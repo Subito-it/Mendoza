@@ -28,6 +28,7 @@ class SimulatorBootOperation: BaseOperation<Void> {
             
             try pool.execute { (executer, source) in
                 let proxy = CommandLineProxy.Simulators(executer: executer, verbose: self.verbose)
+                
                 try proxy.boot(simulator: source.value)
             }
             

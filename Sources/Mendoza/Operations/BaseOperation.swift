@@ -35,18 +35,22 @@ class BaseOperation<Output: Any>: Operation, Starting, Ending, Throwing, LoggedO
     lazy var logger = ExecuterLogger(name: "\(type(of: self))", address: "operation")
     var loggers = Set<ExecuterLogger>()
     
+    var startTimeInterval: TimeInterval = 0.0
+    
     private var isExecutingObserver: NSKeyValueObservation?
     
     override init() {
         super.init()
         
-        isExecutingObserver = observe(\BaseOperation.isExecuting) { (op, _) in
+        isExecutingObserver = observe(\BaseOperation.isExecuting) { [unowned self] (op, _) in
             guard !op.isCancelled else { return }
             
             if op.isExecuting {
+                self.startTimeInterval = CFAbsoluteTimeGetCurrent()
                 print("🏃‍♀️ `\(op.className.components(separatedBy: ".").last ?? op.className)` did start".bold)
             } else {
-                print("🏁 `\(op.className.components(separatedBy: ".").last ?? op.className)` did complete".bold)
+                let delta = CFAbsoluteTimeGetCurrent() - self.startTimeInterval
+                print("🏁 `\(op.className.components(separatedBy: ".").last ?? op.className)` did complete in \(delta)s".bold)
             }
         }
         loggers.insert(logger)

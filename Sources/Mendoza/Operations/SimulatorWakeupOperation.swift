@@ -9,13 +9,15 @@ import Foundation
 
 class SimulatorWakeupOperation: BaseOperation<Void> {
     private let nodes: [Node]
+    private let runHeadless: Bool
     private let verbose: Bool
     private lazy var pool: ConnectionPool = {
         return makeConnectionPool(sources: nodes)
     }()
     
-    init(nodes: [Node], verbose: Bool) {
+    init(nodes: [Node], runHeadless: Bool, verbose: Bool) {
         self.nodes = nodes
+        self.runHeadless = runHeadless
         self.verbose = verbose
     }
     
@@ -27,7 +29,10 @@ class SimulatorWakeupOperation: BaseOperation<Void> {
             
             try pool.execute { (executer, node) in
                 let simulators = CommandLineProxy.Simulators(executer: executer, verbose: self.verbose)
-                try simulators.wakeUp()
+                
+                if self.runHeadless == false {
+                    try simulators.wakeUp()
+                }
             }
             
             didEnd?(())

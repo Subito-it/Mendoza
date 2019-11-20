@@ -12,6 +12,7 @@ class TestTearDownOperation: BaseOperation<Void> {
     
     private let configuration: Configuration
     private let timestamp: String
+    private let git: GitStatus?
     private lazy var executer: Executer? = {
         let destinationNode = configuration.resultDestination.node
         
@@ -19,8 +20,9 @@ class TestTearDownOperation: BaseOperation<Void> {
         return try? destinationNode.makeExecuter(logger: logger)
     }()
     
-    init(configuration: Configuration, timestamp: String) {
+    init(configuration: Configuration, git: GitStatus?, timestamp: String) {
         self.configuration = configuration
+        self.git = git
         self.timestamp = timestamp
     }
 
@@ -32,12 +34,12 @@ class TestTearDownOperation: BaseOperation<Void> {
             
             guard let executer = executer else { fatalError("💣 Failed making executer") }
             
-            try cleanupRetriedTestsFromTestResultSummary(executer: executer)
-            
             try writeHtmlRepeatedTestResultSummary(executer: executer)
             try writeJsonRepeatedTestResultSummary(executer: executer)
             try writeHtmlTestResultSummary(executer: executer)
             try writeJsonTestResultSummary(executer: executer)
+            try writeGitInfo(executer: executer)
+            try writeGitInfoInResultBundleInfoPlist(executer: executer)
             
             didEnd?(())
         } catch {
@@ -63,70 +65,6 @@ class TestTearDownOperation: BaseOperation<Void> {
         }
         
         return filteredTestCaseResults
-    }
-    
-    private func cleanupRetriedTestsFromTestResultSummary(executer: Executer) throws {
-        guard let testCaseResults = testCaseResults else { return }
-        
-        let repeatedTestCases = Dictionary(grouping: testCaseResults, by: { "\($0.suite)_\($0.name)" }).filter { $1.count > 1 }.values
-        
-        guard repeatedTestCases.count > 0 else { return }
-        
-        let uniquePlistTestCases = Dictionary(grouping: testCaseResults, by: { $0.summaryPlistPath }).values.compactMap { $0.first }
-        
-        var testsToDelete = [TestCaseResult]()
-        
-        for repeatedTestCase in repeatedTestCases {
-            guard let testToKeep = (repeatedTestCase.first { $0.status == .passed } ?? repeatedTestCase.first) else { continue }
-            
-            testsToDelete += repeatedTestCase.filter { $0 != testToKeep }
-        }
-
-        for uniquePlistTestCase in uniquePlistTestCases {
-            let tempUrl = Path.temp.url.appendingPathComponent("\(UUID().uuidString).plist")
-            
-            let remotePath = "\(self.configuration.resultDestination.path)/\(self.timestamp)/\(uniquePlistTestCase.summaryPlistPath)"
-            
-            try executer.download(remotePath: remotePath, localUrl: tempUrl)
-            
-            guard let tempUrlContent = try? Data(contentsOf: tempUrl) else {
-                throw Error("Failed copying \(remotePath) to \(tempUrl.absoluteString)")
-            }
-
-            guard var testResultDictionary = (try? PropertyListSerialization.propertyList(from: tempUrlContent, options: .mutableContainers, format: nil) as? [String: Any]) else {
-                throw Error("Failed decoding \(tempUrl.absoluteString)")
-            }
-
-            for testToDelete in testsToDelete {
-                guard testToDelete.summaryPlistPath == uniquePlistTestCase.summaryPlistPath else { continue }
-
-                let keyPath = testResultDictionary.firstKeyPath { key, value in
-                    return key.hasSuffix("TestIdentifier") && (value as? String) == "\(testToDelete.suite)/\(testToDelete.name)()"
-                }
-                
-                var segments = keyPath.components(separatedBy: ".").dropLast()
-                
-                let durationKeyPath = segments.joined(separator: ".") + ".Duration"
-                let removedDuration = testResultDictionary[keyPath: durationKeyPath] as? Double
-                testResultDictionary[keyPath: segments.joined(separator: ".")] = nil
-                
-                if let removedDuration = removedDuration {
-                    while segments.count > 0 {
-                        segments = segments.dropLast(2)
-                        
-                        let durationKeyPath = segments.joined(separator: ".") + ".Duration"
-                        guard let duration = testResultDictionary[keyPath: durationKeyPath] as? Double else { break }
-                        
-                        testResultDictionary[keyPath: durationKeyPath] = duration - removedDuration
-                    }
-                }
-            }
-            
-            let data = try PropertyListSerialization.data(fromPropertyList: testResultDictionary, format: .xml, options: 0)
-            try data.write(to: tempUrl)
-            
-            try executer.upload(localUrl: tempUrl, remotePath: remotePath)
-        }
     }
     
     private func writeHtmlRepeatedTestResultSummary(executer: Executer) throws {
@@ -213,6 +151,47 @@ class TestTearDownOperation: BaseOperation<Void> {
         try contentData.write(to: tempUrl)
         try executer.upload(localUrl: tempUrl, remotePath: destinationPath)
     }
+    
+    private func writeGitInfo(executer: Executer) throws {
+        guard let git = git else { return }
+        
+        let destinationPath = "\(self.configuration.resultDestination.path)/\(self.timestamp)/\(Environment.jsonGitSummaryFilename)"
+        
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = .prettyPrinted
+        guard let contentData = try? encoder.encode(git) else {
+            throw Error("Failed writing json git data")
+        }
+        
+        let tempUrl = Path.temp.url.appendingPathComponent("\(UUID().uuidString).json")
+        
+        try contentData.write(to: tempUrl)
+        try executer.upload(localUrl: tempUrl, remotePath: destinationPath)
+    }
+    
+    private func writeGitInfoInResultBundleInfoPlist(executer: Executer) throws {
+        guard let git = git else { return }
+        
+        let infoPlistPath = "\(self.configuration.resultDestination.path)/\(self.timestamp)/\(Environment.xcresultFilename)/Info.plist"
+        
+        let uniqueUrl = Path.temp.url.appendingPathComponent("\(UUID().uuidString).plist")
+        try executer.download(remotePath: infoPlistPath, localUrl: uniqueUrl)
+        
+        guard let data = try? Data(contentsOf: uniqueUrl) else { return }
+
+        var infoPlist = try PropertyListDecoder().decode([String: AnyCodable].self, from: data)
+
+        infoPlist["branchName"] = AnyCodable(git.branch)
+        infoPlist["commitMessage"] = AnyCodable(git.commitMessage)
+        infoPlist["commitHash"] = AnyCodable(git.commitHash)
+                
+        guard let contentData = try? PropertyListEncoder().encode(infoPlist) else {
+            throw Error("Failed writing json git data to xcresult bundle Info.plit")
+        }
+
+        try contentData.write(to: uniqueUrl)
+        try executer.upload(localUrl: uniqueUrl, remotePath: infoPlistPath)
+    }    
 }
 
 extension TestCaseResult {

@@ -39,6 +39,11 @@ class ValidationOperation: BaseOperation<Void> {
                     throw Error("Incompatible swift compiler version, check that Xcode's versions match.\n\nExpecting:\n`\(compilingSwiftVersion)`\n\nGot:\n`\(remoteSwiftVersion)`", logger: executer.logger)
                 }
                 
+                let remoteMendozaVersion = try executer.execute("mendoza --version")
+                guard Mendoza.version == remoteMendozaVersion else {
+                    throw Error("Incompatible mendoza versions.\n\nExpecting:\n`\(Mendoza.version)`\n\nGot:\n`\(remoteMendozaVersion)`", logger: executer.logger)
+                }
+                
                 try self.checkDependencies(executer: executer)
             }
                         

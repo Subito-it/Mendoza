@@ -7,7 +7,7 @@
 
 import Foundation
 
-class TestDistributionPlugin: Plugin<TestOrderInput, [[TestCase]]> {
+class TestDistributionPlugin: Plugin<TestOrderInput, [[EstimatedTestCase]]> {
     init(baseUrl: URL, plugin: (data: String?, debug: Bool) = (nil, false)) {
         super.init(name: "TestDistributionPlugin", baseUrl: baseUrl, plugin: plugin)
     }
