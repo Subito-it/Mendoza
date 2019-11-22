@@ -107,7 +107,7 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                 
                 try self.reclaimDiskSpace(executer: executer, testRunner: testRunner)
                 
-                print("\nℹ️  Node {\(runnerIndex)} did execute tests in \(CFAbsoluteTimeGetCurrent() - self.startTimeInterval)s\n".magenta)
+                print("\nℹ️  Node {\(runnerIndex)} did execute tests in \(hoursMinutesSeconds(in: CFAbsoluteTimeGetCurrent() - self.startTimeInterval))\n".magenta)
             }
             
             didEnd?(result)
@@ -179,21 +179,21 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                         guard let currentRunning = currentRunningAndDuration() else { return }
                         self.currentRunningTest[runnerIndex] = nil
                         
-                        print("✓ \(currentRunning.test.description) passed [\(self.testCasesCompleted.count)/\(self.testCasesCount)] in \(currentRunning.duration) {\(runnerIndex)}".green)
+                        print("✓ \(self.verbose ? "[\(Date().description)]" : "")\(currentRunning.test.description) passed [\(self.testCasesCompleted.count)/\(self.testCasesCount)] in \(currentRunning.duration) {\(runnerIndex)}".green)
                     }
                 case .testFailed:
                     self.syncQueue.sync { [unowned self] in
                         guard let currentRunning = currentRunningAndDuration() else { return }
                         self.currentRunningTest[runnerIndex] = nil
                         
-                        print("𝘅 \(currentRunning.test.description) failed [\(self.testCasesCompleted.count)/\(self.testCasesCount)] in \(currentRunning.duration) {\(runnerIndex)}".green)
+                        print("𝘅 \(self.verbose ? "[\(Date().description)]" : "")\(currentRunning.test.description) failed [\(self.testCasesCompleted.count)/\(self.testCasesCount)] in \(currentRunning.duration) {\(runnerIndex)}".green)
                     }
                 case .testCrashed:
                     self.syncQueue.sync { [unowned self] in
                         guard let currentRunning = currentRunningAndDuration() else { return }
                         self.currentRunningTest[runnerIndex] = nil
                         
-                        print("💥 \(currentRunning.test.description) crash [\(self.testCasesCompleted.count)/\(self.testCasesCount)] in \(currentRunning.duration) {\(runnerIndex)}".green)
+                        print("💥 \(self.verbose ? "[\(Date().description)]" : "")\(currentRunning.test.description) crash [\(self.testCasesCompleted.count)/\(self.testCasesCount)] in \(currentRunning.duration) {\(runnerIndex)}".green)
                     }
                 }
             }
