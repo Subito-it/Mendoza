@@ -9,11 +9,7 @@ import Foundation
 
 class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
     // An array of TestCases sorted from the longest to the shortest estimated execution time
-    var sortedTestCases: [TestCase]? {
-        didSet {
-            testCasesCount = sortedTestCases?.count ?? 0
-        }
-    }
+    var sortedTestCases: [TestCase]?
     var currentResult: [TestCaseResult]?
     var currentRunningTest = [Int: (test: TestCase, start: TimeInterval)]()
     var testRunners: [(testRunner: TestRunner, node: Node)]?
@@ -29,6 +25,7 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
     private let syncQueue = DispatchQueue(label: String(describing: TestRunnerOperation.self))
     private let verbose: Bool
     private var timeoutBlocks = [Int: CancellableDelayedTask]()
+    private var maxTestsPerIteration = 0
     
     private enum XcodebuildLineEvent {
         case testStart(testCase: TestCase)
@@ -39,13 +36,12 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
         var isTestPassed: Bool { switch self { case .testPassed: return true; default: return false } }
     }
     
-    private lazy var pool: ConnectionPool<(TestRunner, [TestCase])> = {
+    private lazy var pool: ConnectionPool<TestRunner> = {
         guard let sortedTestCases = sortedTestCases else { fatalError("💣 Required field `distributedTestCases` not set") }
         guard let testRunners = testRunners else { fatalError("💣 Required field `testRunner` not set") }
-        guard testRunners.count >= sortedTestCases.count else { fatalError("💣 Invalid testRunner count") }
         
         let input = zip(testRunners, sortedTestCases)
-        return makeConnectionPool(sources: input.map { (node: $0.0.node, value: ($0.0.testRunner, $0.1)) })
+        return makeConnectionPool(sources: input.map { (node: $0.0.node, value: $0.0.testRunner) })
     }()
     
     init(configuration: Configuration, buildTarget: String, testTarget: String, sdk: XcodeProject.SDK, testTimeoutSeconds: Int, verbose: Bool) {
@@ -65,42 +61,67 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
             
             var result = currentResult ?? [TestCaseResult]()
             
+            testCasesCount = sortedTestCases?.count ?? 0
             guard testCasesCount > 0 else {
                 didEnd?(result)
                 return
             }
+            maxTestsPerIteration = max(1, testCasesCount / ((testRunners?.count ?? 1) * 2))
             
             if result.count > 0 {
                 print("\n\nℹ️  Repeating failing tests".magenta)
             }
             
             try pool.execute { [unowned self] (executer, source) in
-                let testRunner = source.value.0
-                let testCases = source.value.1
+                let testRunner = source.value
                 
-                var runnerIndex = 0
-                self.syncQueue.sync { [unowned self] in
-                    runnerIndex = self.testRunners?.firstIndex { $0.0.id == testRunner.id && $0.0.name == testRunner.name } ?? 0
+                let runnerIndex = self.syncQueue.sync { [unowned self] in self.testRunners?.firstIndex { $0.0.id == testRunner.id && $0.0.name == testRunner.name } ?? 0 }
+                
+                while true {
+                    // If the sorting plugin is installed, test cases are sorted by execution time with longest coming first.
+                    // we enqueue tests from available test cases stepping by the total number of runners. This way long test
+                    // are spread an executed on all runners.
+                    let testCases: [TestCase] = self.syncQueue.sync { [unowned self] in
+                        var testCases = [TestCase]()
+                        let totalRunners = self.testRunners?.count ?? 1
+                        
+                        let sortedTestCases = self.sortedTestCases ?? []
+                        
+                        for (index, testCase) in sortedTestCases.enumerated() {
+                            if index % totalRunners == runnerIndex {
+                                testCases.append(testCase)
+                                if testCases.count == self.maxTestsPerIteration {
+                                    break
+                                }
+                            }
+                        }
+                        
+                        self.sortedTestCases?.removeAll(where: { testCases.contains($0) })
+                        
+                        return testCases
+                    }
+                    
+                    guard testCases.count > 0 else { break }
+                    
+                    print("ℹ️  Node \(source.node.address) will execute \(testCases.count) tests on \(testRunner.name) {\(runnerIndex)}".magenta)
+                    
+                    executer.logger?.log(command: "Will launch \(testCases.count) test cases")
+                    executer.logger?.log(output: testCases.map { $0.testIdentifier }.joined(separator: "\n"), statusCode: 0)
+                    
+                    let output = try autoreleasepool {
+                        return try self.testWithoutBuilding(executer: executer, testCases: testCases, testRunner: testRunner, runnerIndex: runnerIndex)
+                    }
+                    
+                    let xcResultUrl = try self.findTestResultUrl(executer: executer, testRunner: testRunner)
+                    
+                    // We need to move results because xcodebuild test-without-building shows a weird behaviour not allowing more than 2 xcresults in the same folder.
+                    // Repeatedly performing 'xcodebuild test-without-building' results in older xcresults being deleted
+                    let resultUrl = Path.results.url.appendingPathComponent(testRunner.id)
+                    _ = try executer.capture("mkdir -p '\(resultUrl.path)'; mv '\(xcResultUrl.path)' '\(resultUrl.path)'")
+                    
+                    let testResults = try self.parseTestResults(output, candidates: testCases, node: source.node.address, xcResultPath: xcResultUrl.path)
+                    self.syncQueue.sync { result += testResults }
                 }
-                
-                guard testCases.count > 0 else { return }
-                
-                print("ℹ️  Node \(source.node.address) will execute \(testCases.count) tests on \(testRunner.name) {\(runnerIndex)}".magenta)
-                
-                executer.logger?.log(command: "Will launch \(testCases.count) test cases")
-                executer.logger?.log(output: testCases.map { $0.testIdentifier }.joined(separator: "\n"), statusCode: 0)
-                
-                let output = try self.testWithoutBuilding(executer: executer, testCases: testCases, testRunner: testRunner, runnerIndex: runnerIndex)
-                
-                let xcResultUrl = try self.findTestResultUrl(executer: executer, testRunner: testRunner)
-                
-                // We need to move results because xcodebuild test-without-building shows a weird behaviour not allowing more than 2 xcresults in the same folder.
-                // Repeatedly performing 'xcodebuild test-without-building' results in older xcresults being deleted
-                let resultUrl = Path.results.url.appendingPathComponent(testRunner.id)
-                _ = try executer.capture("mkdir -p '\(resultUrl.path)'; mv '\(xcResultUrl.path)' '\(resultUrl.path)'")
-
-                let testResults = try self.parseTestResults(output, candidates: testCases, node: source.node.address, xcResultPath: xcResultUrl.path)
-                self.syncQueue.sync { result += testResults }
                 
                 try self.copyDiagnosticReports(executer: executer, testRunner: testRunner)
                 try self.copyStandardOutputLogs(executer: executer, testRunner: testRunner)
