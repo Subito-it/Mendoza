@@ -8,9 +8,10 @@
 import Foundation
 
 class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
-    var distributedTestCases: [[TestCase]]? {
+    // An array of TestCases sorted from the longest to the shortest estimated execution time
+    var sortedTestCases: [TestCase]? {
         didSet {
-            testCasesCount = distributedTestCases?.reduce(0, { $0 + $1.count }) ?? 0
+            testCasesCount = sortedTestCases?.count ?? 0
         }
     }
     var currentResult: [TestCaseResult]?
@@ -39,11 +40,11 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
     }
     
     private lazy var pool: ConnectionPool<(TestRunner, [TestCase])> = {
-        guard let distributedTestCases = distributedTestCases else { fatalError("💣 Required field `distributedTestCases` not set") }
+        guard let sortedTestCases = sortedTestCases else { fatalError("💣 Required field `distributedTestCases` not set") }
         guard let testRunners = testRunners else { fatalError("💣 Required field `testRunner` not set") }
-        guard testRunners.count >= distributedTestCases.count else { fatalError("💣 Invalid testRunner count") }
+        guard testRunners.count >= sortedTestCases.count else { fatalError("💣 Invalid testRunner count") }
         
-        let input = zip(testRunners, distributedTestCases)
+        let input = zip(testRunners, sortedTestCases)
         return makeConnectionPool(sources: input.map { (node: $0.0.node, value: ($0.0.testRunner, $0.1)) })
     }()
     
@@ -64,7 +65,7 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
             
             var result = currentResult ?? [TestCaseResult]()
             
-            guard distributedTestCases?.contains(where: { $0.count > 0 }) == true else {
+            guard testCasesCount > 0 else {
                 didEnd?(result)
                 return
             }

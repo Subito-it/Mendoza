@@ -34,7 +34,7 @@ Extract test methods from UI test target files. Can be overridden by plugin impl
 
 Compile project using xcodebuild's `build-for-testing` which will produce a test bundle that will be later sent to remote nodes. Pre/post compilation can be customize with plugins. 
 
-### testDistributionOperation
+### testSortingOperation
 
 Distributes test methods over available nodes. Can be overridden by plugin implementation to achieve a more balanced total execution time per node.
 
