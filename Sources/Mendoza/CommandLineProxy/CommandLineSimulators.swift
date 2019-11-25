@@ -30,7 +30,11 @@ extension CommandLineProxy {
                 
         func reset() throws {
             let commands = ["defaults read com.apple.iphonesimulator",
-                            "sleep 3; pkill -1 Simulator; sleep 3; killall -9 com.apple.CoreSimulator.CoreSimulatorService; sleep 3;"]
+                            "sleep 3",
+                            "kill -9 $(ps ax | grep -i 'SpringBoard.app/SpringBoard' | awk '{ print $1 }')",
+                            "killall -9 com.apple.CoreSimulator.CoreSimulatorService",
+                            "sleep 3",
+                            "pkill -9 Simulator"]
             
             try commands.forEach { _ = try executer.execute("\($0) 2>/dev/null || true") }
         }
