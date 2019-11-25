@@ -103,7 +103,7 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                     
                     guard testCases.count > 0 else { break }
                     
-                    print("ℹ️  Node \(source.node.address) will execute \(testCases.count) tests on \(testRunner.name) {\(runnerIndex)}".magenta)
+                    print("ℹ️  \(self.verbose ? "[\(Date().description)] " : "")Node \(source.node.address) will execute \(testCases.count) tests on \(testRunner.name) {\(runnerIndex)}".magenta)
                     
                     executer.logger?.log(command: "Will launch \(testCases.count) test cases")
                     executer.logger?.log(output: testCases.map { $0.testIdentifier }.joined(separator: "\n"), statusCode: 0)
@@ -201,21 +201,21 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                         guard let currentRunning = currentRunningAndDuration() else { return }
                         self.currentRunningTest[runnerIndex] = nil
                         
-                        print("✓ \(self.verbose ? "[\(Date().description)]" : "")\(currentRunning.test.description) passed [\(self.testCasesCompleted.count)/\(self.testCasesCount)] in \(currentRunning.duration) {\(runnerIndex)}".green)
+                        print("✓ \(self.verbose ? "[\(Date().description)] " : "")\(currentRunning.test.description) passed [\(self.testCasesCompleted.count)/\(self.testCasesCount)] in \(currentRunning.duration) {\(runnerIndex)}".green)
                     }
                 case .testFailed:
                     self.syncQueue.sync { [unowned self] in
                         guard let currentRunning = currentRunningAndDuration() else { return }
                         self.currentRunningTest[runnerIndex] = nil
                         
-                        print("𝘅 \(self.verbose ? "[\(Date().description)]" : "")\(currentRunning.test.description) failed [\(self.testCasesCompleted.count)/\(self.testCasesCount)] in \(currentRunning.duration) {\(runnerIndex)}".green)
+                        print("𝘅 \(self.verbose ? "[\(Date().description)] " : "")\(currentRunning.test.description) failed [\(self.testCasesCompleted.count)/\(self.testCasesCount)] in \(currentRunning.duration) {\(runnerIndex)}".green)
                     }
                 case .testCrashed:
                     self.syncQueue.sync { [unowned self] in
                         guard let currentRunning = currentRunningAndDuration() else { return }
                         self.currentRunningTest[runnerIndex] = nil
                         
-                        print("💥 \(self.verbose ? "[\(Date().description)]" : "")\(currentRunning.test.description) crash [\(self.testCasesCompleted.count)/\(self.testCasesCount)] in \(currentRunning.duration) {\(runnerIndex)}".green)
+                        print("💥 \(self.verbose ? "[\(Date().description)] " : "")\(currentRunning.test.description) crash [\(self.testCasesCompleted.count)/\(self.testCasesCount)] in \(currentRunning.duration) {\(runnerIndex)}".green)
                     }
                 }
             }
