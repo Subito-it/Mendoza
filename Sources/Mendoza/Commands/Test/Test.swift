@@ -109,14 +109,8 @@ class Test {
         let simulatorBootOperation = SimulatorBootOperation(verbose: userOptions.verbose)
         let simulatorWakeupOperation = SimulatorWakeupOperation(nodes: uniqueNodes, runHeadless: userOptions.runHeadless, verbose: userOptions.verbose)
         let distributeTestBundleOperation = DistributeTestBundleOperation(nodes: uniqueNodes)
-        let testRunnerOperation = TestRunnerOperation(configuration: configuration, buildTarget: targets.build.name, testTarget: targets.test.name, sdk: sdk, testTimeoutSeconds: userOptions.testTimeoutSeconds, verbose: userOptions.verbose)
+        let testRunnerOperation = TestRunnerOperation(configuration: configuration, buildTarget: targets.build.name, testTarget: targets.test.name, sdk: sdk, failingTestsRetryCount: userOptions.failingTestsRetryCount, testTimeoutSeconds: userOptions.testTimeoutSeconds, verbose: userOptions.verbose)
         
-        var retryTestSortingOperations = [TestSortingOperation]()
-        var retryTestRunnerOperations = [TestRunnerOperation]()
-        for _ in 0..<userOptions.failingTestsRetryCount {
-            retryTestSortingOperations.append(.init(device: device, plugin: testSortingPlugin, verbose: userOptions.verbose))
-            retryTestRunnerOperations.append(.init(configuration: configuration, buildTarget: targets.build.name, testTarget: targets.test.name, sdk: sdk, testTimeoutSeconds: userOptions.testTimeoutSeconds, verbose: userOptions.verbose))
-        }
         let testCollectorOperation = TestCollectorOperation(configuration: configuration, timestamp: timestamp, buildTarget: targets.build.name, testTarget: targets.test.name)
         let testTearDownOperation = TestTearDownOperation(configuration: configuration, git: gitStatus, timestamp: timestamp)
         let cleanupOperation = CleanupOperation(configuration: configuration, timestamp: timestamp)
@@ -141,7 +135,7 @@ class Test {
              testTearDownOperation,
              simulatorTearDownOperation,
              cleanupOperation,
-             tearDownOperation] + retryTestSortingOperations + retryTestRunnerOperations
+             tearDownOperation]
         
         switch sdk {
         case .ios:
@@ -172,15 +166,7 @@ class Test {
         
         testRunnerOperation.addDependencies([simulatorWakeupOperation, distributeTestBundleOperation, testSortingOperation])
         
-        var lastTestRunnerOperation = testRunnerOperation
-        for index in 0..<userOptions.failingTestsRetryCount {
-            retryTestSortingOperations[index].addDependency(lastTestRunnerOperation)
-            retryTestRunnerOperations[index].addDependency(retryTestSortingOperations[index])
-            
-            lastTestRunnerOperation = retryTestRunnerOperations[index]
-        }
-        
-        testCollectorOperation.addDependency(lastTestRunnerOperation)
+        testCollectorOperation.addDependency(testRunnerOperation)
         
         testTearDownOperation.addDependency(testCollectorOperation)
         simulatorTearDownOperation.addDependency(testCollectorOperation)
@@ -235,18 +221,12 @@ class Test {
         case .macos:
             testSortingOperation.testRunnersCount = uniqueNodes.count
             testRunnerOperation.testRunners = uniqueNodes.map { (testRunner: $0, node: $0) }
-            
-            retryTestSortingOperations.forEach { $0.testRunnersCount = testSortingOperation.testRunnersCount }
-            retryTestRunnerOperations.forEach { $0.testRunners = testRunnerOperation.testRunners }
         case .ios:
             simulatorSetupOperation.didEnd = { simulators in
                 simulatorBootOperation.simulators = simulators
                 
                 testSortingOperation.testRunnersCount = simulators.count
                 testRunnerOperation.testRunners = simulators.map { (testRunner: $0.0, node: $0.1) }
-                
-                retryTestSortingOperations.forEach { $0.testRunnersCount = testSortingOperation.testRunnersCount }
-                retryTestRunnerOperations.forEach { $0.testRunners = testRunnerOperation.testRunners }
             }
         }
         
@@ -292,49 +272,7 @@ class Test {
             testTearDownOperation.testCaseResults = testCaseResults
             try? self.eventPlugin.run(event: Event(kind: .stopTesting, info: [:]), device: device)
         }
-                
-        if userOptions.failingTestsRetryCount > 0 {
-            retryTestRunnerOperations.last?.didEnd = testRunnerOperation.didEnd
-            retryTestRunnerOperations.insert(testRunnerOperation, at: 0)
-            
-            for index in 0..<retryTestRunnerOperations.count {
-                retryTestRunnerOperations[index].didStart = { [unowned self] in                    
-                    try? self.eventPlugin.run(event: Event(kind: .startTesting, info: ["retry_indx": "\(index)"]), device: device)
-                }
-            }
-            for index in 0..<retryTestRunnerOperations.count - 1 {
-                retryTestRunnerOperations[index].didEnd = { [unowned self] testCaseResults in
-                    let failingGroups = Dictionary(grouping: testCaseResults, by: { "\($0.suite)/\($0.name)" }).values.filter { $0.allSatisfy { $0.status == .failed }}
-                    
-                    let failingTestCases = failingGroups.compactMap { $0.first }.map { TestCase(name: $0.name, suite: $0.suite) }
-                    retryTestSortingOperations[index].testCases = failingTestCases
-                    
-                    for index2 in index + 1..<retryTestRunnerOperations.count {
-                        retryTestRunnerOperations[index2].currentResult = testCaseResults
-                    }
-                    
-                    let nodes = Set(testCaseResults.map { $0.node })
-                    for node in nodes {
-                        let testCases = testCaseResults.filter { $0.node == node }
-                        for xcResultPath in Set(testCases.map { $0.xcResultPath }) {
-                            testSessionResult.xcResultPath[xcResultPath] = node
-                        }
                         
-                        let executionTime = testCases.reduce(0.0, { $0 + $1.duration })
-                        testSessionResult.nodes["\(node)-r\(index)"] = .init(executionTime: executionTime, totalTests: testCases.count)
-                    }
-                    
-                    try? self.eventPlugin.run(event: Event(kind: .stopTesting, info: ["retry_indx": "\(index)"]), device: device)
-                }
-            }
-            assert(retryTestSortingOperations.count == retryTestRunnerOperations.count - 1, "💣 Wrong sizing")
-            for index in 0..<retryTestSortingOperations.count {
-                retryTestSortingOperations[index].didEnd = { sortedTestCases in
-                    retryTestRunnerOperations[index + 1].sortedTestCases = sortedTestCases
-                }
-            }
-        }
-        
         tearDownOperation.didStart = { [unowned tearDownOperation] in
             tearDownOperation.testSessionResult = testSessionResult
         }
