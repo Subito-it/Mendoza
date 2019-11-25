@@ -362,16 +362,22 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                 print("⏰ Unknown test timed out {\(runnerIndex)}".red)
             }
             
-            let proxy = CommandLineProxy.Simulators(executer: simulatorExecuter, verbose: true)
-            let simulator = Simulator(id: testRunner.id, name: "Simulator", device: Device.defaultInit())
-            
-            // There's no better option than shutting down simulator at this point
-            // xcodebuild will take care to boot simulator again and continue testing
-            try? proxy.shutdown(simulator: simulator)
-            try? proxy.boot(simulator: simulator)
+            self.forceResetSimulator(executer: executer, testRunner: testRunner)
         }
         
         return task
+    }
+    
+    private func forceResetSimulator(executer: Executer, testRunner: TestRunner) {
+        guard let simulatorExecuter = try? executer.clone() else { return }
+
+        let proxy = CommandLineProxy.Simulators(executer: simulatorExecuter, verbose: true)
+        let simulator = Simulator(id: testRunner.id, name: "Simulator", device: Device.defaultInit())
+        
+        // There's no better option than shutting down simulator at this point
+        // xcodebuild will take care to boot simulator again and continue testing
+        try? proxy.shutdown(simulator: simulator)
+        try? proxy.boot(simulator: simulator)
     }
     
     private func findTestRun(executer: Executer) throws -> String {
