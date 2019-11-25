@@ -25,7 +25,6 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
     private let syncQueue = DispatchQueue(label: String(describing: TestRunnerOperation.self))
     private let verbose: Bool
     private var timeoutBlocks = [Int: CancellableDelayedTask]()
-    private var maxTestsPerIteration = 0
     
     private enum XcodebuildLineEvent {
         case testStart(testCase: TestCase)
@@ -66,7 +65,6 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                 didEnd?(result)
                 return
             }
-            maxTestsPerIteration = max(1, testCasesCount / ((testRunners?.count ?? 1) * 2))
             
             if result.count > 0 {
                 print("\n\nℹ️  Repeating failing tests".magenta)
@@ -78,27 +76,14 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                 let runnerIndex = self.syncQueue.sync { [unowned self] in self.testRunners?.firstIndex { $0.0.id == testRunner.id && $0.0.name == testRunner.name } ?? 0 }
                 
                 while true {
-                    // If the sorting plugin is installed, test cases are sorted by execution time with longest coming first.
-                    // we enqueue tests from available test cases stepping by the total number of runners. This way long test
-                    // are spread an executed on all runners.
                     let testCases: [TestCase] = self.syncQueue.sync { [unowned self] in
-                        var testCases = [TestCase]()
-                        let totalRunners = self.testRunners?.count ?? 1
-                        
-                        let sortedTestCases = self.sortedTestCases ?? []
-                        
-                        for (index, testCase) in sortedTestCases.enumerated() {
-                            if index % totalRunners == runnerIndex {
-                                testCases.append(testCase)
-                                if testCases.count == self.maxTestsPerIteration {
-                                    break
-                                }
-                            }
+                        guard let testCase = self.sortedTestCases?.first else {
+                            return []
                         }
                         
-                        self.sortedTestCases?.removeAll(where: { testCases.contains($0) })
+                        self.sortedTestCases?.removeFirst()
                         
-                        return testCases
+                        return [testCase]
                     }
                     
                     guard testCases.count > 0 else { break }
