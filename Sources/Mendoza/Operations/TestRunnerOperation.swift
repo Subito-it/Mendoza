@@ -38,6 +38,7 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
         case testCrashed
         
         var isTestPassed: Bool { switch self { case .testPassed: return true; default: return false } }
+        var isTestCrashed: Bool { switch self { case .testCrashed: return true; default: return false } }
     }
     
     private lazy var pool: ConnectionPool<TestRunner> = {
@@ -180,10 +181,10 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
             let lines = partialProgress.components(separatedBy: "\n")
             let events = lines.compactMap(self.parseXcodebuildOutput)
             
-            let currentRunningAndDuration: () -> (test: TestCase, duration: String)? = {
+            let currentRunningAndDuration: (Bool) -> (test: TestCase, duration: String)? = { [unowned self] addToCompleted in
                 guard let currentRunning = self.currentRunningTest[runnerIndex] else { return nil }
                 
-                if !self.testCasesCompleted.contains(currentRunning.test) {
+                if addToCompleted {
                     self.testCasesCompleted.append(currentRunning.test)
                 }
                 
@@ -192,7 +193,7 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                 return (test: currentRunning.test, duration: duration)
             }
             
-            for event in events {
+            for (index, event) in events.enumerated() {
                 switch event {
                 case let .testStart(testCase):
                     self.syncQueue.sync {
@@ -202,21 +203,23 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                     }
                 case .testPassed:
                     self.syncQueue.sync { [unowned self] in
-                        guard let currentRunning = currentRunningAndDuration() else { return }
+                        guard let currentRunning = currentRunningAndDuration(true) else { return }
                         self.currentRunningTest[runnerIndex] = nil
                         
                         print("✓ \(self.verbose ? "[\(Date().description)] " : "")\(currentRunning.test.description) passed [\(self.testCasesCompleted.count)/\(self.testCasesCount)]\(self.retryCount > 0 ? " (\(self.retryCount) retries)" : "") in \(currentRunning.duration) {\(runnerIndex)}".green)
                     }
                 case .testFailed:
                     self.syncQueue.sync { [unowned self] in
-                        guard let currentRunning = currentRunningAndDuration() else { return }
+                        let addToCompleted = index > 0 ? events[index - 1].isTestCrashed == false : true
+                        
+                        guard let currentRunning = currentRunningAndDuration(addToCompleted) else { return }
                         self.currentRunningTest[runnerIndex] = nil
                         
                         print("𝘅 \(self.verbose ? "[\(Date().description)] " : "")\(currentRunning.test.description) failed [\(self.testCasesCompleted.count)/\(self.testCasesCount)]\(self.retryCount > 0 ? " (\(self.retryCount) retries)" : "") in \(currentRunning.duration) {\(runnerIndex)}".green)
                     }
                 case .testCrashed:
                     self.syncQueue.sync { [unowned self] in
-                        guard let currentRunning = currentRunningAndDuration() else { return }
+                        guard let currentRunning = currentRunningAndDuration(true) else { return }
                         self.currentRunningTest[runnerIndex] = nil
                         
                         print("💥 \(self.verbose ? "[\(Date().description)] " : "")\(currentRunning.test.description) crash [\(self.testCasesCompleted.count)/\(self.testCasesCount)]\(self.retryCount > 0 ? " (\(self.retryCount) retries)" : "") in \(currentRunning.duration) {\(runnerIndex)}".green)
