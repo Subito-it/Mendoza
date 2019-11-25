@@ -119,7 +119,14 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                     let resultUrl = Path.results.url.appendingPathComponent(testRunner.id)
                     _ = try executer.capture("mkdir -p '\(resultUrl.path)'; mv '\(xcResultUrl.path)' '\(resultUrl.path)'")
                     
-                    let testResults = try self.parseTestResults(output, candidates: testCases, node: source.node.address, xcResultPath: xcResultUrl.path)
+                    var testResults = try self.parseTestResults(output, candidates: testCases, node: source.node.address, xcResultPath: xcResultUrl.path)
+                                        
+                    if let bootstrappingTestResults = try self.handleBootstrappingErrors(output, partialResult: testResults, candidates: testCases, node: source.node.address, xcResultPath: xcResultUrl.path) {
+                        testResults += bootstrappingTestResults
+                        
+                        self.forceResetSimulator(executer: executer, testRunner: testRunner)
+                    }
+                    
                     self.syncQueue.sync { result += testResults }
                 }
                 
@@ -348,14 +355,26 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
         return result
     }
     
+    private func handleBootstrappingErrors(_ output: String, partialResult: [TestCaseResult], candidates: [TestCase], node: String, xcResultPath: String) throws -> [TestCaseResult]? {
+        let boostrappingError = "Application failed preflight checks"
+        
+        let resultPath = xcResultPath.replacingOccurrences(of: "\(Path.logs.rawValue)/", with: "")
+        
+        if output.contains(boostrappingError) {
+            let failedCandidates = candidates.filter { candidate in
+                return partialResult.contains(where: { candidate.suite == $0.suite && candidate.testIdentifier == $0.testCaseIdentifier }) == false
+            }
+            
+            return failedCandidates.map { TestCaseResult(node: node, xcResultPath: resultPath, suite: $0.suite, name: $0.name, status: .failed, duration: -1) }
+        }
+        
+        return nil
+    }
+    
     private func makeTimeoutBlock(executer: Executer, currentRunning: (test: TestCase, start: TimeInterval)?, testRunner: TestRunner, runnerIndex: Int) -> CancellableDelayedTask {
         let task = CancellableDelayedTask(delay: TimeInterval(testTimeoutSeconds), queue: syncQueue)
         
-        task.run {
-            guard let simulatorExecuter = try? executer.clone() else {
-                return
-            }
-            
+        task.run { [unowned self] in
             if let currentRunning = currentRunning {
                 print("⏰ \(currentRunning.test.description) timed out {\(runnerIndex)} in \(Int(CFAbsoluteTimeGetCurrent() - currentRunning.start))s".red)
             } else {
