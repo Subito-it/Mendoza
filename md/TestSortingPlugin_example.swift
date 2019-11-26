@@ -30,7 +30,7 @@ struct TestSortingPlugin {
         
         for test in input.tests {
             let testIdentifier = "\(test.suite)-\(test.name)()-\(input.device.name)-\(input.device.runtime)".md5Value
-            let url = URL(string: "http://jessica.local:8090/v1/teststats?\(testIdentifier)")!
+            let url = URL(string: "http://cachi.local:8090/v1/teststats?\(testIdentifier)")! // https://github.com/Subito-it/Cachi
             
             let sem = DispatchSemaphore(value: 0)
             URLSession.shared.dataTask(with: url) { data, _, error in

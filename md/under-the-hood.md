@@ -36,7 +36,7 @@ Compile project using xcodebuild's `build-for-testing` which will produce a test
 
 ### testSortingOperation
 
-Distributes test methods over available nodes. Can be overridden by plugin implementation to achieve a more balanced total execution time per node.
+Returning a sorted list of tests from longest to shortest execution time will optimize total execution time of your test suite
 
 ### simulatorSetupOperation (iOS projects only)
 
