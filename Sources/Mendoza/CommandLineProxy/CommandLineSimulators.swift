@@ -20,7 +20,7 @@ extension CommandLineProxy {
         }
         
         func wakeUp() throws {
-            _ = try executer.execute("open -a \"$(xcode-select -p)/Applications/Simulator.app\" & sleep 5")
+            _ = try executer.execute("open -a \"$(xcode-select -p)/Applications/Simulator.app\"; sleep 5")
             let simulatorsBooting = try bootedSimulators()
             // Be nice to Simulator.app and wait for the default simulator to be booted. Random crashes and error happens doing otherwise
             for simulatorBooting in simulatorsBooting {
