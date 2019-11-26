@@ -86,12 +86,13 @@ extension CommandLineProxy {
             executer.logger?.addBlackList(appleIdCredentials.username)
             executer.logger?.addBlackList(appleIdCredentials.password)
             
+            try reset()
+            
             let cmds = ["export FASTLANE_USER=\(appleIdCredentials.username)",
                         "export FASTLANE_PASSWORD=\(appleIdCredentials.password)",
                         "rm -f ~/Library/Caches/XcodeInstall/com.apple.pkg.iPhoneSimulatorSDK\(runtime.replacingOccurrences(of: ".", with: "_"))*.dmg",
                         "xcversion update",
-                        "echo '\(password)' | sudo -S xcversion simulators --install='iOS \(runtime)'",
-                        "pkill -1 Simulator; killall -9 com.apple.CoreSimulator.CoreSimulatorService"]
+                        "echo '\(password)' | sudo -S xcversion simulators --install='iOS \(runtime)'"]
             
             let result = try executer.capture(cmds.joined(separator: "; "))
             guard result.status == 0 else {
