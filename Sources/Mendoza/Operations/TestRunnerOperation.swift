@@ -95,9 +95,7 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                     
                     guard testCases.count > 0 else { break }
                     
-                    if self.verbose {
-                        print("ℹ️  \(self.verbose ? "[\(Date().description)] " : "")Node \(source.node.address) will execute \(testCases.count) tests on \(testRunner.name) {\(runnerIndex)}".magenta)
-                    }
+                    print("ℹ️  \(self.verbose ? "[\(Date().description)] " : "")Node \(source.node.address) will execute \(testCases.count) tests on \(testRunner.name) {\(runnerIndex)}".magenta)
                     
                     executer.logger?.log(command: "Will launch \(testCases.count) test cases")
                     executer.logger?.log(output: testCases.map { $0.testIdentifier }.joined(separator: "\n"), statusCode: 0)
