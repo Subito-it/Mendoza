@@ -20,7 +20,7 @@ extension CommandLineProxy {
         }
         
         func wakeUp() throws {
-            _ = try executer.execute("open -a \"$(xcode-select -p)/Applications/Simulator.app\"; sleep 5")
+            _ = try executer.execute("open -a \"$(xcode-select -p)/Applications/Simulator.app\" &; sleep 5")
             let simulatorsBooting = try bootedSimulators()
             // Be nice to Simulator.app and wait for the default simulator to be booted. Random crashes and error happens doing otherwise
             for simulatorBooting in simulatorsBooting {
@@ -30,11 +30,11 @@ extension CommandLineProxy {
                 
         func reset() throws {
             let commands = ["defaults read com.apple.iphonesimulator",
-                            "sleep 3",
                             "pkill -9 Simulator",
-                            "sleep 3",
-                            "kill -9 $(ps ax | grep -i 'SpringBoard.app/SpringBoard' | awk '{ print $1 }')",
-                            "killall -9 com.apple.CoreSimulator.CoreSimulatorService"]
+                            "sleep 5",
+                            "pkill -9 SpringBoard",
+                            "killall -9 com.apple.CoreSimulator.CoreSimulatorService",
+                            "sleep 5"]
             
             try commands.forEach { _ = try executer.execute("\($0) 2>/dev/null || true") }
         }
@@ -42,7 +42,7 @@ extension CommandLineProxy {
         func rewriteSettings() throws {
             try reset()
             
-            let commands = ["rm '\(executer.homePath)/Library/Preferences/com.apple.iphonesimulator.plist' || true", // Delete iphone simulator settings to remove multiple `ScreenConfigurations` if present
+            let commands = ["rm '\(executer.homePath)/Library/Preferences/com.apple.iphonesimulator.plist'", // Delete iphone simulator settings to remove multiple `ScreenConfigurations` if present
                             "rm -rf '\(executer.homePath)/Library/Saved Application State/com.apple.iphonesimulator.savedState'",
                             "defaults read com.apple.iphonesimulator"]
             
