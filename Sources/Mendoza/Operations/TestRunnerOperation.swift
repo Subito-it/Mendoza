@@ -8,11 +8,8 @@
 import Foundation
 
 class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
-    var distributedTestCases: [[TestCase]]? {
-        didSet {
-            testCasesCount = distributedTestCases?.reduce(0, { $0 + $1.count }) ?? 0
-        }
-    }
+    // An array of TestCases sorted from the longest to the shortest estimated execution time
+    var sortedTestCases: [TestCase]?
     var currentResult: [TestCaseResult]?
     var currentRunningTest = [Int: (test: TestCase, start: TimeInterval)]()
     var testRunners: [(testRunner: TestRunner, node: Node)]?
@@ -24,10 +21,15 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
     private let buildTarget: String
     private let testTarget: String
     private let sdk: XcodeProject.SDK
+    private let failingTestsRetryCount: Int
     private let testTimeoutSeconds: Int
     private let syncQueue = DispatchQueue(label: String(describing: TestRunnerOperation.self))
     private let verbose: Bool
     private var timeoutBlocks = [Int: CancellableDelayedTask]()
+    private var retryCountMap = NSCountedSet()
+    private var retryCount: Int { // access only from syncQueue
+        return retryCountMap.reduce(0, { $0 + retryCountMap.count(for: $1) })
+    }
     
     private enum XcodebuildLineEvent {
         case testStart(testCase: TestCase)
@@ -36,22 +38,23 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
         case testCrashed
         
         var isTestPassed: Bool { switch self { case .testPassed: return true; default: return false } }
+        var isTestCrashed: Bool { switch self { case .testCrashed: return true; default: return false } }
     }
     
-    private lazy var pool: ConnectionPool<(TestRunner, [TestCase])> = {
-        guard let distributedTestCases = distributedTestCases else { fatalError("💣 Required field `distributedTestCases` not set") }
+    private lazy var pool: ConnectionPool<TestRunner> = {
+        guard let sortedTestCases = sortedTestCases else { fatalError("💣 Required field `distributedTestCases` not set") }
         guard let testRunners = testRunners else { fatalError("💣 Required field `testRunner` not set") }
-        guard testRunners.count >= distributedTestCases.count else { fatalError("💣 Invalid testRunner count") }
         
-        let input = zip(testRunners, distributedTestCases)
-        return makeConnectionPool(sources: input.map { (node: $0.0.node, value: ($0.0.testRunner, $0.1)) })
+        let input = zip(testRunners, sortedTestCases)
+        return makeConnectionPool(sources: input.map { (node: $0.0.node, value: $0.0.testRunner) })
     }()
     
-    init(configuration: Configuration, buildTarget: String, testTarget: String, sdk: XcodeProject.SDK, testTimeoutSeconds: Int, verbose: Bool) {
+    init(configuration: Configuration, buildTarget: String, testTarget: String, sdk: XcodeProject.SDK, failingTestsRetryCount: Int, testTimeoutSeconds: Int, verbose: Bool) {
         self.configuration = configuration
         self.buildTarget = buildTarget
         self.testTarget = testTarget
         self.sdk = sdk
+        self.failingTestsRetryCount = failingTestsRetryCount
         self.testTimeoutSeconds = testTimeoutSeconds
         self.verbose = verbose
     }
@@ -64,7 +67,8 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
             
             var result = currentResult ?? [TestCaseResult]()
             
-            guard distributedTestCases?.contains(where: { $0.count > 0 }) == true else {
+            testCasesCount = sortedTestCases?.count ?? 0
+            guard testCasesCount > 0 else {
                 didEnd?(result)
                 return
             }
@@ -74,32 +78,53 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
             }
             
             try pool.execute { [unowned self] (executer, source) in
-                let testRunner = source.value.0
-                let testCases = source.value.1
+                let testRunner = source.value
                 
-                var runnerIndex = 0
-                self.syncQueue.sync { [unowned self] in
-                    runnerIndex = self.testRunners?.firstIndex { $0.0.id == testRunner.id && $0.0.name == testRunner.name } ?? 0
-                }
+                let runnerIndex = self.syncQueue.sync { [unowned self] in self.testRunners?.firstIndex { $0.0.id == testRunner.id && $0.0.name == testRunner.name } ?? 0 }
                 
-                guard testCases.count > 0 else { return }
-                
-                print("ℹ️  Node \(source.node.address) will execute \(testCases.count) tests on \(testRunner.name) {\(runnerIndex)}".magenta)
-                
-                executer.logger?.log(command: "Will launch \(testCases.count) test cases")
-                executer.logger?.log(output: testCases.map { $0.testIdentifier }.joined(separator: "\n"), statusCode: 0)
-                
-                let output = try self.testWithoutBuilding(executer: executer, testCases: testCases, testRunner: testRunner, runnerIndex: runnerIndex)
-                
-                let xcResultUrl = try self.findTestResultUrl(executer: executer, testRunner: testRunner)
-                
-                // We need to move results because xcodebuild test-without-building shows a weird behaviour not allowing more than 2 xcresults in the same folder.
-                // Repeatedly performing 'xcodebuild test-without-building' results in older xcresults being deleted
-                let resultUrl = Path.results.url.appendingPathComponent(testRunner.id)
-                _ = try executer.capture("mkdir -p '\(resultUrl.path)'; mv '\(xcResultUrl.path)' '\(resultUrl.path)'")
+                while true {
+                    let testCases: [TestCase] = self.syncQueue.sync { [unowned self] in
+                        guard let testCase = self.sortedTestCases?.first else {
+                            return []
+                        }
+                        
+                        self.sortedTestCases?.removeFirst()
+                        
+                        return [testCase]
+                    }
+                    
+                    guard testCases.count > 0 else { break }
+                    
+                    print("ℹ️  \(self.verbose ? "[\(Date().description)] " : "")Node \(source.node.address) will execute \(testCases.count) tests on \(testRunner.name) {\(runnerIndex)}".magenta)
+                    
+                    executer.logger?.log(command: "Will launch \(testCases.count) test cases")
+                    executer.logger?.log(output: testCases.map { $0.testIdentifier }.joined(separator: "\n"), statusCode: 0)
+                    
+                    let output = try autoreleasepool {
+                        return try self.testWithoutBuilding(executer: executer, testCases: testCases, testRunner: testRunner, runnerIndex: runnerIndex)
+                    }
+                    
+                    let xcResultUrl = try self.findTestResultUrl(executer: executer, testRunner: testRunner)
+                    
+                    // We need to move results because xcodebuild test-without-building shows a weird behaviour not allowing more than 2 xcresults in the same folder.
+                    // Repeatedly performing 'xcodebuild test-without-building' results in older xcresults being deleted
+                    let resultUrl = Path.results.url.appendingPathComponent(testRunner.id)
+                    _ = try executer.capture("mkdir -p '\(resultUrl.path)'; mv '\(xcResultUrl.path)' '\(resultUrl.path)'")
+                    
+                    var testResults = try self.parseTestResults(output, candidates: testCases, node: source.node.address, xcResultPath: xcResultUrl.path)
+                                                            
+                    if let bootstrappingTestResults = try self.handleBootstrappingErrors(output, partialResult: testResults, candidates: testCases, node: source.node.address, xcResultPath: xcResultUrl.path) {
+                        testResults += bootstrappingTestResults
+                        
+                        self.forceResetSimulator(executer: executer, testRunner: testRunner)
+                    }
 
-                let testResults = try self.parseTestResults(output, candidates: testCases, node: source.node.address, xcResultPath: xcResultUrl.path)
-                self.syncQueue.sync { result += testResults }
+                    self.syncQueue.sync { [unowned self] in
+                        self.enqueueFailedTests(testResults: testResults, failingTestsRetryCount: self.failingTestsRetryCount).forEach { self.sortedTestCases?.insert($0, at: 0) }
+                        
+                        result += testResults
+                    }
+                }
                 
                 try self.copyDiagnosticReports(executer: executer, testRunner: testRunner)
                 try self.copyStandardOutputLogs(executer: executer, testRunner: testRunner)
@@ -154,10 +179,10 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
             let lines = partialProgress.components(separatedBy: "\n")
             let events = lines.compactMap(self.parseXcodebuildOutput)
             
-            let currentRunningAndDuration: () -> (test: TestCase, duration: String)? = {
+            let currentRunningAndDuration: (Bool) -> (test: TestCase, duration: String)? = { [unowned self] addToCompleted in
                 guard let currentRunning = self.currentRunningTest[runnerIndex] else { return nil }
                 
-                if !self.testCasesCompleted.contains(currentRunning.test) {
+                if addToCompleted {
                     self.testCasesCompleted.append(currentRunning.test)
                 }
                 
@@ -166,7 +191,7 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                 return (test: currentRunning.test, duration: duration)
             }
             
-            for event in events {
+            for (index, event) in events.enumerated() {
                 switch event {
                 case let .testStart(testCase):
                     self.syncQueue.sync {
@@ -176,24 +201,26 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                     }
                 case .testPassed:
                     self.syncQueue.sync { [unowned self] in
-                        guard let currentRunning = currentRunningAndDuration() else { return }
+                        guard let currentRunning = currentRunningAndDuration(true) else { return }
                         self.currentRunningTest[runnerIndex] = nil
                         
-                        print("✓ \(self.verbose ? "[\(Date().description)]" : "")\(currentRunning.test.description) passed [\(self.testCasesCompleted.count)/\(self.testCasesCount)] in \(currentRunning.duration) {\(runnerIndex)}".green)
+                        print("✓ \(self.verbose ? "[\(Date().description)] " : "")\(currentRunning.test.description) passed [\(self.testCasesCompleted.count)/\(self.testCasesCount)]\(self.retryCount > 0 ? " (\(self.retryCount) retries)" : "") in \(currentRunning.duration) {\(runnerIndex)}".green)
                     }
                 case .testFailed:
                     self.syncQueue.sync { [unowned self] in
-                        guard let currentRunning = currentRunningAndDuration() else { return }
+                        let addToCompleted = index > 0 ? events[index - 1].isTestCrashed == false : true
+                        
+                        guard let currentRunning = currentRunningAndDuration(addToCompleted) else { return }
                         self.currentRunningTest[runnerIndex] = nil
                         
-                        print("𝘅 \(self.verbose ? "[\(Date().description)]" : "")\(currentRunning.test.description) failed [\(self.testCasesCompleted.count)/\(self.testCasesCount)] in \(currentRunning.duration) {\(runnerIndex)}".green)
+                        print("𝘅 \(self.verbose ? "[\(Date().description)] " : "")\(currentRunning.test.description) failed [\(self.testCasesCompleted.count)/\(self.testCasesCount)]\(self.retryCount > 0 ? " (\(self.retryCount) retries)" : "") in \(currentRunning.duration) {\(runnerIndex)}".green)
                     }
                 case .testCrashed:
                     self.syncQueue.sync { [unowned self] in
-                        guard let currentRunning = currentRunningAndDuration() else { return }
+                        guard let currentRunning = currentRunningAndDuration(true) else { return }
                         self.currentRunningTest[runnerIndex] = nil
                         
-                        print("💥 \(self.verbose ? "[\(Date().description)]" : "")\(currentRunning.test.description) crash [\(self.testCasesCompleted.count)/\(self.testCasesCount)] in \(currentRunning.duration) {\(runnerIndex)}".green)
+                        print("💥 \(self.verbose ? "[\(Date().description)] " : "")\(currentRunning.test.description) crash [\(self.testCasesCompleted.count)/\(self.testCasesCount)]\(self.retryCount > 0 ? " (\(self.retryCount) retries)" : "") in \(currentRunning.duration) {\(runnerIndex)}".green)
                     }
                 }
             }
@@ -326,30 +353,67 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
         return result
     }
     
+    private func handleBootstrappingErrors(_ output: String, partialResult: [TestCaseResult], candidates: [TestCase], node: String, xcResultPath: String) throws -> [TestCaseResult]? {
+        let boostrappingError = "Application failed preflight checks"
+        
+        let resultPath = xcResultPath.replacingOccurrences(of: "\(Path.logs.rawValue)/", with: "")
+        
+        if output.contains(boostrappingError) {
+            let failedCandidates = candidates.filter { candidate in
+                return partialResult.contains(where: { candidate.suite == $0.suite && candidate.testIdentifier == $0.testCaseIdentifier }) == false
+            }
+            
+            return failedCandidates.map { TestCaseResult(node: node, xcResultPath: resultPath, suite: $0.suite, name: $0.name, status: .failed, duration: -1) }
+        }
+        
+        return nil
+    }
+    
     private func makeTimeoutBlock(executer: Executer, currentRunning: (test: TestCase, start: TimeInterval)?, testRunner: TestRunner, runnerIndex: Int) -> CancellableDelayedTask {
         let task = CancellableDelayedTask(delay: TimeInterval(testTimeoutSeconds), queue: syncQueue)
         
-        task.run {
-            guard let simulatorExecuter = try? executer.clone() else {
-                return
-            }
-            
+        task.run { [unowned self] in
             if let currentRunning = currentRunning {
                 print("⏰ \(currentRunning.test.description) timed out {\(runnerIndex)} in \(Int(CFAbsoluteTimeGetCurrent() - currentRunning.start))s".red)
             } else {
                 print("⏰ Unknown test timed out {\(runnerIndex)}".red)
             }
             
-            let proxy = CommandLineProxy.Simulators(executer: simulatorExecuter, verbose: true)
-            let simulator = Simulator(id: testRunner.id, name: "Simulator", device: Device.defaultInit())
-            
-            // There's no better option than shutting down simulator at this point
-            // xcodebuild will take care to boot simulator again and continue testing
-            try? proxy.shutdown(simulator: simulator)
-            try? proxy.boot(simulator: simulator)
+            self.forceResetSimulator(executer: executer, testRunner: testRunner)
         }
         
         return task
+    }
+    
+    private func forceResetSimulator(executer: Executer, testRunner: TestRunner) {
+        guard let simulatorExecuter = try? executer.clone() else { return }
+
+        let proxy = CommandLineProxy.Simulators(executer: simulatorExecuter, verbose: true)
+        let simulator = Simulator(id: testRunner.id, name: "Simulator", device: Device.defaultInit())
+        
+        // There's no better option than shutting down simulator at this point
+        // xcodebuild will take care to boot simulator again and continue testing
+        try? proxy.shutdown(simulator: simulator)
+        try? proxy.boot(simulator: simulator)
+    }
+    
+    private func enqueueFailedTests(testResults: [TestCaseResult], failingTestsRetryCount: Int) -> [TestCase] {
+        let failedTestCases = testResults.filter { $0.status == .failed }.map { TestCase(name: $0.name, suite: $0.suite) }
+
+        var testCases = [TestCase]()
+        for failedTestCase in failedTestCases {
+            if retryCountMap.count(for: failedTestCase) < failingTestsRetryCount {
+                retryCountMap.add(failedTestCase)
+                testCases.insert(failedTestCase, at: 0)
+                testCasesCount += 1
+                
+                if self.verbose {
+                    print("🔁  Renqueuing \(failedTestCase), retry count: \(retryCountMap.count(for: failedTestCase))".yellow)
+                }
+            }
+        }
+        
+        return testCases
     }
     
     private func findTestRun(executer: Executer) throws -> String {

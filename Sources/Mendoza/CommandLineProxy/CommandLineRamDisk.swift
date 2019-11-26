@@ -48,8 +48,8 @@ extension CommandLineProxy {
             }
             guard diskId != 0 else { return }
             
-            let unmount = try executer.execute("diskutil unmount /dev/disk\(diskId) || true")
-            let eject = try executer.execute("diskutil eject /dev/disk\(diskId) || true")
+            let unmount = try executer.execute("diskutil unmount /dev/disk\(diskId) &>/dev/null || true")
+            let eject = try executer.execute("diskutil eject /dev/disk\(diskId) &>/dev/null || true")
             
             #if DEBUG
                 print("unmount \(unmount)")

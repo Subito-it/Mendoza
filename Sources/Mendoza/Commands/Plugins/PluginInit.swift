@@ -31,9 +31,9 @@ struct PluginInit {
             if Bariloche.ask("\nDo you want to install the `Test Event` plugin?\n".underline + "This plugin allows to perform actions (e.g. notifications) based on dispatching events") {
                 try EventPlugin(baseUrl: currentUrl).writeTemplate()
             }
-        case "distribute":
-            if Bariloche.ask("\nDo you want to install the `Test Distribution` plugin?\n".underline + "This plugin allows to specify which distribution node should perform `XCTestCase`'s test method") {
-                try TestDistributionPlugin(baseUrl: currentUrl).writeTemplate()
+        case "sorting":
+            if Bariloche.ask("\nDo you want to install the `Test Sorting` plugin?\n".underline + "This plugin allows to sort `XCTestCase`'s in order to optimize total execution time of test sessions") {
+                try TestSortingPlugin(baseUrl: currentUrl).writeTemplate()
             }
         case "extract":
             if Bariloche.ask("\nDo you want to install the `Test Extraction` plugin?\n".underline + "This plugin allows to customize which `XCTestCase`'s test method should be distributed to testing nodes") {

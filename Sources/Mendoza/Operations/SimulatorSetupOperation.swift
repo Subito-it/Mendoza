@@ -209,7 +209,7 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
         let settings = try simulatorProxy.loadSimulatorSettings()
         guard let screenConfiguration = settings.ScreenConfigurations
             , let screenIdentifier = Array(screenConfiguration.keys).last else {
-            fatalError("💣 Failed to get screenIdentifier from simulator plist")
+                fatalError("💣 Failed to get screenIdentifier from simulator plist")
         }
         
         settings.CurrentDeviceUDID = nil

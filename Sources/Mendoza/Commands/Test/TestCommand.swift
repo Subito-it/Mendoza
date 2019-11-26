@@ -14,7 +14,7 @@ class TestCommand: Command {
     let help: String? = "Dispatch UI tests"
     
     let debugPluginsFlag = Flag(short: nil, long: "plugin_debug", help: "Dump plugin invocation commands")
-    let dispatchOnLocalHostFlag = Flag(short: "l", long: "use_localhost", help: "Distribute tests on localhost as well")
+    let dispatchOnLocalHostFlag = Flag(short: "l", long: "use_localhost", help: "Use localhost to execute tests")
     let verboseFlag = Flag(short: nil, long: "verbose", help: "Dump debug messages")
     let runHeadlessFlag = Flag(short: nil, long: "run_headless", help: "Run headless")
 
