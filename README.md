@@ -32,6 +32,8 @@ Mendoza hides all the complexity behind a single `test` command by leveraging bu
 
 # Installation
 
+You'll need to install Mendoza on all nodes you'll use to distribute tests.
+
 ```
 brew install Subito-it/made/mendoza
 ```
@@ -57,7 +59,7 @@ From the target selection select the Mendoza project and add `/usr/local/include
 Inside your project folder run
 
 ```
-mendoza configure init
+mendoza configuration init
 ```
 
 this will prompt you with a series of (fairly self-explanatory) questions and produce a configuration file that you will feed to the `test` command as follows:
