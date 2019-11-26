@@ -230,6 +230,11 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                 
         var output = ""
         for shouldRetry in [true, false] {
+            self.syncQueue.sync {
+                self.timeoutBlocks[runnerIndex]?.cancel()
+                self.timeoutBlocks[runnerIndex] = self.makeTimeoutBlock(executer: executer, currentRunning: self.currentRunningTest[runnerIndex], testRunner: testRunner, runnerIndex: runnerIndex)
+            }
+
             output = try executer.execute(testWithoutBuilding, progress: progressHandler) { result, originalError in
                 try self.assertAccessibilityPermissiong(in: result.output)
                 throw originalError
@@ -275,6 +280,7 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
         let testResultCrashMarker1 = #"Restarting after unexpected exit or crash in (.*)/(.*)\(\)"#
         let testResultCrashMarker2 = #"\s+(.*)\(\) encountered an error \(Crash:"#
         let testResultCrashMarker3 = #"Checking for crash reports corresponding to unexpected termination of"#
+        let testResultFailureMarker1 = #"^(Testing failed:)$"#
         
         let startRegex = #"Test Case '-\[\#(self.testTarget)\.(.*)\]' started"#
         
@@ -311,7 +317,11 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
         if line.contains(testResultCrashMarker3) {
             return .testCrashed
         }
-        
+
+        if let tests = try? line.capturedGroups(withRegexString: testResultFailureMarker1), tests.count == 1 {
+            return .testFailed(duration: -1)
+        }
+
         return nil
     }
     
@@ -379,6 +389,10 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                 print("⏰ Unknown test timed out {\(runnerIndex)}".red)
             }
             
+            // - NOTE:
+            // To stop tests that time out we're forse resetting simulators.
+            // This abrupt way of stopping tests will have as a consequence that
+            // no data related to the test will be written to the output xcresult
             self.forceResetSimulator(executer: executer, testRunner: testRunner)
         }
         
