@@ -69,16 +69,15 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
                     }
                 }
                 
-                let simulatorProxy = CommandLineProxy.Simulators(executer: executer, verbose: self.verbose)
-                let bootedSimulators = try simulatorProxy.bootedSimulators()
+                let bootedSimulators = try proxy.bootedSimulators()
                 for simulator in bootedSimulators {
-                    try simulatorProxy.terminateApp(identifier: self.configuration.buildBundleIdentifier, on: simulator)
-                    try simulatorProxy.terminateApp(identifier: self.configuration.testBundleIdentifier, on: simulator)
+                    try proxy.terminateApp(identifier: self.configuration.buildBundleIdentifier, on: simulator)
+                    try proxy.terminateApp(identifier: self.configuration.testBundleIdentifier, on: simulator)
                 }
                 
                 let unusedSimulators = bootedSimulators.filter { !nodeSimulators.contains($0) }
                 for unusedSimulator in unusedSimulators {
-                    try simulatorProxy.shutdown(simulator: unusedSimulator)
+                    try proxy.shutdown(simulator: unusedSimulator)
                 }
 
                 self.syncQueue.sync { [unowned self] in
