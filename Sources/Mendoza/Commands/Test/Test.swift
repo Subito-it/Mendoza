@@ -118,12 +118,12 @@ class Test {
         let tearDownOperation = TearDownOperation(configuration: configuration, plugin: tearDownPlugin)
         
         let operations: [RunOperation] =
-            [validationOperation,
+            [compileOperation,
+             validationOperation,
              macOsValidationOperation,
              localSetupOperation,
              setupOperation,
              wakeupOperation,
-             compileOperation,
              testExtractionOperation,
              testSortingOperation,
              simulatorSetupOperation,
@@ -153,7 +153,6 @@ class Test {
         setupOperation.addDependency(localSetupOperation)
         testExtractionOperation.addDependency(localSetupOperation)
         
-        compileOperation.addDependency(setupOperation)
         simulatorSetupOperation.addDependencies([setupOperation, wakeupOperation])
         
         testSortingOperation.addDependency(testExtractionOperation)
