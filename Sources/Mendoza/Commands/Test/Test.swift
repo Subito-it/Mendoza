@@ -101,7 +101,7 @@ class Test {
         let macOsValidationOperation = MacOsValidationOperation(configuration: configuration)
         let localSetupOperation = LocalSetupOperation()
         let wakeupOperation = WakeupOperation(nodes: uniqueNodes)
-        let setupOperation = SetupOperation(nodes: uniqueNodes)
+        let remoteSetupOperation = RemoteSetupOperation(nodes: uniqueNodes)
         let compileOperation = CompileOperation(configuration: configuration, baseUrl: gitBaseUrl, project: project, scheme: configuration.scheme, preCompilationPlugin: preCompilationPlugin, postCompilationPlugin: postCompilationPlugin, sdk: sdk)
         let testExtractionOperation = TestExtractionOperation(configuration: configuration, baseUrl: gitBaseUrl, testTargetSourceFiles: testTargetSourceFiles, filePatterns: filePatterns, device: device, plugin: testExtractionPlugin)
         let testSortingOperation = TestSortingOperation(device: device, plugin: testSortingPlugin, verbose: userOptions.verbose)
@@ -122,7 +122,7 @@ class Test {
              validationOperation,
              macOsValidationOperation,
              localSetupOperation,
-             setupOperation,
+             remoteSetupOperation,
              wakeupOperation,
              testExtractionOperation,
              testSortingOperation,

@@ -1,5 +1,5 @@
 //
-//  SetupOperation.swift
+//  RemoteSetupOperation.swift
 //  Mendoza
 //
 //  Created by Tomas Camin on 17/01/2019.
@@ -7,7 +7,7 @@
 
 import Foundation
 
-class SetupOperation: BaseOperation<Void> {
+class RemoteSetupOperation: BaseOperation<Void> {
     private let nodes: [Node]
     private lazy var pool: ConnectionPool = {
         return makeConnectionPool(sources: nodes)
