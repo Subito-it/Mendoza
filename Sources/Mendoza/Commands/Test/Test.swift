@@ -146,17 +146,18 @@ class Test {
             simulatorBootOperation.cancel()
             simulatorSetupOperation.cancel()
         }
-
-        wakeupOperation.addDependency(validationOperation)
-        localSetupOperation.addDependencies([validationOperation, macOsValidationOperation])
         
-        setupOperation.addDependency(localSetupOperation)
+        compileOperation.addDependency(localSetupOperation)
+
+        remoteSetupOperation.addDependency(validationOperation)
+        
+        wakeupOperation.addDependencies([localSetupOperation, remoteSetupOperation])
+        
         testExtractionOperation.addDependency(localSetupOperation)
         
-        simulatorSetupOperation.addDependencies([setupOperation, wakeupOperation])
+        simulatorSetupOperation.addDependency(wakeupOperation)
         
         testSortingOperation.addDependency(testExtractionOperation)
-        testSortingOperation.addDependency(simulatorSetupOperation)
         
         simulatorBootOperation.addDependency(simulatorSetupOperation)
         simulatorWakeupOperation.addDependency(simulatorBootOperation)
