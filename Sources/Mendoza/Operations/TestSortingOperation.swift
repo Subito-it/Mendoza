@@ -10,7 +10,6 @@ import Foundation
 // If available the plugin should return a list of TestCases sorted from the longest to the shortest estimated execution time
 
 class TestSortingOperation: BaseOperation<[TestCase]> {
-    var testRunnersCount: Int?
     var testCases: [TestCase]?
     
     private let device: Device
@@ -29,14 +28,12 @@ class TestSortingOperation: BaseOperation<[TestCase]> {
         guard !isCancelled else { return }
         
         do {
-            guard let testRunnersCount = testRunnersCount
-                , testRunnersCount > 0
-                , let testCases = testCases else { fatalError("💣 Required fields not set") }
+            guard let testCases = testCases else { fatalError("💣 Required fields not set") }
             
             didStart?()
             
             if plugin.isInstalled {
-                let input = TestOrderInput(tests: testCases, testRunnersCount: testRunnersCount, device: device)
+                let input = TestOrderInput(tests: testCases, device: device)
                 didEnd?(try plugin.run(input: input))
             } else {
                 didEnd?(testCases)
