@@ -150,7 +150,7 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
     
     private func testWithoutBuilding(executer: Executer, testTarget: String, testCases: [TestCase], testRunner: TestRunner, runnerIndex: Int) throws -> String {
         let testRun = try findTestRun(executer: executer)
-        let onlyTesting = testCases.map { "-only-testing:\(testTarget)/\($0.testIdentifier)" }.joined(separator: " ")
+        let onlyTesting = testCases.map { "-only-testing:\(testTarget.replacingOccurrences(of: " ", with: "-"))/\($0.testIdentifier)" }.joined(separator: " ")
         let destinationPath = Path.logs.url.appendingPathComponent(testRunner.id).path
         
         var testWithoutBuilding: String
