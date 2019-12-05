@@ -150,16 +150,16 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
     
     private func testWithoutBuilding(executer: Executer, testTarget: String, testCases: [TestCase], testRunner: TestRunner, runnerIndex: Int) throws -> String {
         let testRun = try findTestRun(executer: executer)
-        let onlyTesting = testCases.map { "-only-testing:\(testTarget.replacingOccurrences(of: " ", with: "-"))/\($0.testIdentifier)" }.joined(separator: " ")
+        let onlyTesting = testCases.map { "-only-testing:'\(testTarget)/\($0.testIdentifier)'" }.joined(separator: " ")
         let destinationPath = Path.logs.url.appendingPathComponent(testRunner.id).path
         
         var testWithoutBuilding: String
         
         switch sdk {
         case .ios:
-            testWithoutBuilding = #"xcodebuild -parallel-testing-enabled NO -disable-concurrent-destination-testing -xctestrun \#(testRun) -destination 'platform=iOS Simulator,id=\#(testRunner.id)' -derivedDataPath '\#(destinationPath)' \#(onlyTesting) -enableCodeCoverage YES -destination-timeout 60 test-without-building"#
+            testWithoutBuilding = #"xcodebuild -parallel-testing-enabled NO -disable-concurrent-destination-testing -xctestrun '\#(testRun)' -destination 'platform=iOS Simulator,id=\#(testRunner.id)' -derivedDataPath '\#(destinationPath)' \#(onlyTesting) -enableCodeCoverage YES -destination-timeout 60 test-without-building"#
         case .macos:
-            testWithoutBuilding = #"xcodebuild -parallel-testing-enabled NO -disable-concurrent-destination-testing -xctestrun \#(testRun) -destination 'platform=OS X,arch=x86_64' -derivedDataPath '\#(destinationPath)' \#(onlyTesting) -enableCodeCoverage YES test-without-building"#
+            testWithoutBuilding = #"xcodebuild -parallel-testing-enabled NO -disable-concurrent-destination-testing -xctestrun '\#(testRun)' -destination 'platform=OS X,arch=x86_64' -derivedDataPath '\#(destinationPath)' \#(onlyTesting) -enableCodeCoverage YES test-without-building"#
         }
         testWithoutBuilding += " || true"
         
@@ -282,7 +282,9 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
         let testResultCrashMarker3 = #"Checking for crash reports corresponding to unexpected termination of"#
         let testResultFailureMarker1 = #"^(Testing failed:)$"#
         
-        let startRegex = #"Test Case '-\[\#(self.testTarget)\.(.*)\]' started"#
+        let testTarget = self.testTarget.replacingOccurrences(of: " ", with: "_")
+        
+        let startRegex = #"Test Case '-\[\#(testTarget)\.(.*)\]' started"#
         
         if let tests = try? line.capturedGroups(withRegexString: startRegex), tests.count == 1 {
             let testCaseName = tests[0].components(separatedBy: " ").last ?? ""
@@ -293,7 +295,7 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
             return .testStart(testCase: testCase)
         }
         
-        let passFailRegex = #"Test Case '-\[\#(self.testTarget)\.(.*)\]' (passed|failed) \((.*) seconds\)"#
+        let passFailRegex = #"Test Case '-\[\#(testTarget)\.(.*)\]' (passed|failed) \((.*) seconds\)"#
         if let tests = try? line.capturedGroups(withRegexString: passFailRegex), tests.count == 3 {
             let duration = Double(tests[2]) ?? -1
             
