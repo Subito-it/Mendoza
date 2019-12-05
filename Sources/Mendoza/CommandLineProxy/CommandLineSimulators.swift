@@ -40,6 +40,8 @@ extension CommandLineProxy {
         }
         
         func rewriteSettings() throws {
+            _ = try executer.execute("open -a \"$(xcode-select -p)/Applications/Simulator.app\"; sleep 5")
+            
             try reset()
             
             let commands = ["rm '\(executer.homePath)/Library/Preferences/com.apple.iphonesimulator.plist'", // Delete iphone simulator settings to remove multiple `ScreenConfigurations` if present
