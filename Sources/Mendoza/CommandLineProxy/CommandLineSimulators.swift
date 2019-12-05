@@ -96,7 +96,7 @@ extension CommandLineProxy {
             
             let result = try executer.capture(cmds.joined(separator: "; "))
             guard result.status == 0 else {
-                _ = try executer.execute("rm -rf \(executer.homePath)/Library/Caches/XcodeInstall/*.dmg")
+                _ = try executer.execute("rm -rf '\(executer.homePath)/Library/Caches/XcodeInstall/*.dmg'")
                 throw Error("Failed installing runtime!", logger: executer.logger)
             }
             guard !result.output.contains("specified Apple developer account credentials are incorrect") else {
@@ -244,7 +244,7 @@ extension CommandLineProxy {
             let uniqueUrl = Path.temp.url.appendingPathComponent("\(UUID().uuidString).plist")
             try data.write(to: uniqueUrl)
             
-            _ = try executer.execute(#"rm "\#(settingsPath)""#)
+            _ = try executer.execute("rm '\(settingsPath)'")
             try executer.upload(localUrl: uniqueUrl, remotePath: settingsPath)
             
             // Force reload
