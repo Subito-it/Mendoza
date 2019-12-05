@@ -22,18 +22,8 @@ struct Scheme: CustomStringConvertible {
 
 class XcodeProject: NSObject {
     enum SDK: String, RawRepresentable {
-        case macos, ios
-        
-        init?(rawValue: String) {
-            switch rawValue {
-            case "macosx":
-                self = .macos
-            case "iphoneos":
-                self = .ios
-            default:
-                return nil
-            }
-        }
+        case macos = "macosx"
+        case ios = "iphoneos"
     }
     
     private let project: XcodeProj
