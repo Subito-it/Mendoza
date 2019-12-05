@@ -28,9 +28,11 @@ class CancellableDelayedTask {
         didRun = true
         
         runQueue.asyncAfter(deadline: .now() + delay) { [weak self] in
-            let isCancelled: Bool? = self?.synchQueue.sync {
-                self?._isRunning = true
-                return self?.cancelled == true
+            guard let self = self else { return }
+            
+            let isCancelled: Bool? = self.synchQueue.sync {
+                self._isRunning = true
+                return self.cancelled == true
             }
             
             guard isCancelled == false else { return }
@@ -40,6 +42,6 @@ class CancellableDelayedTask {
     }
 
     func cancel() {
-        synchQueue.sync { cancelled = true }
+        synchQueue.sync { [weak self] in self?.cancelled = true }
     }
 }
