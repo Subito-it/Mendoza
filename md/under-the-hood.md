@@ -18,7 +18,7 @@ For macOS projects we validate that the all testing nodes are running the same O
 
 Prepares filesystem on the compiling node.
 
-### setupOperation
+### remoteSetupOperation
 
 Prepares filesystem on the remote testing nodes. Initializes RAM disks if necessary.
 

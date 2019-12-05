@@ -101,7 +101,7 @@ class Test {
         let macOsValidationOperation = MacOsValidationOperation(configuration: configuration)
         let localSetupOperation = LocalSetupOperation()
         let wakeupOperation = WakeupOperation(nodes: uniqueNodes)
-        let setupOperation = SetupOperation(nodes: uniqueNodes)
+        let remoteSetupOperation = RemoteSetupOperation(nodes: uniqueNodes)
         let compileOperation = CompileOperation(configuration: configuration, baseUrl: gitBaseUrl, project: project, scheme: configuration.scheme, preCompilationPlugin: preCompilationPlugin, postCompilationPlugin: postCompilationPlugin, sdk: sdk)
         let testExtractionOperation = TestExtractionOperation(configuration: configuration, baseUrl: gitBaseUrl, testTargetSourceFiles: testTargetSourceFiles, filePatterns: filePatterns, device: device, plugin: testExtractionPlugin)
         let testSortingOperation = TestSortingOperation(device: device, plugin: testSortingPlugin, verbose: userOptions.verbose)
@@ -118,12 +118,12 @@ class Test {
         let tearDownOperation = TearDownOperation(configuration: configuration, plugin: tearDownPlugin)
         
         let operations: [RunOperation] =
-            [validationOperation,
+            [compileOperation,
+             validationOperation,
              macOsValidationOperation,
              localSetupOperation,
-             setupOperation,
+             remoteSetupOperation,
              wakeupOperation,
-             compileOperation,
              testExtractionOperation,
              testSortingOperation,
              simulatorSetupOperation,
@@ -146,18 +146,18 @@ class Test {
             simulatorBootOperation.cancel()
             simulatorSetupOperation.cancel()
         }
-
-        wakeupOperation.addDependency(validationOperation)
-        localSetupOperation.addDependencies([validationOperation, macOsValidationOperation])
         
-        setupOperation.addDependency(localSetupOperation)
+        compileOperation.addDependency(localSetupOperation)
+
+        remoteSetupOperation.addDependency(validationOperation)
+        
+        wakeupOperation.addDependencies([localSetupOperation, remoteSetupOperation])
+        
         testExtractionOperation.addDependency(localSetupOperation)
         
-        compileOperation.addDependency(setupOperation)
-        simulatorSetupOperation.addDependencies([setupOperation, wakeupOperation])
+        simulatorSetupOperation.addDependency(wakeupOperation)
         
         testSortingOperation.addDependency(testExtractionOperation)
-        testSortingOperation.addDependency(simulatorSetupOperation)
         
         simulatorBootOperation.addDependency(simulatorSetupOperation)
         simulatorWakeupOperation.addDependency(simulatorBootOperation)
@@ -219,13 +219,11 @@ class Test {
         
         switch sdk {
         case .macos:
-            testSortingOperation.testRunnersCount = uniqueNodes.count
             testRunnerOperation.testRunners = uniqueNodes.map { (testRunner: $0, node: $0) }
         case .ios:
             simulatorSetupOperation.didEnd = { simulators in
                 simulatorBootOperation.simulators = simulators
                 
-                testSortingOperation.testRunnersCount = simulators.count
                 testRunnerOperation.testRunners = simulators.map { (testRunner: $0.0, node: $0.1) }
             }
         }
