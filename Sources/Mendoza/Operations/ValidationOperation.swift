@@ -53,8 +53,9 @@ class ValidationOperation: BaseOperation<Void> {
         }
     }
     
-    private func checkDependencies(executer: Executer) throws {        
-        _ = try executer.execute("whereis xcversion") { _, _ in throw Error("To use UI Testing dispatcher you'll install xcode-install (https://github.com/KrauseFx/xcode-install)") }
+    private func checkDependencies(executer: Executer) throws {
+        _ = try executer.execute("whereis xcode-select") { _, _ in throw Error("`xcode-select` missing on \(executer.address). To use UI Testing dispatcher you'll need to install Xcode's Command Line Tools by manually launching Xcode or by running `gem install xcode-install; xcversion install-cli-tools`") }
+        _ = try executer.execute("whereis xcversion") { _, _ in throw Error("`xcode-install` missing on \(executer.address). To use UI Testing dispatcher you'll install xcode-install (https://github.com/KrauseFx/xcode-install)") }
     }
     
     override func cancel() {
