@@ -101,7 +101,7 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                     executer.logger?.log(output: testCases.map { $0.testIdentifier }.joined(separator: "\n"), statusCode: 0)
                     
                     let output = try autoreleasepool {
-                        return try self.testWithoutBuilding(executer: executer, testCases: testCases, testRunner: testRunner, runnerIndex: runnerIndex)
+                        return try self.testWithoutBuilding(executer: executer, testTarget: self.testTarget, testCases: testCases, testRunner: testRunner, runnerIndex: runnerIndex)
                     }
                     
                     let xcResultUrl = try self.findTestResultUrl(executer: executer, testRunner: testRunner)
@@ -148,9 +148,9 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
         super.cancel()
     }
     
-    private func testWithoutBuilding(executer: Executer, testCases: [TestCase], testRunner: TestRunner, runnerIndex: Int) throws -> String {
+    private func testWithoutBuilding(executer: Executer, testTarget: String, testCases: [TestCase], testRunner: TestRunner, runnerIndex: Int) throws -> String {
         let testRun = try findTestRun(executer: executer)
-        let onlyTesting = testCases.map { "-only-testing:\(configuration.scheme)/\($0.testIdentifier)" }.joined(separator: " ")
+        let onlyTesting = testCases.map { "-only-testing:\(testTarget)/\($0.testIdentifier)" }.joined(separator: " ")
         let destinationPath = Path.logs.url.appendingPathComponent(testRunner.id).path
         
         var testWithoutBuilding: String
