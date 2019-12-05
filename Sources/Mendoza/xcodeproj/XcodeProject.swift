@@ -176,7 +176,7 @@ class XcodeProject: NSObject {
         }
         
         guard let sdk = SDK(rawValue: rawSdk) else {
-            throw Error("Unsupported SDKROOT \(rawSdk)")
+            throw Error("Unsupported SDKROOT \(rawSdk). Expecting either iphoneos or macosx")
         }
         
         return sdk
