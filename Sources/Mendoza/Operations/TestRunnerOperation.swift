@@ -280,6 +280,7 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
         let testResultCrashMarker1 = #"Restarting after unexpected exit or crash in (.*)/(.*)\(\)"#
         let testResultCrashMarker2 = #"\s+(.*)\(\) encountered an error \(Crash:"#
         let testResultCrashMarker3 = #"Checking for crash reports corresponding to unexpected termination of"#
+        let testResultTimeoutMarker4 = #"\s+(.*)\(\) encountered an error \(Test runner exited"# // Should be caused by the force reset of simulator
         let testResultFailureMarker1 = #"^(Testing failed:)$"#
         
         let testTarget = self.testTarget.replacingOccurrences(of: " ", with: "_")
@@ -314,6 +315,10 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
         
         if let tests = try? line.capturedGroups(withRegexString: testResultCrashMarker2), tests.count == 1 {
             return .testCrashed
+        }
+        
+        if let tests = try? line.capturedGroups(withRegexString: testResultTimeoutMarker4), tests.count == 1 {
+            return .testFailed(duration: -1)
         }
         
         if line.contains(testResultCrashMarker3) {
