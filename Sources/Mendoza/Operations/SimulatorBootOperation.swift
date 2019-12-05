@@ -11,12 +11,14 @@ class SimulatorBootOperation: BaseOperation<Void> {
     var simulators: [(simulator: Simulator, node: Node)]?
     
     private let verbose: Bool
+    private let runHeadless: Bool
     private lazy var pool: ConnectionPool<Simulator> = {
         guard let simulators = simulators else { fatalError("💣 Required fields not set") }
         return makeConnectionPool(sources: simulators.map { (node: $0.node, value: $0.simulator) })
     }()
     
-    init(verbose: Bool) {
+    init(runHeadless: Bool, verbose: Bool) {
+        self.runHeadless = runHeadless
         self.verbose = verbose
     }
 
@@ -25,8 +27,10 @@ class SimulatorBootOperation: BaseOperation<Void> {
         
         do {
             didStart?()
-            
+
             try pool.execute { (executer, source) in
+                guard self.runHeadless == false else { return }
+                
                 let proxy = CommandLineProxy.Simulators(executer: executer, verbose: self.verbose)
                 
                 try proxy.boot(simulator: source.value)
