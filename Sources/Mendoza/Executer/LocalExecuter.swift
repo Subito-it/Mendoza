@@ -140,7 +140,9 @@ private extension Process {
             outputData.append(data)
             progress?(String(decoding: data, as: UTF8.self))
         }
-        outputData.append(pipe.fileHandleForReading.readDataToEndOfFile())
+        let trailingData = pipe.fileHandleForReading.readDataToEndOfFile()
+        progress?(String(decoding: trailingData, as: UTF8.self))
+        outputData.append(trailingData)
         
         pipe.fileHandleForReading.closeFile()
         
