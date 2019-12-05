@@ -68,7 +68,7 @@ this will prompt you with a series of (fairly self-explanatory) questions and pr
 #### iOS project
 
 ```
-mendoza test configuration.json --device_name="iPhone 8" --device_runtime="12.1"
+mendoza test config.json --device_name="iPhone 8" --device_runtime="12.1"
 ```
 
 #### macOS project
