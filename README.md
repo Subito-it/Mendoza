@@ -178,6 +178,8 @@ You should definitely consider using [swift sh](https://github.com/mxcl/swift-sh
 
 By default test methods will be extracted from all files in the UI testing target. This should work most of the times however in some advanced cases this could not be the desired behaviour, for example if there is some custom tagging to run tests on specific devices (e.g. only iPhone/iPad). This plugin allows to override the default behaviour and put in place a custom implementation
 
+See an example [TestExtractionPlugin.swift](md/TestExtractionPlugin_example.swift).
+
 
 ## sorting
 
@@ -185,7 +187,7 @@ By default test cases will be executed randomly because Mendoza has no informati
 
 Using tools like [Cachi](https://github.com/Subito-it/Cachi) you can automatically store and retrieve tests statistics.
 
-See the example [TestSortingPlugin.swift](md/TestSortingPlugin_example.swift).
+See an example [TestSortingPlugin.swift](md/TestSortingPlugin_example.swift).
 
 
 ## event
