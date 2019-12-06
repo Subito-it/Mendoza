@@ -78,11 +78,10 @@ class TestExtractionOperation: BaseOperation<[TestCase]> {
             let path = url.path
             
             if testTargetSourceFiles.contains(where: { path.hasSuffix($0) }) {
-                let containsXCTestCase = (try? String(contentsOf: url))?.contains("XCTestCase") ?? false
                 let matchesInclude = includeRegex.contains(where: { $0.firstMatch(in: path, range: NSRange(location: 0, length: path.count)) != nil })
                 let matchesExclude = excludeRegex.contains(where: { $0.firstMatch(in: path, range: NSRange(location: 0, length: path.count)) != nil })
                 
-                if containsXCTestCase && matchesInclude && !matchesExclude {
+                if matchesInclude && !matchesExclude {
                     testFileUrls.append(url)
                 }
             }
