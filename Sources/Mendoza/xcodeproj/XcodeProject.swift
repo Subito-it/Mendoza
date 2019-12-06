@@ -106,12 +106,12 @@ class XcodeProject: NSObject {
         guard let scheme = xcscheme(name: name) else { throw Error("Scheme \(name) not found!") }
         
         guard let runTargetName = scheme.launchAction?.buildableProductRunnable?.buildableReference.blueprintName else {
-            throw Error("Expecting 1 run target in scheme \(name)")
+            throw Error("Expecting 1 run target in scheme \(name). Check that you have an executable selected in the info section of the run settings in the selected scheme.")
         }
         
         let testableTargetNames = scheme.testAction?.testables.map { $0.buildableReference.blueprintName } ?? []
         guard testableTargetNames.count == 1 else {
-            throw Error("Expecting 1 testing target in scheme \(name)")
+            throw Error("Expecting 1 testing target in scheme \(name). Check that you have an executable selected in the info section of the run settings in the selected scheme.")
         }
         
         let targets = project.pbxproj.nativeTargets
