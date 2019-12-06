@@ -400,7 +400,9 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
             // To stop tests that time out we're force resetting simulators.
             // This abrupt way of stopping tests will have as a consequence that
             // no data related to the test will be written to the output xcresult
-            self.forceResetSimulator(executer: executer, testRunner: testRunner)
+            DispatchQueue.global(qos: .userInitiated).async {
+                self.forceResetSimulator(executer: executer, testRunner: testRunner)
+            }
         }
         
         return task
