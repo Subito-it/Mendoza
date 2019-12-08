@@ -6,7 +6,7 @@
 //
 
 import Foundation
-import xcodeproj
+import XcodeProj
 import PathKit
 
 struct Scheme: CustomStringConvertible {
@@ -104,8 +104,8 @@ class XcodeProject: NSObject {
     
     func getTargetsInScheme(_ name: String) throws -> (build: PBXNativeTarget, test: PBXNativeTarget) {
         guard let scheme = xcscheme(name: name) else { throw Error("Scheme \(name) not found!") }
-        
-        guard let runTargetName = scheme.launchAction?.buildableProductRunnable?.buildableReference.blueprintName else {
+                
+        guard let runTargetName = scheme.launchAction?.runnable?.buildableReference.blueprintName else {
             throw Error("Expecting 1 run target in scheme \(name). Check that you have an executable selected in the info section of the run settings in the selected scheme.")
         }
         

@@ -9,12 +9,12 @@ let package = Package(
       .package(url: "https://github.com/tcamin/KeychainAccess.git", .branch("master")),
       .package(url: "https://github.com/Subito-it/Bariloche", .branch("master")),
       .package(url: "https://github.com/tcamin/Shout.git", .branch("subito")),
-      .package(url: "https://github.com/tuist/xcodeproj.git", .upToNextMajor(from: "6.4.0")),
+      .package(url: "https://github.com/tcamin/XcodeProj.git", .branch("Mendoza")),
       .package(url: "https://github.com/jpsim/SourceKitten.git", from: "0.0.0"),
     ],
     targets: [
       .target(
           name: "Mendoza",
-          dependencies: ["Bariloche", "Shout", "xcodeproj", "KeychainAccess", "SourceKittenFramework"])
+          dependencies: ["Bariloche", "Shout", "XcodeProj", "KeychainAccess", "SourceKittenFramework"])
     ]
 )
