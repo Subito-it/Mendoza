@@ -26,6 +26,11 @@ class XcodeProject: NSObject {
         case ios = "iphoneos"
     }
     
+    enum BuildSystem: String, RawRepresentable {
+        case modern
+        case original = "Original"
+    }
+    
     private let project: XcodeProj
     private let path: PathKit.Path
     
@@ -57,6 +62,12 @@ class XcodeProject: NSObject {
     func testTargetSourceFilePaths(scheme: String) throws -> [String] {
         let targets = try getTargetsInScheme(scheme)
         return try targets.test.sourceFiles().compactMap({ $0.path })
+    }
+    
+    func buildSystem() -> XcodeProject.BuildSystem {
+        let buildSystem: WorkspaceSettings.BuildSystem = project.sharedData?.workspaceSettings?.buildSystem ?? .original
+        
+        return XcodeProject.BuildSystem(rawValue: buildSystem.rawValue) ?? .modern
     }
     
     func disableDebugger(schemeName: String) throws {
