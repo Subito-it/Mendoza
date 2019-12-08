@@ -36,7 +36,7 @@ struct ConfigurationInitializer {
         guard workspaces.count == 1 || projects.count < 2 else { throw Error("Too many .xcodeproj found in folder!") }
         guard let url = XcodeProject.projectUrl(from: workspaces.first) ?? projects.first else { throw Error("Failed to load .xcworkspace!") }
         guard let project = (try? XcodeProject(url: url)) else { throw Error("Failed to load .xcodeproj!") }
-        
+                
         let testingSchemes = project.testingSchemes().sorted { $0.name > $1.name }
         guard testingSchemes.count > 0 else { throw Error("No shared testing scheme found in \(url.path), does your UI Testing target have a dedicated scheme?1") }
         
@@ -47,7 +47,16 @@ struct ConfigurationInitializer {
         
         let selectedBuildConfiguration = Bariloche.ask(title: "Select build configuration used to run UI Tests:", array: buildConfigurations)
 
-        let bundleIdentifiers = try project.getTargetsBundleIdentifiers(for: selectedScheme.value.name)
+        var bundleIdentifiers = try project.getTargetsBundleIdentifiers(for: selectedScheme.value.name)
+        if bundleIdentifiers.build.hasPrefix("$(") {
+            let identifier: String = Bariloche.ask("\nBundle identifier coulnd't be autodetected. Please specify the bundle identifier of the app to test:".underline) { guard !$0.isEmpty else { throw Error("Invalid value") }; return $0 }
+            bundleIdentifiers.build = identifier
+        }
+        if bundleIdentifiers.test.hasPrefix("$(") {
+            let identifier: String = Bariloche.ask("\nBundle identifier coulnd't be autodetected. Please specify the bundle identifier of the runner app:".underline) { guard !$0.isEmpty else { throw Error("Invalid value") }; return $0 }
+            bundleIdentifiers.test = identifier
+        }
+        
         let sdk = try project.getBuildSDK(for: selectedScheme.value.name)
         
         var storeAppleIdCredentials = false
