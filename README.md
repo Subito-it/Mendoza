@@ -139,7 +139,7 @@ Will launch tests as specified in the configuration files.
 - --exclude_files=[files]: specify which files should be skipped when extracting UI tests. Accepts wildcards and comma separated. e.g SBTA*.swift,SBTF*.swift. (default: '')
 - --plugin_data=[data]: a custom string that can be used to inject data to plugins
 - --plugin_debug: write log files for plugin development. Refer to the [plugins](#Plugins) paragraph
-- --run_headless: run simulators headless
+- --nonHeadlessSimulatorsFlag: run simulators in non headless mode. This will make testing slightly slower because devices need to be booted an arranged properly
 - --use_localhost: 🔥 when passing these flag tests will be dispatched on the localhost as well even if it is not specified in the configuration file. This is useful when launching tests locally leveraging additional simulators of your own development machine
 
 ### Test output
