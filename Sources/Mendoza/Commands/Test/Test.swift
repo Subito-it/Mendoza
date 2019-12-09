@@ -62,9 +62,6 @@ class Test {
         
         let git = Git(executer: LocalExecuter())
         let gitStatus = try git.status()
-        #if !DEBUG
-            try git.pull()
-        #endif
         
         let queue = OperationQueue()
         
