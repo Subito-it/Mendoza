@@ -65,7 +65,7 @@ class Plugin<Input: DefaultInitializable, Output: DefaultInitializable> {
                 ?? ""
         }
 
-        let command = "\(pluginRunUrl.path) $'\(escape(inputString))' $'\(escape(plugin.data))'"
+        let command = "chmod +x \(pluginRunUrl.path); \(pluginRunUrl.path) $'\(escape(inputString))' $'\(escape(plugin.data))'"
         if plugin.debug {
             let timestamp = Int(Date().timeIntervalSince1970)
             try command.data(using: .utf8)?.write(to: baseUrl.appendingPathComponent(filename + ".debug-\(timestamp)"))
