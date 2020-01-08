@@ -225,7 +225,7 @@ extension CommandLineProxy {
                 settings = try? loadSettings()
             }
             
-            if settings?.ScreenConfigurations?.keys.count == 0 {
+            if settings == nil || settings?.ScreenConfigurations?.keys.count == 0 {
                 try CommandLineProxy.Simulators(executer: executer, verbose: verbose).rewriteSettings()
                 settings = try? loadSettings()
                 
