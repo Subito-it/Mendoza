@@ -36,6 +36,7 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
         case testPassed(duration: Double)
         case testFailed(duration: Double)
         case testCrashed
+        case noSpaceOnDevice
         
         var isTestPassed: Bool { switch self { case .testPassed: return true; default: return false } }
         var isTestCrashed: Bool { switch self { case .testCrashed: return true; default: return false } }
@@ -222,6 +223,8 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                         
                         print("💥 \(self.verbose ? "[\(Date().description)] " : "")\(currentRunning.test.description) crash [\(self.testCasesCompleted.count)/\(self.testCasesCount)]\(self.retryCount > 0 ? " (\(self.retryCount) retries)" : "") in \(currentRunning.duration) {\(runnerIndex)}".red)
                     }
+                case .noSpaceOnDevice:
+                    fatalError("💥  No space left on \(executer.address). If you're using a RAM disk in Mendoza's configuration consider increasing size")
                 }
             }
             
@@ -286,6 +289,10 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
         let testTarget = self.testTarget.replacingOccurrences(of: " ", with: "_")
         
         let startRegex = #"Test Case '-\[\#(testTarget)\.(.*)\]' started"#
+        
+        if line.contains(##"Code=28 "No space left on device""##) {
+            return .noSpaceOnDevice
+        }
         
         if let tests = try? line.capturedGroups(withRegexString: startRegex), tests.count == 1 {
             let testCaseName = tests[0].components(separatedBy: " ").last ?? ""
@@ -364,6 +371,8 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                 
                 let testCaseResults = TestCaseResult(node: node, xcResultPath: resultPath, suite: currentCandidate.suite, name: currentCandidate.name, status: .failed, duration: -1)
                 result.append(testCaseResults)
+            case .noSpaceOnDevice:
+                throw Error("💥  No space left on device. If you're using a RAM disk in Mendoza's configuration consider increasing size".red)
             }
         }
         
