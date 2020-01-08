@@ -37,7 +37,7 @@ class Plugin<Input: DefaultInitializable, Output: DefaultInitializable> {
     
     func run(input: Input) throws -> Output {
         let pluginUrl = baseUrl.appendingPathComponent(filename)
-        let pluginRunUrl = baseUrl.appendingPathComponent("_\(filename)")
+        let pluginRunUrl = baseUrl.appendingPathComponent("_\(filename)_\(CFAbsoluteTimeGetCurrent())")
         
         try? fileManager.removeItem(at: pluginRunUrl)
         defer { if !plugin.debug { try? fileManager.removeItem(at: pluginRunUrl) } }
@@ -72,7 +72,7 @@ class Plugin<Input: DefaultInitializable, Output: DefaultInitializable> {
         }
         
         do {
-            let output = try executer.capture(command).output            
+            let output = try executer.capture(command).output
             guard let result = output.components(separatedBy: pluginOutputMarker).last
                 , let resultData = result.data(using: .utf8) , resultData.count > 0
                 , let ret = try? JSONDecoder().decode(Output.self, from: resultData) else {
