@@ -90,8 +90,8 @@ extension CommandLineProxy {
             
             try reset()
             
-            let cmds = ["export FASTLANE_USER=\(appleIdCredentials.username)",
-                        "export FASTLANE_PASSWORD=\(appleIdCredentials.password)",
+            let cmds = ["export FASTLANE_USER='\(appleIdCredentials.username)'",
+                        "export FASTLANE_PASSWORD='\(appleIdCredentials.password)'",
                         "rm -f ~/Library/Caches/XcodeInstall/com.apple.pkg.iPhoneSimulatorSDK\(runtime.replacingOccurrences(of: ".", with: "_"))*.dmg",
                         "xcversion update",
                         "echo '\(password)' | sudo -S xcversion simulators --install='iOS \(runtime)'"]
@@ -117,7 +117,7 @@ extension CommandLineProxy {
         ///   - name: name of the device to create (e.g 'iPhone 6-1')
         ///   - device: the device instance to create
         /// - Returns: an instance of Simulator
-        func makeSimulatorIfNeeded(name: String, device: Device) throws -> Simulator {            
+        func makeSimulatorIfNeeded(name: String, device: Device) throws -> Simulator {
             let simulatorsStatus = try executer.execute("$(xcode-select -p)/usr/bin/instruments -s devices")
             
             let statusRegex = try NSRegularExpression(pattern: #"(.*)\s\((\d+\.\d+(\.\d+)?)\)\s\[(.*)\]\s\(Simulator\)$"#)
