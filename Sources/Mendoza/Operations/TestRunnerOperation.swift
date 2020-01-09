@@ -395,11 +395,11 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
         return nil
     }
     
-    private func makeTimeoutBlock(executer: Executer, currentRunning: (test: TestCase, start: TimeInterval)?, testRunner: TestRunner, runnerIndex: Int) -> CancellableDelayedTask {
+    private func makeTimeoutBlock(executer: Executer, currentRunning: @autoclosure @escaping () -> (test: TestCase, start: TimeInterval)?, testRunner: TestRunner, runnerIndex: Int) -> CancellableDelayedTask {
         let task = CancellableDelayedTask(delay: TimeInterval(testTimeoutSeconds), queue: syncQueue)
         
         task.run { [unowned self] in
-            if let currentRunning = currentRunning {
+            if let currentRunning = currentRunning() {
                 print("⏰ \(currentRunning.test.description) timed out {\(runnerIndex)} in \(Int(CFAbsoluteTimeGetCurrent() - currentRunning.start))s".red)
             } else {
                 print("⏰ Unknown test timed out {\(runnerIndex)}".red)
