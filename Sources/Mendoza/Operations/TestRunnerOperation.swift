@@ -239,7 +239,7 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
             }
 
             output = try executer.execute(testWithoutBuilding, progress: progressHandler) { result, originalError in
-                try self.assertAccessibilityPermissiong(in: result.output)
+                try self.assertAccessibilityPermissions(in: result.output)
                 throw originalError
             }
             
@@ -247,7 +247,7 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
             
             // xcodebuild returns 0 even on ** TEST EXECUTE FAILED ** when missing
             // accessibility permissions or other errors like the bootstrapping onese we check in testsDidFailToStart
-            try self.assertAccessibilityPermissiong(in: output)
+            try self.assertAccessibilityPermissions(in: output)
             
             guard !testsDidFailBootstrapping(in: output) else {
                 Thread.sleep(forTimeInterval: 5.0)
@@ -509,7 +509,7 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
         }
     }
     
-    private func assertAccessibilityPermissiong(in output: String) throws {
+    private func assertAccessibilityPermissions(in output: String) throws {
         if output.contains("does not have permission to use Accessibility") {
             throw Error("Unable to run UI Tests because Xcode Helper does not have permission to use Accessibility. To enable UI testing, go to the Security & Privacy pane in System Preferences, select the Privacy tab, then select Accessibility, and add Xcode Helper to the list of applications allowed to use Accessibility")
         }
