@@ -6,6 +6,10 @@ The architecture of Mendoza is based on a set of NSOperations orchestrated by a 
 
 ## Operations
 
+### initialSetupOperation
+
+Initial setup checking that all nodes are ready to properly execute tests
+
 ### validationOperation
 
 Validate configuration file checking for missing credentials, passwords, network reachability and dependencies.

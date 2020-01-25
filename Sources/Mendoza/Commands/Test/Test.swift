@@ -94,6 +94,7 @@ class Test {
         let testSortingPlugin = TestSortingPlugin(baseUrl: pluginUrl, plugin: plugin)
         let tearDownPlugin = TearDownPlugin(baseUrl: pluginUrl, plugin: plugin)
         
+        let initialSetupOperation = InitialSetupOperation(nodes: uniqueNodes)
         let validationOperation = ValidationOperation(configuration: configuration)
         let macOsValidationOperation = MacOsValidationOperation(configuration: configuration)
         let localSetupOperation = LocalSetupOperation()
@@ -115,7 +116,8 @@ class Test {
         let tearDownOperation = TearDownOperation(configuration: configuration, plugin: tearDownPlugin)
         
         let operations: [RunOperation] =
-            [compileOperation,
+            [initialSetupOperation,
+             compileOperation,
              validationOperation,
              macOsValidationOperation,
              localSetupOperation,
@@ -143,6 +145,10 @@ class Test {
             simulatorBootOperation.cancel()
             simulatorSetupOperation.cancel()
         }
+        
+        macOsValidationOperation.addDependency(initialSetupOperation)
+        validationOperation.addDependency(initialSetupOperation)
+        localSetupOperation.addDependency(initialSetupOperation)
         
         compileOperation.addDependency(localSetupOperation)
 
