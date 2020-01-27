@@ -108,6 +108,11 @@ extension CommandLineProxy {
                 throw Error("Failed installing runtime, after install simulator runtime still not installed!", logger: executer.logger)
             }
         }
+        
+        func runXcode11ReleaseNotesWorkarounds(on simulator: Simulator) throws {
+            // See release notes workarounds: https://developer.apple.com/documentation/xcode_release_notes/xcode_11_release_notes?language=objc
+            _ = try executer.execute("xcrun simctl spawn '\(simulator.id)' defaults write com.apple.springboard FBLaunchWatchdogScale 2")
+        }
 
         /// This method instantiates a Simulator given a name.
         ///

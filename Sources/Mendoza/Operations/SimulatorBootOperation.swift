@@ -34,6 +34,8 @@ class SimulatorBootOperation: BaseOperation<Void> {
                 let proxy = CommandLineProxy.Simulators(executer: executer, verbose: self.verbose)
                 
                 try proxy.boot(simulator: source.value)
+                
+                try proxy.runXcode11ReleaseNotesWorkarounds(on: source.value)
             }
             
             didEnd?(())
