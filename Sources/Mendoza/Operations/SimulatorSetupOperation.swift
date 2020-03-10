@@ -64,8 +64,9 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
                         try? proxy.rewriteSettings()
                         nodeSimulators.forEach { try? proxy.boot(simulator: $0) }
                         
+                        try? proxy.close()
                         try self.updateSimulatorsArrangement(executer: executer, simulators: nodeSimulators)
-                        try proxy.reset()
+                        try? proxy.launch()
                     }
                 }
                 
@@ -203,7 +204,8 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
     ///   - param1: simulators to arrange
     private func updateSimulatorsArrangement(executer: Executer, simulators: [Simulator]) throws {
         let simulatorProxy = CommandLineProxy.Simulators(executer: executer, verbose: verbose)
-        try simulatorProxy.reset()
+        try simulatorProxy.close()
+        try simulatorProxy.launch()
         
         let settings = try simulatorProxy.loadSimulatorSettings()
         guard let screenConfiguration = settings.ScreenConfigurations
