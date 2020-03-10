@@ -27,26 +27,41 @@ extension CommandLineProxy {
                 try waitForBoot(simulator: simulatorBooting)
             }
         }
-                
+        
         func reset() throws {
-            let commands = ["defaults read com.apple.iphonesimulator",
-                            "pkill -9 Simulator",
-                            "sleep 5",
-                            "pkill -9 SpringBoard",
+            try close()
+            
+            let commands = ["pkill -9 SpringBoard",
                             "killall -9 com.apple.CoreSimulator.CoreSimulatorService",
                             "sleep 5"]
+                        
+            try commands.forEach { _ = try executer.execute("\($0) 2>/dev/null || true") }
+        }
+        
+        func close() throws {
+            let commands = ["mendoza mendoza close_simulator_app",
+                            "sleep 1"]
+            
+            try commands.forEach { _ = try executer.execute("\($0) 2>/dev/null || true") }
+
+        }
+                
+        func launch() throws {
+            let commands = ["defaults read com.apple.iphonesimulator &>/dev/null",
+                            "open -a \"$(xcode-select -p)/Applications/Simulator.app\"",
+                            "sleep 1"]
             
             try commands.forEach { _ = try executer.execute("\($0) 2>/dev/null || true") }
         }
         
         func rewriteSettings() throws {
-            _ = try executer.execute("open -a \"$(xcode-select -p)/Applications/Simulator.app\"; sleep 5")
-            
-            try reset()
+            try? launch()
+            try? close()
             
             let commands = ["rm '\(executer.homePath)/Library/Preferences/com.apple.iphonesimulator.plist'", // Delete iphone simulator settings to remove multiple `ScreenConfigurations` if present
-                            "rm -rf '\(executer.homePath)/Library/Saved Application State/com.apple.iphonesimulator.savedState'",
-                            "defaults read com.apple.iphonesimulator"]
+                            "rm -rf '\(executer.homePath)/Library/Saved Application State/com.apple.iphonesimulator.savedState'"]
+            
+            try? launch()
             
             try commands.forEach { _ = try executer.execute("\($0) 2>/dev/null || true") }
             
