@@ -107,6 +107,7 @@ class ConfigurationValidator {
         }
         
         // TODO: validate that apple credentials are valid
+        _ = credentials
     }
     
     private func validateAuthentication() throws {
