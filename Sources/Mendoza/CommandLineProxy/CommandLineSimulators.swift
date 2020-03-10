@@ -113,6 +113,11 @@ extension CommandLineProxy {
             // See release notes workarounds: https://developer.apple.com/documentation/xcode_release_notes/xcode_11_release_notes?language=objc
             _ = try executer.execute("xcrun simctl spawn '\(simulator.id)' defaults write com.apple.springboard FBLaunchWatchdogScale 2")
         }
+        
+        func runPasteboardWorkaround() throws {
+            // See https://twitter.com/objcandtwits/status/1227459913594658816?s=21
+            _ = try executer.execute("defaults write com.apple.iphonesimulator PasteboardAutomaticSync -bool false")
+        }
 
         /// This method instantiates a Simulator given a name.
         ///

@@ -36,6 +36,8 @@ class SimulatorBootOperation: BaseOperation<Void> {
                 try proxy.boot(simulator: source.value)
                 
                 try proxy.runXcode11ReleaseNotesWorkarounds(on: source.value)
+                
+                try proxy.runPasteboardWorkaround()
             }
             
             didEnd?(())
