@@ -8,6 +8,7 @@
 import Foundation
 import Bariloche
 import CoreGraphics
+import AppKit
 
 class MendozaCommand: Command {
     let name: String? = "mendoza"
@@ -64,6 +65,14 @@ class MendozaCommand: Command {
             guard let data = try? JSONEncoder().encode(result) else { return false }
             print(String(decoding: data, as: UTF8.self))
 
+            return true
+        case "close_simulator_app":
+            let runningApps = NSRunningApplication.runningApplications(withBundleIdentifier: "com.apple.iphonesimulator")
+            
+            for runningApp in runningApps {
+                runningApp.terminate()
+            }
+            
             return true
         default:
             return false
