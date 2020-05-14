@@ -9,7 +9,7 @@ import Foundation
 import SourceKittenFramework
 
 struct XCTestFileParser {
-    func extractTestCases(from urls: [URL]) throws -> [TestCase] {
+    func extractTestCases(from urls: [URL], baseXCTestCaseClass: String) throws -> [TestCase] {
         var result = [TestCase]()
 
         for url in urls {
@@ -23,10 +23,11 @@ struct XCTestFileParser {
                 return [] // no testing classes found
             }
 
-            let testClasses = visibleClasses.filter { $0.conforms(candidates: visibleClasses).contains("XCTestCase") }
+            let testClasses = visibleClasses.filter { $0.conforms(candidates: visibleClasses).contains(baseXCTestCaseClass) }
 
             let testCases: [[TestCase]] = testClasses.compactMap {
-                guard let suite = $0.name,
+                guard
+                    let suite = $0.name,
                     let methods = $0.subElements?.filter({ $0.isTestMethod }) else {
                     return nil
                 }

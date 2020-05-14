@@ -14,6 +14,7 @@ struct Configuration: Codable {
     let buildBundleIdentifier: String
     let testBundleIdentifier: String
     let scheme: String
+    let baseXCTestCaseClass: String
     let buildConfiguration: String
     let storeAppleIdCredentials: Bool
     let resultDestination: ResultDestination

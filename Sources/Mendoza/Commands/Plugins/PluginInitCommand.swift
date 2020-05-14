@@ -21,6 +21,7 @@ class PluginInitCommand: Command {
     - `postcompilation`: plugin to perform actions after compilation completes
     - `teardown`: plugin to perform actions at the end of the dispatch process
     """
+
     let help: String? = "Initialize plugins"
 
     let configuration = Argument<URL>(name: "configuration_file", kind: .positional, optional: false, help: "Mendoza's configuration file path", autocomplete: .files("json"))

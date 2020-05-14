@@ -10,6 +10,8 @@ import Foundation
 struct TestCase: Codable, Hashable {
     let name: String
     let suite: String
+    let tags: [String]? = []
+    let testCaseIDs: [String]? = []
 
     var testIdentifier: String { "\(suite)/\(name)" }
 }

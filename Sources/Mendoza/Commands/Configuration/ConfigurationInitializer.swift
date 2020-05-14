@@ -48,12 +48,26 @@ struct ConfigurationInitializer {
         let selectedBuildConfiguration = Bariloche.ask(title: "Select build configuration used to run UI Tests:", array: buildConfigurations)
 
         var bundleIdentifiers = try project.getTargetsBundleIdentifiers(for: selectedScheme.value.name)
+
         if bundleIdentifiers.build.hasPrefix("$(") {
-            let identifier: String = Bariloche.ask("\nBundle identifier coulnd't be autodetected. Please specify the bundle identifier of the app to test:".underline) { guard !$0.isEmpty else { throw Error("Invalid value") }; return $0 }
+            let identifier: String = Bariloche.ask("\nBundle identifier coulnd't be autodetected. Please specify the bundle identifier of the app to test:".underline) {
+                guard !$0.isEmpty else {
+                    throw Error("Invalid value")
+                }
+                return $0
+            }
             bundleIdentifiers.build = identifier
         }
+
         if bundleIdentifiers.test.hasPrefix("$(") {
-            let identifier: String = Bariloche.ask("\nBundle identifier coulnd't be autodetected. Please specify the bundle identifier of the runner app:".underline) { guard !$0.isEmpty else { throw Error("Invalid value") }; return $0 }
+            let identifier: String = Bariloche.ask("\nBundle identifier coulnd't be autodetected. Please specify the bundle identifier of the runner app:".underline) {
+                guard !$0.isEmpty else {
+                    throw Error("Invalid value")
+                }
+
+                return $0
+            }
+
             bundleIdentifiers.test = identifier
         }
 
@@ -64,11 +78,26 @@ struct ConfigurationInitializer {
         case .macos:
             break
         case .ios:
-            let appleIdCredentials = Bariloche.ask(title: "Do you want required simulators to be installed automatically?", array: ["Yes, requires AppleID username/password (stored in Keychain)", "No"])
+            let appleIdCredentials = Bariloche.ask(
+                title: "Do you want required simulators to be installed automatically?",
+                array: ["Yes, requires AppleID username/password (stored in Keychain)", "No"]
+            )
             storeAppleIdCredentials = appleIdCredentials.index == 0
             if storeAppleIdCredentials {
-                let username: String = Bariloche.ask("\nAppleID username:".underline) { guard !$0.isEmpty else { throw Error("Invalid value") }; return $0 }
-                let password: String = Bariloche.ask("\nAppleID password:".underline, secure: true) { guard !$0.isEmpty else { throw Error("Invalid value") }; return $0 }
+                let username: String = Bariloche.ask("\nAppleID username:".underline) {
+                    guard !$0.isEmpty else {
+                        throw Error("Invalid value")
+                    }
+                    return $0
+                }
+
+                let password: String = Bariloche.ask("\nAppleID password:".underline, secure: true) {
+                    guard !$0.isEmpty else {
+                        throw Error("Invalid value")
+                    }
+                    
+                    return $0
+                }
 
                 let keychain = KeychainAccess.Keychain(service: Environment.bundle)
                 try keychain.set(try JSONEncoder().encode(Credentials(username: username, password: password)), key: "appleID")
@@ -88,21 +117,26 @@ struct ConfigurationInitializer {
         let resultDestinationPath: String = Bariloche.ask("\nPlease select at which path on `\(resultDestinationNodeName.value)` results should be saved".underline)
         let resultDestination = Configuration.ResultDestination(node: destinationNode, path: resultDestinationPath)
 
+        let baseXCTestCaseClass: String = Bariloche.ask("\nPlease specify the base class for XCTests i.e XCTestCase or a custom class".underline)
+
         let basePath = "\(baseUrl.path)/"
         let projectRelativePath = url.path.replacingOccurrences(of: basePath, with: "")
         let workspaceRelativePath = workspaces.first?.path.replacingOccurrences(of: basePath, with: "")
 
-        let configuration = Configuration(projectPath: projectRelativePath,
-                                          workspacePath: workspaceRelativePath,
-                                          buildBundleIdentifier: bundleIdentifiers.build,
-                                          testBundleIdentifier: bundleIdentifiers.test,
-                                          scheme: selectedScheme.value.name,
-                                          buildConfiguration: selectedBuildConfiguration.value,
-                                          storeAppleIdCredentials: storeAppleIdCredentials,
-                                          resultDestination: resultDestination,
-                                          nodes: nodes,
-                                          compilation: Configuration.Compilation(),
-                                          sdk: sdk.rawValue)
+        let configuration = Configuration(
+            projectPath: projectRelativePath,
+            workspacePath: workspaceRelativePath,
+            buildBundleIdentifier: bundleIdentifiers.build,
+            testBundleIdentifier: bundleIdentifiers.test,
+            scheme: selectedScheme.value.name,
+            baseXCTestCaseClass: baseXCTestCaseClass,
+            buildConfiguration: selectedBuildConfiguration.value,
+            storeAppleIdCredentials: storeAppleIdCredentials,
+            resultDestination: resultDestination,
+            nodes: nodes,
+            compilation: Configuration.Compilation(),
+            sdk: sdk.rawValue
+        )
 
         let encoder = JSONEncoder()
         encoder.outputFormatting = .prettyPrinted

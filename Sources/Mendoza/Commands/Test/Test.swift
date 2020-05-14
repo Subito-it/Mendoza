@@ -19,7 +19,18 @@ class Test {
     private let timestamp: String
     private var observers = [NSKeyValueObservation]()
 
-    init(configurationUrl: URL, device: Device, runHeadless: Bool, filePatterns: FilePatterns, testTimeoutSeconds: Int, failingTestsRetryCount: Int, dispatchOnLocalHost: Bool, pluginData: String?, debugPlugins: Bool, verbose: Bool) throws {
+    init(
+        configurationUrl: URL,
+        device: Device,
+        runHeadless: Bool,
+        filePatterns: FilePatterns,
+        testTimeoutSeconds: Int,
+        failingTestsRetryCount: Int,
+        dispatchOnLocalHost: Bool,
+        pluginData: String?,
+        debugPlugins: Bool,
+        verbose: Bool
+    ) throws {
         plugin = (data: pluginData, debug: debugPlugins)
 
         let configurationData = try Data(contentsOf: configurationUrl)
@@ -27,7 +38,20 @@ class Test {
 
         if dispatchOnLocalHost, !configuration.nodes.contains(where: { AddressType(node: $0) == .local }) { // add localhost
             let updatedNodes = configuration.nodes + [Node.localhost()]
-            let updatedConfiguration = Configuration(projectPath: configuration.projectPath, workspacePath: configuration.workspacePath, buildBundleIdentifier: configuration.buildBundleIdentifier, testBundleIdentifier: configuration.testBundleIdentifier, scheme: configuration.scheme, buildConfiguration: configuration.buildConfiguration, storeAppleIdCredentials: configuration.storeAppleIdCredentials, resultDestination: configuration.resultDestination, nodes: updatedNodes, compilation: configuration.compilation, sdk: configuration.sdk)
+            let updatedConfiguration = Configuration(
+                projectPath: configuration.projectPath,
+                workspacePath: configuration.workspacePath,
+                buildBundleIdentifier: configuration.buildBundleIdentifier,
+                testBundleIdentifier: configuration.testBundleIdentifier,
+                scheme: configuration.scheme, baseXCTestCaseClass: configuration.baseXCTestCaseClass,
+                buildConfiguration: configuration.buildConfiguration,
+                storeAppleIdCredentials: configuration.storeAppleIdCredentials,
+                resultDestination: configuration.resultDestination,
+                nodes: updatedNodes,
+                compilation: configuration.compilation,
+                sdk: configuration.sdk
+            )
+
             configuration = updatedConfiguration
         }
 

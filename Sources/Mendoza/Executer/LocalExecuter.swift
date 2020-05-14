@@ -105,6 +105,7 @@ private extension Process {
         arguments = ["-c", "source ~/.bash_profile; shopt -s huponexit; \(LocalExecuter.executablePathExport()) \(exports)\(cmd) 2>&1"]
 
         let pipe = Pipe()
+
         standardOutput = pipe
         standardError = pipe
         qualityOfService = .userInitiated

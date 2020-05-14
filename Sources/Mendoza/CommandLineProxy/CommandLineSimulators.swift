@@ -65,6 +65,10 @@ extension CommandLineProxy {
             _ = try executer.execute("xcrun simctl shutdown \(simulator.id)")
         }
 
+        func delete(simulator: Simulator) throws {
+            _ = try executer.execute("xcrun simctl delete \(simulator.id)")
+        }
+
         func launchApp(identifier: String, on simulator: Simulator) throws {
             _ = try executer.execute("xcrun simctl launch \(simulator.id) \(identifier)")
         }
@@ -76,11 +80,14 @@ extension CommandLineProxy {
         func installRuntimeIfNeeded(_ runtime: String, nodeAddress: String, appleIdCredentials: Credentials?, administratorPassword: String?) throws {
             let isRuntimeInstalled: () throws -> Bool = { [unowned self] in
                 let installedRuntimes = try self.executer.execute("xcrun simctl list runtimes")
-                let escapedRuntime = runtime.replacingOccurrences(of: ".", with: "-")
+                let escapedRuntime = runtime.components(separatedBy: ".").prefix(2).joined(separator: "-")
+
                 return installedRuntimes.contains("com.apple.CoreSimulator.SimRuntime.iOS-\(escapedRuntime)")
             }
 
-            guard try !isRuntimeInstalled() else { return }
+            guard try !isRuntimeInstalled() else {
+                return
+            }
 
             guard let appleIdCredentials = appleIdCredentials,
                 let password = administratorPassword else {
@@ -98,11 +105,13 @@ extension CommandLineProxy {
 
             try reset()
 
-            let cmds = ["export FASTLANE_USER='\(appleIdCredentials.username)'",
-                        "export FASTLANE_PASSWORD='\(appleIdCredentials.password)'",
-                        "rm -f ~/Library/Caches/XcodeInstall/com.apple.pkg.iPhoneSimulatorSDK\(runtime.replacingOccurrences(of: ".", with: "_"))*.dmg",
-                        "xcversion update",
-                        "echo '\(password)' | sudo -S xcversion simulators --install='iOS \(runtime)'"]
+            let cmds = [
+                "export FASTLANE_USER='\(appleIdCredentials.username)'",
+                "export FASTLANE_PASSWORD='\(appleIdCredentials.password)'",
+                "rm -f ~/Library/Caches/XcodeInstall/com.apple.pkg.iPhoneSimulatorSDK\(runtime.replacingOccurrences(of: ".", with: "_"))*.dmg",
+                "xcversion update",
+                "echo '\(password)' | sudo -S xcversion simulators --install='iOS \(runtime)'",
+            ]
 
             let result = try executer.capture(cmds.joined(separator: "; "))
             guard result.status == 0 else {
@@ -168,7 +177,7 @@ extension CommandLineProxy {
                 let simulatorRuntime = captureGroups[1]
                 let simulatorId = captureGroups[3]
 
-                if simulatorName == name, simulatorRuntime == device.runtime {
+                if simulatorName == name, simulatorRuntime == device.osVersion {
                     return Simulator(id: simulatorId, name: name, device: device)
                 }
             }
@@ -207,7 +216,7 @@ extension CommandLineProxy {
 
                 guard capture.count == 3 else { continue }
 
-                simulators.append(Simulator(id: capture[2], name: capture[0], device: Device(name: capture[0], runtime: capture[1])))
+                simulators.append(Simulator(id: capture[2], name: capture[0], device: Device(name: capture[0], osVersion: capture[1])))
             }
 
             return simulators
@@ -261,6 +270,15 @@ extension CommandLineProxy {
             var settings: Simulators.Settings?
             if try executer.fileExists(atPath: settingsPath) {
                 settings = try? loadSettings()
+            }
+
+            if settings == nil || settings?.ScreenConfigurations?.keys.count == 0 {
+                try CommandLineProxy.Simulators(executer: executer, verbose: verbose).rewriteSettings()
+                settings = try? loadSettings()
+
+                if settings?.ScreenConfigurations?.keys.count == 0 {
+                    throw Error("Failed to reset simulator plist: ScreenConfigurations key missing", logger: executer.logger)
+                }
             }
 
             guard let result = settings else {

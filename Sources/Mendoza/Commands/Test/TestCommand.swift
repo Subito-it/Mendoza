@@ -31,7 +31,7 @@ class TestCommand: Command {
         do {
             let device: Device
             if let deviceName = deviceNameField.value, let deviceRuntime = deviceRuntimeField.value {
-                device = Device(name: deviceName, runtime: deviceRuntime)
+                device = Device(name: deviceName, osVersion: deviceRuntime)
             } else {
                 device = Device.defaultInit()
             }

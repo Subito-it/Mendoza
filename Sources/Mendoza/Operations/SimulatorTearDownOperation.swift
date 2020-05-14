@@ -33,6 +33,7 @@ class SimulatorTearDownOperation: BaseOperation<Void> {
                 let proxy = CommandLineProxy.Simulators(executer: executer, verbose: self.verbose)
 
                 let bootedSimulators = try proxy.bootedSimulators()
+
                 for simulator in bootedSimulators {
                     try proxy.terminateApp(identifier: self.configuration.buildBundleIdentifier, on: simulator)
                     try proxy.terminateApp(identifier: self.configuration.testBundleIdentifier, on: simulator)
@@ -41,6 +42,12 @@ class SimulatorTearDownOperation: BaseOperation<Void> {
                 if self.resetSimulatorsOnCompletion == true {
                     try proxy.gracefullyQuit()
                     try proxy.launch()
+                }
+
+                let mendozaSimulators = try proxy.installedSimulators().filter { $0.name.contains(Mendoza.name) }
+
+                for simulator in mendozaSimulators {
+                    try proxy.delete(simulator: simulator)
                 }
             }
 
