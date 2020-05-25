@@ -12,17 +12,19 @@ class TestExtractionOperation: BaseOperation<[TestCase]> {
     private let baseUrl: URL
     private let testTargetSourceFiles: [String]
     private let filePatterns: FilePatterns
+    private let testFilters: TestFilters
     private let device: Device
     private let plugin: TestExtractionPlugin
     private lazy var executer: Executer = {
         makeLocalExecuter()
     }()
 
-    init(configuration: Configuration, baseUrl: URL, testTargetSourceFiles: [String], filePatterns: FilePatterns, device: Device, plugin: TestExtractionPlugin) {
+    init(configuration: Configuration, baseUrl: URL, testTargetSourceFiles: [String], filePatterns: FilePatterns, testFilters: TestFilters, device: Device, plugin: TestExtractionPlugin) {
         self.configuration = configuration
         self.baseUrl = baseUrl
         self.testTargetSourceFiles = testTargetSourceFiles
         self.filePatterns = filePatterns
+        self.testFilters = testFilters
         self.device = device
         self.plugin = plugin
         super.init()
@@ -39,15 +41,35 @@ class TestExtractionOperation: BaseOperation<[TestCase]> {
 
             let testCases: [TestCase]
             if plugin.isInstalled {
-                let input = TestExtractionInput(candidates: targetTestFiles, device: device)
+                let input = TestExtractionInput(
+                    candidates: targetTestFiles,
+                    device: device,
+                    baseXCTestCaseClass: configuration.baseXCTestCaseClass,
+                    include: testFilters.include,
+                    exclude: testFilters.exclude
+                )
+
                 testCases = try plugin.run(input: input)
             } else {
                 let parser = XCTestFileParser()
-                testCases = try parser.extractTestCases(from: targetTestFiles, baseXCTestCaseClass: configuration.baseXCTestCaseClass)
+
+                testCases = try parser.extractTestCases(
+                    from: targetTestFiles,
+                    baseXCTestCaseClass: configuration.baseXCTestCaseClass,
+                    include: testFilters.include,
+                    exclude: testFilters.exclude
+                )
             }
 
             guard !testCases.isEmpty else {
-                throw Error("❌  No test cases found.\n\nMendoza did look into the following files but found no subclasses of \(configuration.baseXCTestCaseClass):\n\(targetTestFiles.map { $0.path }.joined(separator: "\n"))".red.bold)
+                let error = """
+                ❌  No test cases found.
+
+                Mendoza did look into the following files but found no subclasses of \(configuration.baseXCTestCaseClass):
+                \(targetTestFiles.map { $0.path }.joined(separator: "\n"))
+                """
+
+                throw Error(error.red.bold)
             }
 
             print("\nℹ️  Will execute \(testCases.count) tests\n".magenta)

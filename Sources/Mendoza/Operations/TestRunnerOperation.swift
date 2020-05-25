@@ -133,7 +133,7 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
 
                 try self.reclaimDiskSpace(executer: executer, testRunner: testRunner)
 
-                print("\nℹ️  Node {\(runnerIndex)} did execute tests in \(hoursMinutesSeconds(in: CFAbsoluteTimeGetCurrent() - self.startTimeInterval))\n".magenta)
+                print("\nℹ️  Node {\(runnerIndex)} did execute tests in \(formatTime(duration: CFAbsoluteTimeGetCurrent() - self.startTimeInterval))\n".magenta)
             }
 
             didEnd?(result)
@@ -187,7 +187,7 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                     self.testCasesCompleted.append(currentRunning.test)
                 }
 
-                let duration = hoursMinutesSeconds(in: CFAbsoluteTimeGetCurrent() - currentRunning.start)
+                let duration = formatTime(duration: CFAbsoluteTimeGetCurrent() - currentRunning.start)
 
                 return (test: currentRunning.test, duration: duration)
             }
@@ -461,8 +461,14 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
     private func findTestResultUrl(executer: Executer, testRunner: TestRunner) throws -> URL {
         let resultPath = Path.logs.url.appendingPathComponent(testRunner.id).path
         let testResults = try executer.execute("find '\(resultPath)' -type d -name '*.xcresult'").components(separatedBy: "\n")
-        guard let testResult = testResults.first, !testResult.isEmpty else { throw Error("No test result found", logger: executer.logger) }
-        guard testResults.count == 1 else { throw Error("Too many test results found", logger: executer.logger) }
+
+        guard let testResult = testResults.first, !testResult.isEmpty else {
+            throw Error("No test result found", logger: executer.logger)
+        }
+
+        guard testResults.count == 1 else {
+            throw Error("Too many test results found", logger: executer.logger)
+        }
 
         return URL(fileURLWithPath: testResult)
     }

@@ -83,7 +83,7 @@ public func AssertParse<A>(_ type: A.Type, _ arguments: [String], file: StaticSt
         try closure(parsed)
     } catch {
         let message = type.message(for: error)
-        XCTFail("\"\(message)\" — \(error)", file: file, line: line)
+        XCTFail(#"\#(message)" — \#(error)"#, file: file, line: line)
     }
 }
 
@@ -97,7 +97,7 @@ public func AssertParseCommand<A: ParsableCommand>(_ rootCommand: ParsableComman
         try closure(aCommand)
     } catch {
         let message = rootCommand.message(for: error)
-        XCTFail("\"\(message)\" — \(error)", file: file, line: line)
+        XCTFail(#"\#(message)" — \#(error)"#, file: file, line: line)
     }
 }
 
@@ -236,7 +236,7 @@ extension XCTest {
         dataObserver = notificationCenter.addObserver(forName: dataNotificationName, object: outputHandler, queue: nil) { _ in
             let data = outputHandler.availableData
 
-            guard data.count > 0 else {
+            guard !data.isEmpty else {
                 return notificationCenter.removeObserver(dataObserver as Any)
             }
 
@@ -264,7 +264,7 @@ extension XCTest {
     @discardableResult
     func mendoza(command: String) -> ShellResult {
         let sandboxProject = URL(fileURLWithPath: #file).pathComponents.prefix(while: { $0 != "Tests" }).joined(separator: "/").dropFirst() + "/SandboxProject"
-        let terminalCommand = "cd \(sandboxProject) && \(command.replacingOccurrences(of: "mendoza", with: mendozaExecutablePath)) -l"
+        let terminalCommand = "cd \(sandboxProject) && \(command.replacingOccurrences(of: "mendoza", with: mendozaExecutablePath))"
 
         return shell(terminalCommand)
     }
@@ -288,6 +288,8 @@ extension XCTest {
         if retryCount != 0 {
             terminalCommand.append(contentsOf: argumentFormat(argName: "failure_retry", argNumber: retryCount))
         }
+
+        terminalCommand.append(contentsOf: " -l")
 
         return mendoza(command: terminalCommand)
     }

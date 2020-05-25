@@ -6,38 +6,66 @@
 //
 
 import Foundation
+import Slang
 import SourceKittenFramework
 
 struct XCTestFileParser {
-    func extractTestCases(from urls: [URL], baseXCTestCaseClass: String) throws -> [TestCase] {
+    func extractTestCases(from urls: [URL], baseXCTestCaseClass: String, include: [String], exclude: [String]) throws -> [TestCase] {
         var result = [TestCase]()
 
         for url in urls {
-            guard let file = File(path: url.path) else { throw Error("File `\(url.path)` does not exists") }
-
-            let structure = try Structure(file: file).description
-            guard let structureData = structure.data(using: .utf8) else { throw Error("Failed parsing `\(url.path)` source file") }
-            let parsed = try JSONDecoder().decode(KittenElement.self, from: structureData)
-
-            guard let visibleClasses = parsed.subElements?.filter({ $0.isOpenClass }) else {
-                return [] // no testing classes found
+            guard let file = File(url) else {
+                throw Error("File `\(url.path)` does not exists")
             }
 
-            let testClasses = visibleClasses.filter { $0.conforms(candidates: visibleClasses).contains(baseXCTestCaseClass) }
+            let disassembly = try Disassembly(file)
+            let query = disassembly.query.structure
 
-            let testCases: [[TestCase]] = testClasses.compactMap {
-                guard
-                    let suite = $0.name,
-                    let methods = $0.subElements?.filter({ $0.isTestMethod }) else {
+            let testClasses = query.descendants(where: { $0.conformsTo(class: baseXCTestCaseClass) })
+
+            let output: [[TestCase]] = testClasses.compactMap { baseTestClass in
+                guard let testClass = baseTestClass.one else {
                     return nil
                 }
 
-                return methods.map { TestCase(name: $0.name!.replacingOccurrences(of: "()", with: ""), suite: suite) } // swiftlint:disable:this force_unwrapping
+                let testMethods = baseTestClass.children(where: { $0.functionName(startsWith: "test") })
+
+                return testMethods.compactMap { function in
+                    guard let testMethod = function.one else {
+                        return nil
+                    }
+
+                    let testCaseIDs = function
+                        .children(where: { $0.closureName(contains: "report") })
+                        .children(where: { $0.argumentName(contains: "testCases") })
+                        .one?.bodyCollection ?? []
+
+                    let testTags = function
+                        .children(where: { $0.closureName(contains: "tags") })
+                        .children(where: { $0.argumentName(contains: "testTags") })
+                        .one?.bodyCollection ?? []
+
+                    return TestCase(name: testMethod.name, suite: testClass.name, tags: testTags, testCaseIDs: testCaseIDs)
+                }
             }
 
-            result += testCases.flatMap { $0 }
+            result += output.flatMap { $0 }
         }
 
-        return result
+        return result.filter { testcase in
+            var filterTestCase = true
+
+            let testcaseAttributes: [String] = [testcase.tags, testcase.testCaseIDs, [testcase.name], [testcase.testIdentifier]].flatMap { $0 }
+
+            if !include.isEmpty {
+                filterTestCase = testcaseAttributes.contains(where: { include.contains($0) })
+            }
+
+            if !exclude.isEmpty {
+                filterTestCase = !testcaseAttributes.contains(where: { exclude.contains($0) })
+            }
+
+            return filterTestCase
+        }
     }
 }

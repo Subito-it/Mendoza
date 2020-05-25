@@ -60,8 +60,8 @@
         "repositoryURL": "https://github.com/Quick/Nimble.git",
         "state": {
           "branch": null,
-          "revision": "bbc079f558ccadfa9cd430c6c8d250d93bbccff1",
-          "version": "8.0.8"
+          "revision": "2b1809051b4a65c1d7f5233331daa24572cd7fca",
+          "version": "8.1.1"
         }
       },
       {
@@ -78,8 +78,8 @@
         "repositoryURL": "https://github.com/Quick/Quick.git",
         "state": {
           "branch": null,
-          "revision": "33682c2f6230c60614861dfc61df267e11a1602f",
-          "version": "2.2.0"
+          "revision": "09b3becb37cb2163919a3842a4c5fa6ec7130792",
+          "version": "2.2.1"
         }
       },
       {
@@ -92,11 +92,29 @@
         }
       },
       {
+        "package": "Regex",
+        "repositoryURL": "https://github.com/sharplet/Regex.git",
+        "state": {
+          "branch": null,
+          "revision": "76c2b73d4281d77fc3118391877efd1bf972f515",
+          "version": "2.1.1"
+        }
+      },
+      {
         "package": "Shout",
         "repositoryURL": "https://github.com/tcamin/Shout.git",
         "state": {
           "branch": "subito",
           "revision": "5f3cb8828d21ae159f1c58740fdd4d69acd538f8",
+          "version": null
+        }
+      },
+      {
+        "package": "Slang",
+        "repositoryURL": "https://github.com/Ashraf-Ali-aa/Slang.git",
+        "state": {
+          "branch": "slang-swift-package",
+          "revision": "2999417159a0e24d3d5db744ff688d9d7f4e9b15",
           "version": null
         }
       },

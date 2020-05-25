@@ -1,39 +1,37 @@
 {
-  "scheme" : "MendozaSandboxUITests",
-  "nodes" : [
-    {
-      "concurrentTestRunners" : {
+  "scheme": "MendozaSandboxUITests",
+  "nodes": [{
+    "concurrentTestRunners": {
+
+    },
+    "ramDiskSizeMB": 1024,
+    "name": "mini",
+    "storeAdministratorPassword": true,
+    "address": "localhost"
+  }],
+  "compilation": {
+    "architectures": "x86_64",
+    "buildSettings": "GCC_OPTIMIZATION_LEVEL='s' SWIFT_OPTIMIZATION_LEVEL='-Osize'",
+    "onlyActiveArchitecture": "YES",
+    "useNewBuildSystem": "YES"
+  },
+  "sdk": "iphoneos",
+  "buildBundleIdentifier": "com.subito.MendozaSandbox",
+  "projectPath": "SandboxProject\/MendozaSandbox.xcodeproj",
+  "testBundleIdentifier": "com.subito.MendozaSandboxUITests",
+  "storeAppleIdCredentials": true,
+  "resultDestination": {
+    "path": "\/tmp\/ignore",
+    "node": {
+      "concurrentTestRunners": {
 
       },
-      "ramDiskSizeMB" : 1024,
-      "name" : "mini",
-      "storeAdministratorPassword" : true,
-      "address" : "localhost"
-    }
-  ],
-  "compilation" : {
-    "architectures" : "x86_64",
-    "buildSettings" : "GCC_OPTIMIZATION_LEVEL='s' SWIFT_OPTIMIZATION_LEVEL='-Osize'",
-    "onlyActiveArchitecture" : "YES",
-    "useNewBuildSystem" : "YES"
-  },
-  "sdk" : "iphoneos",
-  "buildBundleIdentifier" : "com.subito.MendozaSandbox",
-  "projectPath" : "SandboxProject\/MendozaSandbox.xcodeproj",
-  "testBundleIdentifier" : "com.subito.MendozaSandboxUITests",
-  "storeAppleIdCredentials" : true,
-  "resultDestination" : {
-    "path" : "\/tmp\/ignore",
-    "node" : {
-      "concurrentTestRunners" : {
-
-      },
-      "ramDiskSizeMB" : 1024,
-      "name" : "mini",
-      "storeAdministratorPassword" : true,
-      "address" : "localhost"
+      "ramDiskSizeMB": 1024,
+      "name": "mini",
+      "storeAdministratorPassword": true,
+      "address": "localhost"
     }
   },
-  "baseXCTestCaseClass" : "XCTestCase",
-  "buildConfiguration" : "Debug"
+  "baseXCTestCaseClass": "XCTestCase",
+  "buildConfiguration": "Debug"
 }

@@ -14,17 +14,79 @@ class MendozaSandboxUITests: XCTestCase {
     }
 
     func testExamplePass() {
-        XCTAssert(true)
+        testMethod(arg: ["T486"]) {
+            XCTAssert(true)
+        }
     }
 
     // @SmokeTest
     func testExampleTag() {
-        let testCaseIdentifier = ["SmokeTest"]
-        XCTAssert(true)
+        tags(testTags: [
+            .help,
+            .regression,
+        ])
+
+        report(territory: [.uk], testCases: ["APP-T486", "APP-T486"]) {
+            XCTAssert(true)
+        }
+    }
+
+    func testExampleTag2() {
+        tags(testTags: [
+            .help,
+        ])
+
+        report(territory: [.uk], testCases: ["APP-T486", "APP-T486"]) {
+            XCTAssert(true)
+        }
+    }
+
+    func testExampleTag3() {
+        tags(testTags: [
+            .help,
+        ])
+
+        report(territory: [.uk], testCases: ["APP-T486", "APP-T486"]) {
+            XCTAssert(true)
+        }
     }
 
     func testExampleFail() {
-        XCTAssert(false)
+        report(territory: [.uk], testCases: ["APP-T486d", "APP-T486d"]) {
+            XCTAssert(false)
+        }
     }
 }
 
+extension XCTestCase {
+    func testMethod(arg _: [String], step: () -> Void) {
+        XCTContext.runActivity(named: "Test run: ") { _ in
+            step()
+        }
+    }
+
+    func report(testCases _: [String], step: () -> Void) {
+        XCTContext.runActivity(named: "Test run: ") { _ in
+            step()
+        }
+    }
+
+    func report(territory _: [Territory], testCases _: [String], step: () -> Void) {
+        XCTContext.runActivity(named: "Test run: ") { _ in
+            step()
+        }
+    }
+
+    func tags(testTags: [TestTags]) {
+        print(testTags)
+    }
+
+    enum TestTags {
+        case help
+        case regression
+    }
+
+    enum Territory {
+        case uk
+    }
+}

@@ -45,12 +45,14 @@ class BaseOperation<Output: Any>: Operation, Starting, Ending, Throwing, LoggedO
         isExecutingObserver = observe(\BaseOperation.isExecuting) { [unowned self] op, _ in
             guard !op.isCancelled else { return }
 
+            let className = op.className.components(separatedBy: ".").last ?? op.className
+
             if op.isExecuting {
                 self.startTimeInterval = CFAbsoluteTimeGetCurrent()
-                print("🏃‍♀️ `\(op.className.components(separatedBy: ".").last ?? op.className)` did start".bold)
+                print("🏃‍♀️ `\(className)` did start".bold)
             } else {
                 let delta = CFAbsoluteTimeGetCurrent() - self.startTimeInterval
-                print("🏁 `\(op.className.components(separatedBy: ".").last ?? op.className)` did complete in \(delta)s".bold)
+                print("🏁 `\(className)` did complete in \(formatTime(duration: delta))".bold)
             }
         }
         loggers.insert(logger)

@@ -36,7 +36,9 @@ class TestCollectorOperation: BaseOperation<Void> {
 
             let destinationPath = "\(configuration.resultDestination.path)/\(timestamp)"
 
-            guard let testCaseResults = testCaseResults else { fatalError("💣 Required field `testCaseResults` not set") }
+            guard let testCaseResults = testCaseResults else {
+                fatalError("💣 Required field `testCaseResults` not set")
+            }
 
             let testNodes = Set(testCaseResults.map { $0.node })
             try pool.execute { [unowned self] executer, source in
@@ -80,13 +82,13 @@ class TestCollectorOperation: BaseOperation<Void> {
         loggers.insert(logger)
 
         let executer = try destinationNode.makeExecuter(logger: logger)
-        let sourcePaths = try executer.execute("find \(destinationPath) -type d -name '*.xcresult'").components(separatedBy: "\n")
+        let sourcePaths = try executer.execute("find \(destinationPath) -type d -name '*.xcresult'").components(separatedBy: "\n").map { $0.replacingOccurrences(of: " ", with: #"\ "#) }
 
         let mergedDestinationPath = "\(destinationPath)/\(Environment.xcresultFilename)"
-        let mergeCmd = "xcrun xcresulttool merge " + sourcePaths.map { "\"\($0)\"" }.joined(separator: " ") + " --output-path \(mergedDestinationPath)"
+        let mergeCmd = "xcrun xcresulttool merge " + sourcePaths.joined(separator: " ") + " --output-path \(mergedDestinationPath)"
         _ = try executer.execute(mergeCmd)
 
-        let cleanupCmd = "rm -rf " + sourcePaths.map { "\"\($0)\"" }.joined(separator: " ")
+        let cleanupCmd = "rm -rf " + sourcePaths.map { #"\#($0)"# }.joined(separator: " ")
         _ = try executer.execute(cleanupCmd)
     }
 }

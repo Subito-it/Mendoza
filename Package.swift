@@ -12,11 +12,12 @@ let package = Package(
         .package(url: "https://github.com/tcamin/XcodeProj.git", .branch("Mendoza")),
         .package(url: "https://github.com/jpsim/SourceKitten.git", from: "0.0.0"),
         .package(url: "https://github.com/apple/swift-argument-parser", .upToNextMinor(from: "0.0.1")),
+        .package(url: "https://github.com/Ashraf-Ali-aa/Slang.git", .branch("slang-swift-package")),
     ],
     targets: [
         .target(
             name: "Mendoza",
-            dependencies: ["Bariloche", "Shout", "XcodeProj", "KeychainAccess", "SourceKittenFramework", "ArgumentParser"]
+            dependencies: ["Bariloche", "Shout", "XcodeProj", "KeychainAccess", "SourceKittenFramework", "ArgumentParser", "Slang"]
         ),
         .testTarget(
             name: "MendozaTests",

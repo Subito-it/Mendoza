@@ -10,10 +10,17 @@ import Foundation
 struct TestCase: Codable, Hashable {
     let name: String
     let suite: String
-    let tags: [String]? = []
-    let testCaseIDs: [String]? = []
+    let tags: [String]
+    let testCaseIDs: [String]
 
-    var testIdentifier: String { "\(suite)/\(name)" }
+    var testIdentifier: String { return "\(suite)/\(name)" }
+
+    init(name: String, suite: String, tags: [String] = [], testCaseIDs: [String] = []) {
+        self.name = name.replacingOccurrences(of: "()", with: "")
+        self.suite = suite
+        self.tags = tags
+        self.testCaseIDs = testCaseIDs
+    }
 }
 
 extension TestCase: DefaultInitializable {

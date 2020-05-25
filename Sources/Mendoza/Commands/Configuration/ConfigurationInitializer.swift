@@ -95,7 +95,7 @@ struct ConfigurationInitializer {
                     guard !$0.isEmpty else {
                         throw Error("Invalid value")
                     }
-                    
+
                     return $0
                 }
 
