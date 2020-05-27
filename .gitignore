@@ -5,3 +5,6 @@
 /*.xcodeproj
 /Release
 xcuserdata
+
+SandboxProject/.mendoza/*.swift.debug*
+SandboxProject/.mendoza/*.swift_*

@@ -32,12 +32,12 @@ class PluginInitCommand: Command {
                                       optional: false,
                                       help: "Plugin to initialize",
                                       autocomplete: .items([
-                                        .init(value: "extract", help: "Customize test method extraction"),
-                                        .init(value: "sorting", help: "Sort tests to improve execution time"),
-                                        .init(value: "event", help: "Event based plugin"),
-                                        .init(value: "precompilation", help: "Run custom code before compilation"),
-                                        .init(value: "postcompilation", help: "Run custom code after compilation"),
-                                        .init(value: "teardown", help: "Run custom code at the end of execution")
+                                          .init(value: "extract", help: "Customize test method extraction"),
+                                          .init(value: "sorting", help: "Sort tests to improve execution time"),
+                                          .init(value: "event", help: "Event based plugin"),
+                                          .init(value: "precompilation", help: "Run custom code before compilation"),
+                                          .init(value: "postcompilation", help: "Run custom code after compilation"),
+                                          .init(value: "teardown", help: "Run custom code at the end of execution"),
                                       ]))
 
     func run() -> Bool {

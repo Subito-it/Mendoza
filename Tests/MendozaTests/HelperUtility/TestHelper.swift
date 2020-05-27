@@ -264,7 +264,9 @@ extension XCTest {
     @discardableResult
     func mendoza(command: String) -> ShellResult {
         let sandboxProject = URL(fileURLWithPath: #file).pathComponents.prefix(while: { $0 != "Tests" }).joined(separator: "/").dropFirst() + "/SandboxProject"
-        let terminalCommand = "cd \(sandboxProject) && \(command.replacingOccurrences(of: "mendoza", with: mendozaExecutablePath))"
+
+        let mendozaCommand = command.components(separatedBy: .whitespaces).dropFirst().joined(separator: " ")
+        let terminalCommand = "cd \(sandboxProject) && \(mendozaExecutablePath) \(mendozaCommand)"
 
         return shell(terminalCommand)
     }
@@ -277,8 +279,11 @@ extension XCTest {
         retryCount: Int = 0,
         includedFiles _: String? = nil,
         excludedFiles _: String? = nil,
+        includeTests: String? = nil,
+        excludeTests: String? = nil,
         timeout _: Int = 120,
-        pluginData _: String? = nil
+        pluginData _: String? = nil,
+        debug: Bool = false
     ) -> ShellResult {
         var terminalCommand = "mendoza test \(config) "
 
@@ -289,7 +294,20 @@ extension XCTest {
             terminalCommand.append(contentsOf: argumentFormat(argName: "failure_retry", argNumber: retryCount))
         }
 
-        terminalCommand.append(contentsOf: " -l")
+        if let includeTests = includeTests {
+            terminalCommand.append(contentsOf: argumentFormat(argName: "include_tests", argValue: includeTests))
+        }
+
+        if let excludeTests = excludeTests {
+            terminalCommand.append(contentsOf: argumentFormat(argName: "exclude_tests", argValue: excludeTests))
+        }
+
+        if debug {
+            terminalCommand.append(contentsOf: " --plugin_debug")
+        }
+
+        print("Running Command:")
+        print(terminalCommand)
 
         return mendoza(command: terminalCommand)
     }

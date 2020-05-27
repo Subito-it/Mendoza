@@ -5,6 +5,10 @@ import PackageDescription
 
 let package = Package(
     name: "Mendoza",
+    products: [
+        .executable(name: "Mendoza", targets: ["Mendoza"]),
+        .library(name: "MendozaCore", targets: ["MendozaCore"]),
+    ],
     dependencies: [
         .package(url: "https://github.com/tcamin/KeychainAccess.git", .branch("master")),
         .package(url: "https://github.com/Subito-it/Bariloche", .branch("master")),
@@ -17,6 +21,10 @@ let package = Package(
     targets: [
         .target(
             name: "Mendoza",
+            dependencies: ["MendozaCore"]
+        ),
+        .target(
+            name: "MendozaCore",
             dependencies: ["Bariloche", "Shout", "XcodeProj", "KeychainAccess", "SourceKittenFramework", "ArgumentParser", "Slang"]
         ),
         .testTarget(

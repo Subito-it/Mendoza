@@ -7,6 +7,7 @@
 
 import Bariloche
 import Foundation
+import MendozaCore
 
 struct PluginInit {
     private let configurationUrl: URL

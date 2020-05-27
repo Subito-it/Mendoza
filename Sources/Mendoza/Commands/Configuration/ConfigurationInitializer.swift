@@ -8,6 +8,7 @@
 import Bariloche
 import Foundation
 import KeychainAccess
+import MendozaCore
 
 struct ConfigurationInitializer {
     private let fileManager = FileManager.default
@@ -231,7 +232,7 @@ struct ConfigurationInitializer {
                 throw Error("Invalid address")
             }
 
-            _ = try LocalExecuter().execute("ping -W 1000 -c 1 \(answer)") { _, _ in throw Error("Node address unreachable") }
+            _ = try LocalExecuter().execute("ping -W 1000 -c 1 \(answer)", currentUrl: nil, progress: nil) { _, _ in throw Error("Node address unreachable") }
 
             return answer
         }

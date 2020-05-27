@@ -7,6 +7,7 @@
 
 import Bariloche
 import Foundation
+import MendozaCore
 
 class TestCommand: Command {
     let name: String? = "test"
