@@ -39,20 +39,42 @@ class CompileOperation: BaseOperation<Void> {
 
             let schemeBackup = try project.backupScheme(name: configuration.scheme, baseUrl: baseUrl)
             try project.disableDebugger(schemeName: configuration.scheme)
+
             defer { try? project.restoreScheme(name: configuration.scheme, with: schemeBackup) }
 
-            let projectFlag: String
+            var xcodeBuild: XcodeBuildCommand
+            var command = [String]()
+
+            command.append("$(xcode-select -p)/usr/bin/xcodebuild")
+
             if let workspacePath = configuration.workspacePath {
-                projectFlag = "-workspace \(workspacePath)"
+                command.append("-workspace \(workspacePath)")
             } else {
-                projectFlag = "-project \(configuration.projectPath)"
+                command.append("-project \(configuration.projectPath)")
             }
 
+            command.append(contentsOf: [
+                "build-for-testing",
+                "-scheme '\(configuration.scheme)'",
+                "-configuration \(configuration.buildConfiguration)",
+                "-derivedDataPath '\(Path.build.rawValue)'",
+                "-sdk '\(sdk.value)'",
+                "-UseNewBuildSystem=\(configuration.compilation.useNewBuildSystem)",
+                "-enableCodeCoverage YES",
+                "COMPILER_INDEX_STORE_ENABLE=NO",
+                "ONLY_ACTIVE_ARCH=\(configuration.compilation.onlyActiveArchitecture)",
+                "VALID_ARCHS='\(configuration.compilation.architectures)'",
+                configuration.compilation.buildSettings
+            ])
+
+            xcodeBuild = XcodeBuildCommand(arguments: command)
+
             if preCompilationPlugin.isInstalled {
-                _ = try preCompilationPlugin.run(input: PluginVoid.defaultInit())
+                xcodeBuild = try preCompilationPlugin.run(input: PreCompilationInput(xcodeBuildCommand: command))
             }
             
             var compilationSucceeded = false
+
             defer {
                 if postCompilationPlugin.isInstalled {
                     _ = try? postCompilationPlugin.run(input: PostCompilationInput(compilationSucceeded: compilationSucceeded))
@@ -61,15 +83,11 @@ class CompileOperation: BaseOperation<Void> {
                 didEnd?(())
             }
 
-            let command: String
-            switch sdk {
-            case .ios:
-                command = "$(xcode-select -p)/usr/bin/xcodebuild \(projectFlag) -scheme '\(configuration.scheme)' -configuration \(configuration.buildConfiguration) -derivedDataPath '\(Path.build.rawValue)' -sdk 'iphonesimulator' COMPILER_INDEX_STORE_ENABLE=NO ONLY_ACTIVE_ARCH=\(configuration.compilation.onlyActiveArchitecture) VALID_ARCHS='\(configuration.compilation.architectures)' \(configuration.compilation.buildSettings) -UseNewBuildSystem=\(configuration.compilation.useNewBuildSystem) -enableCodeCoverage YES build-for-testing"
-            case .macos:
-                command = "$(xcode-select -p)/usr/bin/xcodebuild \(projectFlag) -scheme '\(configuration.scheme)' -configuration \(configuration.buildConfiguration) -derivedDataPath '\(Path.build.rawValue)' -sdk 'macosx' COMPILER_INDEX_STORE_ENABLE=NO ONLY_ACTIVE_ARCH=\(configuration.compilation.onlyActiveArchitecture) VALID_ARCHS='\(configuration.compilation.architectures)' \(configuration.compilation.buildSettings) -UseNewBuildSystem=\(configuration.compilation.useNewBuildSystem) -enableCodeCoverage YES build-for-testing"
-            }
+            #if DEBUG
+            print(xcodeBuild.output)
+            #endif
 
-            _ = try executer.execute(command, currentUrl: baseUrl) { result, originalError in
+            _ = try executer.execute(xcodeBuild.output, currentUrl: baseUrl) { result, originalError in
                 if result.output.contains("** TEST BUILD FAILED **") {
                     throw Error("Compilation failed!")
                 } else {

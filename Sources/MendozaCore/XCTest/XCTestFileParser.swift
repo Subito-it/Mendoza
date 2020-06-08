@@ -53,7 +53,7 @@ struct XCTestFileParser {
         }
 
         return result.filter { testcase in
-            var filterTestCase = true
+            var filterTestCase = false
 
             var testcaseAttributes = [String]()
 
@@ -68,7 +68,7 @@ struct XCTestFileParser {
                 filterTestCase = testcaseAttributes.contains(where: { include.contains($0) })
             }
 
-            if !exclude.isEmpty {
+            if !exclude.isEmpty, filterTestCase == true {
                 filterTestCase = !testcaseAttributes.contains(where: { exclude.contains($0) })
             }
 

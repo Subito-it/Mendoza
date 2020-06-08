@@ -7,6 +7,15 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		C35B825B248FC1F80095E6C9 /* MendozaSandboxUITests-Release.xcconfig in Resources */ = {isa = PBXBuildFile; fileRef = C35B8252248FC1F80095E6C9 /* MendozaSandboxUITests-Release.xcconfig */; };
+		C35B825C248FC1F80095E6C9 /* MendozaSandbox-Shared.xcconfig in Resources */ = {isa = PBXBuildFile; fileRef = C35B8253248FC1F80095E6C9 /* MendozaSandbox-Shared.xcconfig */; };
+		C35B825D248FC1F80095E6C9 /* Project-Release.xcconfig in Resources */ = {isa = PBXBuildFile; fileRef = C35B8254248FC1F80095E6C9 /* Project-Release.xcconfig */; };
+		C35B825E248FC1F80095E6C9 /* MendozaSandboxUITests-Debug.xcconfig in Resources */ = {isa = PBXBuildFile; fileRef = C35B8255248FC1F80095E6C9 /* MendozaSandboxUITests-Debug.xcconfig */; };
+		C35B825F248FC1F80095E6C9 /* Project-Shared.xcconfig in Resources */ = {isa = PBXBuildFile; fileRef = C35B8256248FC1F80095E6C9 /* Project-Shared.xcconfig */; };
+		C35B8260248FC1F80095E6C9 /* MendozaSandboxUITests-Shared.xcconfig in Resources */ = {isa = PBXBuildFile; fileRef = C35B8257248FC1F80095E6C9 /* MendozaSandboxUITests-Shared.xcconfig */; };
+		C35B8261248FC1F80095E6C9 /* MendozaSandbox-Debug.xcconfig in Resources */ = {isa = PBXBuildFile; fileRef = C35B8258248FC1F80095E6C9 /* MendozaSandbox-Debug.xcconfig */; };
+		C35B8262248FC1F80095E6C9 /* MendozaSandbox-Release.xcconfig in Resources */ = {isa = PBXBuildFile; fileRef = C35B8259248FC1F80095E6C9 /* MendozaSandbox-Release.xcconfig */; };
+		C35B8263248FC1F80095E6C9 /* Project-Debug.xcconfig in Resources */ = {isa = PBXBuildFile; fileRef = C35B825A248FC1F80095E6C9 /* Project-Debug.xcconfig */; };
 		C37FFA5322D20ECB00B56984 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = C37FFA5222D20ECB00B56984 /* AppDelegate.swift */; };
 		C37FFA5522D20ECB00B56984 /* ViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = C37FFA5422D20ECB00B56984 /* ViewController.swift */; };
 		C37FFA5822D20ECB00B56984 /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = C37FFA5622D20ECB00B56984 /* Main.storyboard */; };
@@ -26,6 +35,15 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		C35B8252248FC1F80095E6C9 /* MendozaSandboxUITests-Release.xcconfig */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.xcconfig; path = "MendozaSandboxUITests-Release.xcconfig"; sourceTree = "<group>"; };
+		C35B8253248FC1F80095E6C9 /* MendozaSandbox-Shared.xcconfig */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.xcconfig; path = "MendozaSandbox-Shared.xcconfig"; sourceTree = "<group>"; };
+		C35B8254248FC1F80095E6C9 /* Project-Release.xcconfig */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.xcconfig; path = "Project-Release.xcconfig"; sourceTree = "<group>"; };
+		C35B8255248FC1F80095E6C9 /* MendozaSandboxUITests-Debug.xcconfig */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.xcconfig; path = "MendozaSandboxUITests-Debug.xcconfig"; sourceTree = "<group>"; };
+		C35B8256248FC1F80095E6C9 /* Project-Shared.xcconfig */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.xcconfig; path = "Project-Shared.xcconfig"; sourceTree = "<group>"; };
+		C35B8257248FC1F80095E6C9 /* MendozaSandboxUITests-Shared.xcconfig */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.xcconfig; path = "MendozaSandboxUITests-Shared.xcconfig"; sourceTree = "<group>"; };
+		C35B8258248FC1F80095E6C9 /* MendozaSandbox-Debug.xcconfig */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.xcconfig; path = "MendozaSandbox-Debug.xcconfig"; sourceTree = "<group>"; };
+		C35B8259248FC1F80095E6C9 /* MendozaSandbox-Release.xcconfig */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.xcconfig; path = "MendozaSandbox-Release.xcconfig"; sourceTree = "<group>"; };
+		C35B825A248FC1F80095E6C9 /* Project-Debug.xcconfig */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.xcconfig; path = "Project-Debug.xcconfig"; sourceTree = "<group>"; };
 		C37FFA4F22D20ECB00B56984 /* MendozaSandbox.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MendozaSandbox.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		C37FFA5222D20ECB00B56984 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		C37FFA5422D20ECB00B56984 /* ViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ViewController.swift; sourceTree = "<group>"; };
@@ -56,9 +74,26 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		C35B8251248FC1F80095E6C9 /* xcconfig */ = {
+			isa = PBXGroup;
+			children = (
+				C35B8252248FC1F80095E6C9 /* MendozaSandboxUITests-Release.xcconfig */,
+				C35B8253248FC1F80095E6C9 /* MendozaSandbox-Shared.xcconfig */,
+				C35B8254248FC1F80095E6C9 /* Project-Release.xcconfig */,
+				C35B8255248FC1F80095E6C9 /* MendozaSandboxUITests-Debug.xcconfig */,
+				C35B8256248FC1F80095E6C9 /* Project-Shared.xcconfig */,
+				C35B8257248FC1F80095E6C9 /* MendozaSandboxUITests-Shared.xcconfig */,
+				C35B8258248FC1F80095E6C9 /* MendozaSandbox-Debug.xcconfig */,
+				C35B8259248FC1F80095E6C9 /* MendozaSandbox-Release.xcconfig */,
+				C35B825A248FC1F80095E6C9 /* Project-Debug.xcconfig */,
+			);
+			path = xcconfig;
+			sourceTree = "<group>";
+		};
 		C37FFA4622D20ECB00B56984 = {
 			isa = PBXGroup;
 			children = (
+				C35B8251248FC1F80095E6C9 /* xcconfig */,
 				C37FFA5122D20ECB00B56984 /* MendozaSandbox */,
 				C37FFA6622D20ECC00B56984 /* MendozaSandboxUITests */,
 				C37FFA5022D20ECB00B56984 /* Products */,
@@ -177,9 +212,18 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				C35B8263248FC1F80095E6C9 /* Project-Debug.xcconfig in Resources */,
 				C37FFA5D22D20ECC00B56984 /* LaunchScreen.storyboard in Resources */,
+				C35B825F248FC1F80095E6C9 /* Project-Shared.xcconfig in Resources */,
+				C35B825B248FC1F80095E6C9 /* MendozaSandboxUITests-Release.xcconfig in Resources */,
+				C35B8262248FC1F80095E6C9 /* MendozaSandbox-Release.xcconfig in Resources */,
+				C35B825D248FC1F80095E6C9 /* Project-Release.xcconfig in Resources */,
 				C37FFA5A22D20ECC00B56984 /* Assets.xcassets in Resources */,
+				C35B825E248FC1F80095E6C9 /* MendozaSandboxUITests-Debug.xcconfig in Resources */,
 				C37FFA5822D20ECB00B56984 /* Main.storyboard in Resources */,
+				C35B8260248FC1F80095E6C9 /* MendozaSandboxUITests-Shared.xcconfig in Resources */,
+				C35B825C248FC1F80095E6C9 /* MendozaSandbox-Shared.xcconfig in Resources */,
+				C35B8261248FC1F80095E6C9 /* MendozaSandbox-Debug.xcconfig in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -358,6 +402,7 @@
 		};
 		C37FFA6D22D20ECC00B56984 /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = C35B8258248FC1F80095E6C9 /* MendozaSandbox-Debug.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
@@ -376,6 +421,7 @@
 		};
 		C37FFA6E22D20ECC00B56984 /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = C35B8259248FC1F80095E6C9 /* MendozaSandbox-Release.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
@@ -394,6 +440,7 @@
 		};
 		C37FFA7022D20ECC00B56984 /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = C35B8255248FC1F80095E6C9 /* MendozaSandboxUITests-Debug.xcconfig */;
 			buildSettings = {
 				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
 				CODE_SIGN_STYLE = Automatic;
@@ -414,6 +461,7 @@
 		};
 		C37FFA7122D20ECC00B56984 /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = C35B8252248FC1F80095E6C9 /* MendozaSandboxUITests-Release.xcconfig */;
 			buildSettings = {
 				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
 				CODE_SIGN_STYLE = Automatic;

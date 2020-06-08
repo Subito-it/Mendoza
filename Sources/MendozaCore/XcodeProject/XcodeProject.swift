@@ -25,6 +25,13 @@ public class XcodeProject: NSObject {
     public enum SDK: String, RawRepresentable {
         case macos = "macosx"
         case ios = "iphoneos"
+
+        public var value: String {
+            switch self {
+            case .macos: return "macosx"
+            case .ios:   return "iphonesimulator"
+            }
+        }
     }
 
     enum BuildSystem: String, RawRepresentable {

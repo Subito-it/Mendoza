@@ -11,7 +11,7 @@ final class TestCommandCliTests: XCTestCase {
     }
 
     func testPluginTest() throws {
-//        mendoza(command: "mendoza plugin init mendoza.json extract --accept")
+//        mendoza(command: "mendoza plugin init mendoza.json precompilation --accept")
     }
 
     func testDebugPlugin() throws {

@@ -75,13 +75,20 @@ public class Plugin<Input: DefaultInitializable, Output: DefaultInitializable> {
 
         do {
             let output = try executer.capture(command).output
-            guard let result = output.components(separatedBy: pluginOutputMarker).last,
+            let pluginData = output.components(separatedBy: pluginOutputMarker)
+            
+            guard
+                let pluginLogs = pluginData.first,
+                let result = pluginData.last,
                 let resultData = result.data(using: .utf8), !resultData.isEmpty,
                 let ret = try? JSONDecoder().decode(Output.self, from: resultData) else {
                 throw Error("Failed running plugin `\(filename)`, got \(output)", logger: executer.logger)
             }
+
+            print("\n👻  Plugin Log:\n\(pluginLogs)\n")
+
             if plugin.debug {
-                print("⚠️ plugin output:\n\(output)")
+                print("🧪 Plugin Result:\n\(result)\n")
             }
 
             return ret
@@ -142,7 +149,9 @@ public class Plugin<Input: DefaultInitializable, Output: DefaultInitializable> {
         let dependencies: [DefaultInitializable.Type] = [Input.self, Output.self]
         let reflections = dependencies.flatMap { $0.reflections() }
         let uniqueSubject = Set(reflections.map { $0.subject })
-        let uniqueReflections = uniqueSubject.compactMap { uniqueSubject in reflections.first(where: { reflection in reflection.subject == uniqueSubject }) }.map { $0.reflection }
+        let uniqueReflections = uniqueSubject.compactMap { uniqueSubject in
+            reflections.first(where: { reflection in reflection.subject == uniqueSubject })
+        }.map { $0.reflection }
 
         let dependenciesReflection = uniqueReflections.flatMap { $0.components(separatedBy: "\n") }
         result += dependenciesReflection

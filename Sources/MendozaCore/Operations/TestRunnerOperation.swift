@@ -98,7 +98,11 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
 
                     guard !testCases.isEmpty else { break }
 
-                    print("ℹ️  \(self.verbose ? "[\(Date().description)] " : "")Node \(source.node.address) will execute \(testCases.count) tests on \(testRunner.name) {\(runnerIndex)}".magenta)
+                    // TODO: Make this configurable via JSON
+                    #if DEBUG
+                        print("ℹ️  \(self.verbose ? "[\(Date().description)] " : "")Node \(source.node.address) will execute \(testCases.count) tests on \(testRunner.name) {\(runnerIndex)}".magenta)
+                    #endif
+
 
                     executer.logger?.log(command: "Will launch \(testCases.count) test cases")
                     executer.logger?.log(output: testCases.map { $0.testIdentifier }.joined(separator: "\n"), statusCode: 0)
@@ -141,7 +145,9 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
 
                 try self.reclaimDiskSpace(executer: executer, testRunner: testRunner)
 
-                print("\nℹ️  Node {\(runnerIndex)} did execute tests in \(formatTime(duration: CFAbsoluteTimeGetCurrent() - self.startTimeInterval))\n".magenta)
+                #if DEBUG
+                    print("\nℹ️  Node {\(runnerIndex)} did execute tests in \(formatTime(duration: CFAbsoluteTimeGetCurrent() - self.startTimeInterval))\n".magenta)
+                #endif
             }
 
             didEnd?(result)
@@ -486,6 +492,7 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
     }
 
     private func findTestResultUrl(executer: Executer, testRunner: TestRunner) throws -> URL {
+        var xcresultPath: String
         let resultPath = Path.logs.url.appendingPathComponent(testRunner.id).path
         let testResults = try executer.execute("find '\(resultPath)' -type d -name '*.xcresult'").components(separatedBy: "\n")
 
@@ -493,11 +500,23 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
             throw Error("No test result found", logger: executer.logger)
         }
 
-        guard testResults.count == 1 else {
-            throw Error("Too many test results found", logger: executer.logger)
+        if testResults.count > 1 {
+            let sourcePaths = testResults.map { $0.replacingOccurrences(of: " ", with: #"\ "#) }
+
+            let mergedDestinationPath = "\(resultPath)/\(Environment.xcresultFilename)"
+            let mergeCmd = "xcrun xcresulttool merge " + sourcePaths.joined(separator: " ") + " --output-path \(mergedDestinationPath)"
+            let output = try executer.execute(mergeCmd)
+
+            guard let path = output.components(separatedBy: "Merged to:").last else {
+                throw Error("Failed to get merged xcresult Path", logger: executer.logger)
+            }
+
+            xcresultPath = path.trimmingCharacters(in: .whitespacesAndNewlines)
+        } else {
+            xcresultPath = testResult
         }
 
-        return URL(fileURLWithPath: testResult)
+        return URL(fileURLWithPath: xcresultPath)
     }
 
     private func copyDiagnosticReports(executer: Executer, testRunner: TestRunner) throws {

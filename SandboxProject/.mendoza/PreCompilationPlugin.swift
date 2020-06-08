@@ -13,5 +13,12 @@ import Foundation
 struct PreCompilationPlugin {
     func handle(_ input: PreCompilationInput, pluginData: String?) -> XcodeBuildCommand {
         // write your implementation here
+        let commands = input.xcodeBuildCommand
+
+        print("Test")
+        print(commands)
+        
+
+        return XcodeBuildCommand(arguments: commands)
     }
 }
