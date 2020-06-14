@@ -15,6 +15,9 @@ public struct Event: Codable {
         case start, stop
         case startCompiling, stopCompiling
         case startTesting, stopTesting
+        case testSuiteStarted, testSuiteFinished
+        case testCaseStarted, testCaseFinished
+        case testPassed, testFailed, testCrashed
         case error
     }
 }
@@ -26,6 +29,9 @@ extension Event.Kind: CustomReflectable {
             case start, stop
             case startCompiling, stopCompiling
             case startTesting, stopTesting
+            case testSuiteStarted, testSuiteFinished
+            case testCaseStarted, testCaseFinished
+            case testPassed, testFailed, testCrashed
             case error
         }
 

@@ -29,7 +29,7 @@ public class XcodeProject: NSObject {
         public var value: String {
             switch self {
             case .macos: return "macosx"
-            case .ios:   return "iphonesimulator"
+            case .ios: return "iphonesimulator"
             }
         }
     }

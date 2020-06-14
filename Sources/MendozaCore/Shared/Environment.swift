@@ -19,5 +19,6 @@ public enum Environment {
     public static let jsonRepeatedTestSummaryFilename = "repeated_test_result.json"
     public static let suiteResultFilename = "test_details.json"
     public static let xcresultFilename = "merged.xcresult"
+    public static let xcresultType = ".xcresult"
     public static let pluginFolder = ".mendoza"
 }

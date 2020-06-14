@@ -64,7 +64,7 @@ class CompileOperation: BaseOperation<Void> {
                 "COMPILER_INDEX_STORE_ENABLE=NO",
                 "ONLY_ACTIVE_ARCH=\(configuration.compilation.onlyActiveArchitecture)",
                 "VALID_ARCHS='\(configuration.compilation.architectures)'",
-                configuration.compilation.buildSettings
+                configuration.compilation.buildSettings,
             ])
 
             xcodeBuild = XcodeBuildCommand(arguments: command)
@@ -72,7 +72,7 @@ class CompileOperation: BaseOperation<Void> {
             if preCompilationPlugin.isInstalled {
                 xcodeBuild = try preCompilationPlugin.run(input: PreCompilationInput(xcodeBuildCommand: command))
             }
-            
+
             var compilationSucceeded = false
 
             defer {
@@ -84,7 +84,7 @@ class CompileOperation: BaseOperation<Void> {
             }
 
             #if DEBUG
-            print(xcodeBuild.output)
+                print(xcodeBuild.output)
             #endif
 
             _ = try executer.execute(xcodeBuild.output, currentUrl: baseUrl) { result, originalError in

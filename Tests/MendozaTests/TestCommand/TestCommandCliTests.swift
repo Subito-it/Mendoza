@@ -10,6 +10,10 @@ final class TestCommandCliTests: XCTestCase {
         mendozaTest(config: "mendoza.json", deviceName: "iPhone 11 Pro Max", deviceRuntime: "13.2.2", retryCount: 1, includeTests: "help", excludeTests: nil)
     }
 
+    func testRetryTests() throws {
+        mendozaTest(config: "mendoza.json", deviceName: "iPhone 11 Pro Max", deviceRuntime: "13.2.2", testForStability: 2, retryCount: 0, includeTests: "help", excludeTests: nil)
+    }
+
     func testPluginTest() throws {
 //        mendoza(command: "mendoza plugin init mendoza.json precompilation --accept")
     }

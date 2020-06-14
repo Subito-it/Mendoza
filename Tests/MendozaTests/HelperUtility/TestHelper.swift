@@ -276,6 +276,7 @@ extension XCTest {
         config: String,
         deviceName: String,
         deviceRuntime: String,
+        testForStability: Int = 0,
         retryCount: Int = 0,
         includedFiles _: String? = nil,
         excludedFiles _: String? = nil,
@@ -289,6 +290,10 @@ extension XCTest {
 
         terminalCommand.append(contentsOf: argumentFormat(argName: "device_name", argValue: deviceName))
         terminalCommand.append(contentsOf: argumentFormat(argName: "device_runtime", argValue: deviceRuntime))
+
+        if testForStability != 0 {
+            terminalCommand.append(contentsOf: argumentFormat(argName: "test_for_stability", argNumber: testForStability))
+        }
 
         if retryCount != 0 {
             terminalCommand.append(contentsOf: argumentFormat(argName: "failure_retry", argNumber: retryCount))

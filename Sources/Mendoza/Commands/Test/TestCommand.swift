@@ -30,6 +30,7 @@ class TestCommand: Command {
 
     let timeoutField = Argument<Int>(name: "seconds", kind: .named(short: nil, long: "timeout"), optional: true, help: "Maximum allowed idle time (in seconds) in test standard output before dispatch process is automatically terminated. Default 120 seconds")
     let pluginCustomField = Argument<String>(name: "data", kind: .named(short: nil, long: "plugin_data"), optional: true, help: "A custom string that can be used to inject data to plugins")
+    let testForStabilityRetryCountField = Argument<Int>(name: "count", kind: .named(short: "ts", long: "test_for_stability"), optional: true, help: "Number of times a tests should be repeated to determin if test is stable")
     let failingTestsRetryCountField = Argument<Int>(name: "count", kind: .named(short: "r", long: "failure_retry"), optional: true, help: "Number of times a failing tests should be repeated")
 
     func run() -> Bool {
@@ -44,6 +45,7 @@ class TestCommand: Command {
             let timeout = timeoutField.value ?? 120
             let filePatterns = FilePatterns(commaSeparatedIncludePattern: includePatternField.value, commaSeparatedExcludePattern: excludePatternField.value)
             let testFilters = TestFilters(commaSeparatedIncludePattern: includeTestField.value, commaSeparatedExcludePattern: excludeTestField.value)
+            let testForStabilityCount = testForStabilityRetryCountField.value ?? 0
             let failingTestsRetryCount = failingTestsRetryCountField.value ?? 0
 
             let test = try Test(
@@ -54,6 +56,7 @@ class TestCommand: Command {
                 filePatterns: filePatterns,
                 testFilters: testFilters,
                 testTimeoutSeconds: timeout,
+                testForStabilityCount: testForStabilityCount,
                 failingTestsRetryCount: failingTestsRetryCount,
                 dispatchOnLocalHost: dispatchOnLocalHostFlag.value,
                 pluginData: pluginCustomField.value,

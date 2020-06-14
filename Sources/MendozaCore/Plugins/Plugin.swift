@@ -76,7 +76,7 @@ public class Plugin<Input: DefaultInitializable, Output: DefaultInitializable> {
         do {
             let output = try executer.capture(command).output
             let pluginData = output.components(separatedBy: pluginOutputMarker)
-            
+
             guard
                 let pluginLogs = pluginData.first,
                 let result = pluginData.last,

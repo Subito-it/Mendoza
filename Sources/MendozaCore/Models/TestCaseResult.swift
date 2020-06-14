@@ -23,6 +23,10 @@ struct TestCaseResult: Codable, CustomStringConvertible, Hashable {
 
     var description: String { "\(testCaseIdentifier) (\(duration) seconds)" }
     var testCaseIdentifier: String { "\(suite)/\(name)" }
+
+    static func == (lhs: TestCaseResult, rhs: TestCaseResult) -> Bool {
+        return lhs.testCaseIdentifier == rhs.testCaseIdentifier
+    }
 }
 
 extension TestCaseResult: DefaultInitializable {

@@ -52,24 +52,29 @@ struct XCTestFileParser {
             result += output.flatMap { $0 }
         }
 
-        return result.filter { testcase in
+        return filter(testCases: result, include: include, exclude: exclude)
+    }
+
+    func filter(testCases: [TestCase], include: [String], exclude: [String]) -> [TestCase] {
+        return testCases.filter { testcase in
             var filterTestCase = false
 
             var testcaseAttributes = [String]()
 
             testcaseAttributes.append(contentsOf: testcase.tags)
             testcaseAttributes.append(contentsOf: testcase.testCaseIDs)
+            testcaseAttributes.append(testcase.suite)
             testcaseAttributes.append(testcase.name)
             testcaseAttributes.append(testcase.testIdentifier)
 
             testcaseAttributes = testcaseAttributes.compactMap { $0.lowercased() }
 
             if !include.isEmpty {
-                filterTestCase = testcaseAttributes.contains(where: { include.contains($0) })
+                filterTestCase = include.contains(where: { testcaseAttributes.contains($0) })
             }
 
             if !exclude.isEmpty, filterTestCase == true {
-                filterTestCase = !testcaseAttributes.contains(where: { exclude.contains($0) })
+                filterTestCase = !exclude.contains(where: { testcaseAttributes.contains($0) })
             }
 
             return filterTestCase

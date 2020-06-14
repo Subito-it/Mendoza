@@ -11,7 +11,7 @@ public class Test {
     public var didFail: ((Swift.Error) -> Void)?
 
     // swiftlint:disable:next large_tuple
-    private let userOptions: (configuration: Configuration, device: Device, runHeadless: Bool, filePatterns: FilePatterns, testFilters: TestFilters, testTimeoutSeconds: Int, failingTestsRetryCount: Int, dispatchOnLocalHost: Bool, verbose: Bool)
+    private let userOptions: (configuration: Configuration, device: Device, runHeadless: Bool, filePatterns: FilePatterns, testFilters: TestFilters, testTimeoutSeconds: Int, testForStabilityCount: Int, failingTestsRetryCount: Int, dispatchOnLocalHost: Bool, verbose: Bool)
     private let plugin: (data: String?, debug: Bool)
     private let eventPlugin: EventPlugin
     private let pluginUrl: URL
@@ -26,6 +26,7 @@ public class Test {
         filePatterns: FilePatterns,
         testFilters: TestFilters,
         testTimeoutSeconds: Int,
+        testForStabilityCount: Int,
         failingTestsRetryCount: Int,
         dispatchOnLocalHost: Bool,
         pluginData: String?,
@@ -62,6 +63,7 @@ public class Test {
                        filePatterns: filePatterns,
                        testFilters: testFilters,
                        testTimeoutSeconds: testTimeoutSeconds,
+                       testForStabilityCount: testForStabilityCount,
                        failingTestsRetryCount: failingTestsRetryCount,
                        dispatchOnLocalHost: dispatchOnLocalHost,
                        verbose: verbose)
@@ -140,7 +142,18 @@ public class Test {
         let testSortingOperation = TestSortingOperation(device: device, plugin: testSortingPlugin, verbose: userOptions.verbose)
         let simulatorSetupOperation = SimulatorSetupOperation(configuration: configuration, nodes: uniqueNodes, device: device, runHeadless: userOptions.runHeadless, verbose: userOptions.verbose)
         let distributeTestBundleOperation = DistributeTestBundleOperation(nodes: uniqueNodes)
-        let testRunnerOperation = TestRunnerOperation(configuration: configuration, buildTarget: targets.build.name, testTarget: targets.test.name, sdk: sdk, failingTestsRetryCount: userOptions.failingTestsRetryCount, testTimeoutSeconds: userOptions.testTimeoutSeconds, verbose: userOptions.verbose)
+        let testRunnerOperation = TestRunnerOperation(
+            configuration: configuration,
+            buildTarget: targets.build.name,
+            testTarget: targets.test.name,
+            sdk: sdk,
+            testForStabilityCount: userOptions.testForStabilityCount,
+            failingTestsRetryCount: userOptions.failingTestsRetryCount,
+            testTimeoutSeconds: userOptions.testTimeoutSeconds,
+            eventPlugin: eventPlugin,
+            device: userOptions.device,
+            verbose: userOptions.verbose
+        )
 
         let testCollectorOperation = TestCollectorOperation(configuration: configuration, timestamp: timestamp, buildTarget: targets.build.name, testTarget: targets.test.name)
         let testTearDownOperation = TestTearDownOperation(configuration: configuration, git: gitStatus, timestamp: timestamp)
