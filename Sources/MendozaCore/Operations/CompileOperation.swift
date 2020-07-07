@@ -87,13 +87,43 @@ class CompileOperation: BaseOperation<Void> {
                 print(xcodeBuild.output)
             #endif
 
-            _ = try executer.execute(xcodeBuild.output, currentUrl: baseUrl) { result, originalError in
-                if result.output.contains("** TEST BUILD FAILED **") {
+            let output = try executer.execute(xcodeBuild.output, currentUrl: baseUrl) { _, originalError in
+                throw originalError
+            }
+
+            let lines = output.components(separatedBy: "\n")
+
+            let xcodeParser = Parser()
+            var lastFormatted: String?
+
+            print("\nBuild Log:\n")
+            // TODO: Make printing Build logs via a flag
+
+            for line in lines {
+                let value = xcodeParser.parse(line: line, colored: false)
+
+                guard let formatted = value.line else { continue }
+
+                print(formatted)
+
+                switch value.outputType {
+                case .warning:
+                    fallthrough
+                case .error:
+                    if let last = lastFormatted {
+                        print(last)
+                        lastFormatted = nil
+                    }
+                    print(formatted)
+
                     throw Error("Compilation failed!")
-                } else {
-                    throw originalError
+
+                default:
+                    lastFormatted = formatted
                 }
             }
+
+            print(" ")
 
             compilationSucceeded = true
         } catch {

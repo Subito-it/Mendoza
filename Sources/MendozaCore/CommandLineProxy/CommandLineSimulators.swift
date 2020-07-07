@@ -222,6 +222,10 @@ extension CommandLineProxy {
             return simulators
         }
 
+        func findSimultorsBy(name: String) throws -> [Simulator] {
+            return try installedSimulators().filter { $0.name.lowercased().contains(name.lowercased()) }
+        }
+
         func bootedSimulators() throws -> [Simulator] {
             let installed = try installedSimulators()
 
@@ -300,6 +304,11 @@ extension CommandLineProxy {
             // Force reload
             _ = try executer.execute("rm -rf '\(executer.homePath)/Library/Saved Application State/com.apple.iphonesimulator.savedState'")
             _ = try executer.execute("defaults read com.apple.iphonesimulator &>/dev/null")
+        }
+
+        private func kill(daemon: String, simulator: Simulator) throws {
+            let command = "/usr/bin/xcrun simctl spawn \(simulator.id) launchctl kill SIGKILL system/\(daemon)"
+            _ = try executer.execute(command)
         }
     }
 }

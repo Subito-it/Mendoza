@@ -38,7 +38,7 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
     private let device: Device
 
     private enum XcodebuildLineEvent {
-        case testSuitedStarted(suite: String)
+        case testSuitedStarted
         case testCaseStart(testCase: TestCase)
         case testCasePassed(duration: Double)
         case testCaseFailed(duration: Double)
@@ -132,7 +132,7 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
 
                     // TODO: Make this configurable via JSON
                     #if DEBUG
-                        print("ℹ️  \(self.verbose ? "[\(Date().description)] " : "")Node \(source.node.address) will execute \(testCases.count) tests on \(testRunner.name) {\(runnerIndex)}".magenta)
+                    print("ℹ️  \(self.verbose ? "[\(Date().description)] " : "")Node \(source.node.address) will execute \(testCases.count) tests on \(testRunner.name) {\(runnerIndex)}".magenta)
                     #endif
 
                     executer.logger?.log(command: "Will launch \(testCases.count) test cases")
@@ -182,7 +182,7 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                 try self.reclaimDiskSpace(executer: executer, testRunner: testRunner)
 
                 #if DEBUG
-                    print("\nℹ️  Node {\(runnerIndex)} did execute tests in \(formatTime(duration: CFAbsoluteTimeGetCurrent() - self.startTimeInterval))\n".magenta)
+                print("\nℹ️  Node {\(runnerIndex)} did execute tests in \(formatTime(duration: CFAbsoluteTimeGetCurrent() - self.startTimeInterval))\n".magenta)
                 #endif
             }
 
@@ -228,7 +228,8 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
 
             partialProgress += progress
             let lines = partialProgress.components(separatedBy: "\n")
-            let events = lines.compactMap(self.parseXcodebuildOutput)
+            let events = self.parseXcodebuildOutput(lines: lines)
+
 
             let currentRunningAndDuration: (Bool) -> (test: TestCase, duration: String)? = { [unowned self] addToCompleted in
                 guard let currentRunning = self.currentRunningTest[runnerIndex] else { return nil }
@@ -245,12 +246,13 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
             var values = [String: [String]]()
 
             for (index, event) in events.enumerated() {
-                switch event {
-                case .testSuitedStarted(suite: _):
-                    self.syncQueue.sync {
-                        // try? self.eventPlugin.run(event: Event(kind: .testSuiteStarted, info: ["testSuitedStarted": testSuite]), device: self.device)
+                let xcodeEvent = event.xcodeEvent
+                let eventValues: [String: String] = event.values
 
-                        // print("\n\(testSuite)".bold.white)
+                switch xcodeEvent {
+                case .testSuitedStarted:
+                    self.syncQueue.sync { [unowned self] in
+                        try? self.eventPlugin.run(event: Event(kind: .testSuiteStarted, info: eventValues, values: values), device: self.device)
                     }
 
                 case let .testCaseStart(testCase):
@@ -259,7 +261,7 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                         values["tags"] = testCase.tags
                         values["testCaseIDs"] = testCase.testCaseIDs
 
-                        try? self.eventPlugin.run(event: Event(kind: .testCaseStarted, info: ["testCaseStarted": testCase.name], values: [:]), device: self.device)
+                        try? self.eventPlugin.run(event: Event(kind: .testCaseStarted, info: eventValues, values: values), device: self.device)
 
                         if self.verbose {
                             print(log: "🛫 [\(Date().description)] \(testCase.description) started {\(runnerIndex)}".yellow)
@@ -269,13 +271,13 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                 case .testCasePassed:
                     self.syncQueue.sync { [unowned self] in
                         guard let currentRunning = currentRunningAndDuration(true) else { return }
-                        self.currentRunningTest[runnerIndex] = nil
+                        values["tags"] = currentRunning.test.tags
                         values["testCaseIDs"] = currentRunning.test.testCaseIDs
 
-                        try? self.eventPlugin.run(event: Event(kind: .testPassed, info: [:], values: [:]), device: self.device)
+                        try? self.eventPlugin.run(event: Event(kind: .testPassed, info: eventValues, values: values), device: self.device)
 
                         self.printOutput(
-                            status: event.self,
+                            status: xcodeEvent,
                             testCase: currentRunning.test,
                             completedTests: self.testCasesCompleted.count,
                             totalTests: self.testCasesCount,
@@ -284,22 +286,22 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                             verbose: self.verbose
                         )
 
-                        //                        print(log: "✓ \(self.verbose ? "[\(Date().description)] " : "")\(currentRunning.test.description) passed [\(self.testCasesCompleted.count)/\(self.testCasesCount)]\(self.retryCount > 0 ? " (\(self.retryCount) retries)" : "") in \(currentRunning.duration) {\(runnerIndex)}".green)
+                        self.currentRunningTest[runnerIndex] = nil
                     }
 
                 case .testCaseFailed:
                     self.syncQueue.sync { [unowned self] in
-                        let addToCompleted = index > 0 ? events[index - 1].isTestCrashed == false : true
+                        let addToCompleted = index > 0 ? events[index - 1].xcodeEvent?.isTestCrashed == false : true
 
                         guard let currentRunning = currentRunningAndDuration(addToCompleted) else { return }
 
                         values["tags"] = currentRunning.test.tags
                         values["testCaseIDs"] = currentRunning.test.testCaseIDs
 
-                        try? self.eventPlugin.run(event: Event(kind: .testFailed, info: [:], values: [:]), device: self.device)
+                        try? self.eventPlugin.run(event: Event(kind: .testFailed, info: eventValues, values: values), device: self.device)
 
                         self.printOutput(
-                            status: event.self,
+                            status: xcodeEvent,
                             testCase: currentRunning.test,
                             completedTests: self.testCasesCompleted.count,
                             totalTests: self.testCasesCount,
@@ -307,9 +309,8 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                             runnerIndex: runnerIndex,
                             verbose: self.verbose
                         )
-                         self.currentRunningTest[runnerIndex] = nil
-                        //
-                        //                        print(log: "𝘅 \(self.verbose ? "[\(Date().description)] " : "")\(currentRunning.test.description) failed [\(self.testCasesCompleted.count)/\(self.testCasesCount)]\(self.retryCount > 0 ? " (\(self.retryCount) retries)" : "") in \(currentRunning.duration) {\(runnerIndex)}".red)
+
+                        self.currentRunningTest[runnerIndex] = nil
                     }
 
                 case .testCaseCrashed:
@@ -319,10 +320,10 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                         values["tags"] = currentRunning.test.tags
                         values["testCaseIDs"] = currentRunning.test.testCaseIDs
 
-                        try? self.eventPlugin.run(event: Event(kind: .testCrashed, info: [:], values: [:]), device: self.device)
+                        try? self.eventPlugin.run(event: Event(kind: .testCrashed, info: eventValues, values: values), device: self.device)
 
                         self.printOutput(
-                            status: event.self,
+                            status: xcodeEvent,
                             testCase: currentRunning.test,
                             completedTests: self.testCasesCompleted.count,
                             totalTests: self.testCasesCount,
@@ -330,12 +331,16 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                             runnerIndex: runnerIndex,
                             verbose: self.verbose
                         )
-                         self.currentRunningTest[runnerIndex] = nil
-                        //                        print(log: "💥 \(self.verbose ? "[\(Date().description)] " : "")\(currentRunning.test.description) crash [\(self.testCasesCompleted.count)/\(self.testCasesCount)]\(self.retryCount > 0 ? " (\(self.retryCount) retries)" : "") in \(currentRunning.duration) {\(runnerIndex)}".red)
+
+                        self.currentRunningTest[runnerIndex] = nil
                     }
 
                 case .noSpaceOnDevice:
+                    try? self.eventPlugin.run(event: Event(kind: .testCrashed, info: eventValues, values: [:]), device: self.device)
                     fatalError("💥  No space left on \(executer.address). If you're using a RAM disk in Mendoza's configuration consider increasing size")
+                    
+                case .none:
+                    break
                 }
             }
 
@@ -390,77 +395,55 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
         return output
     }
 
-    private func parseXcodebuildOutput(line: String) -> XcodebuildLineEvent? {
-        let testResultCrashMarker1 = #"Restarting after unexpected exit or crash in (.*)/(.*)\(\)"#
-        let testResultCrashMarker2 = #"\s+(.*)\(\) encountered an error \(Crash:"#
-        let testResultCrashMarker3 = #"Checking for crash reports corresponding to unexpected termination of"#
-        let testResultTimeoutMarker4 = #"\s+(.*)\(\) encountered an error \(Test runner exited"# // Should be caused by the force reset of simulator
-        let testResultFailureMarker1 = #"^(Testing failed:)$"#
+    private func parseXcodebuildOutput(lines: [String]) -> [(xcodeEvent: XcodebuildLineEvent?, values: [String: String])] {
+        let xcodeParser = Parser()
 
-        let testTarget = self.testTarget.replacingOccurrences(of: " ", with: "_")
+        var output: [(xcodeEvent: XcodebuildLineEvent?, values: [String: String])] = []
 
-        let testSuiteRegex = #"Test Suite '(.*)' started"#
-        let startRegex = #"Test Case '-\[\#(testTarget)\.(.*)\]' started"#
-        let passFailRegex = #"Test Case '-\[\#(testTarget)\.(.*)\]' (passed|failed) \((.*) seconds\)"#
+        for line in lines {
+            var xcodebuildEvent: XcodebuildLineEvent?
+            var values: [String: String] = [:]
 
-        // TODO:
-        // - Get TestSuite Started
-        // - Save UI test logs
+            let outputData = xcodeParser.parse(line: line, colored: false)
+            values = outputData.value
 
-        // print(line)
+            switch outputData.pattern {
+            case .noSpaceOnDevice:
+                xcodebuildEvent = .noSpaceOnDevice
 
-        if line.contains(##"Code=28 "No space left on device""##) {
-            return .noSpaceOnDevice
-        }
+            case .testSuiteStart:
+                xcodebuildEvent = .testSuitedStarted
+                values = outputData.value
 
-        if let tests = try? line.capturedGroups(withRegexString: testSuiteRegex), tests.count == 1 {
-            let testCaseSuite = tests.first ?? ""
+            case .testCaseStarted:
+                let testCaseSuite = values["testSuite"] ?? ""
+                let testCaseName = values["testCase"] ?? ""
+                let testCase = TestCase(name: testCaseName, suite: testCaseSuite)
 
-            return .testSuitedStarted(suite: testCaseSuite)
-        }
+                xcodebuildEvent = .testCaseStart(testCase: testCase)
 
-        if let tests = try? line.capturedGroups(withRegexString: startRegex), tests.count == 1 {
-            let testCaseName = tests[0].components(separatedBy: " ").last ?? ""
-            let testCaseSuite = tests[0].components(separatedBy: " ").first ?? ""
+            case .testCasePassed, .parallelTestCasePassed:
+                let duration = Double(values["time"] ?? "-1") ?? -1
+                xcodebuildEvent = .testCasePassed(duration: duration)
 
-            let testCase = TestCase(name: testCaseName, suite: testCaseSuite)
+            case .failingTest, .uiFailingTest, .parallelTestCaseFailed:
+                let duration = Double(values["time"] ?? "-1") ?? -1
+                xcodebuildEvent = .testCaseFailed(duration: duration)
 
-            return .testCaseStart(testCase: testCase)
-        }
+            case .restartingTests, .encounteredAnError, .checkingForCrashReports:
+                xcodebuildEvent = .testCaseCrashed
 
-        if let tests = try? line.capturedGroups(withRegexString: passFailRegex), tests.count == 3 {
-            let duration = Double(tests[2]) ?? -1
+            case .encounteredAnSimulatorError, .testingFailed:
+                xcodebuildEvent = .testCaseFailed(duration: -1)
 
-            if tests[1] == "passed" {
-                return .testCasePassed(duration: duration)
-            } else if tests[1] == "failed" {
-                return .testCaseFailed(duration: duration)
-            } else {
-                fatalError("Unexpected test result \(tests[1]). Expecting either 'passed' or 'failed'")
+            default:
+                xcodebuildEvent = nil
             }
+
+            output.append((xcodebuildEvent, values))
         }
 
-        if let tests = try? line.capturedGroups(withRegexString: testResultCrashMarker1), tests.count == 2 {
-            return .testCaseCrashed
-        }
-
-        if let tests = try? line.capturedGroups(withRegexString: testResultCrashMarker2), tests.count == 1 {
-            return .testCaseCrashed
-        }
-
-        if let tests = try? line.capturedGroups(withRegexString: testResultTimeoutMarker4), tests.count == 1 {
-            return .testCaseFailed(duration: -1)
-        }
-
-        if line.contains(testResultCrashMarker3) {
-            return .testCaseCrashed
-        }
-
-        if let tests = try? line.capturedGroups(withRegexString: testResultFailureMarker1), tests.count == 1 {
-            return .testCaseFailed(duration: -1)
-        }
-
-        return nil
+        return output.filter({ $0.xcodeEvent != nil })
     }
 
     private func parseTestResults(_ output: String, candidates: [TestCase], node: String, xcResultPath: String) throws -> [TestCaseResult] {
@@ -469,13 +452,14 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
         var result = [TestCaseResult]()
 
         let lines = output.components(separatedBy: "\n")
-        let events = lines.compactMap(parseXcodebuildOutput)
+        let xcodeEvents = parseXcodebuildOutput(lines: lines)
+        let events = xcodeEvents.compactMap({ $0.xcodeEvent })
 
         var currentCandidate: TestCase?
 
         for event in events {
             switch event {
-            case .testSuitedStarted(suite: _):
+            case .testSuitedStarted:
                 break
 
             case let .testCaseStart(test):
@@ -513,7 +497,8 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                     xcResultPath: resultPath,
                     suite: currentCandidate.suite,
                     name: currentCandidate.name,
-                    status: .failed, duration: -1,
+                    status: .failed,
+                    duration: -1,
                     testCaseIDs: currentCandidate.testCaseIDs,
                     testTags: currentCandidate.tags
                 )
@@ -538,7 +523,18 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                 partialResult.contains(where: { candidate.suite == $0.suite && candidate.testIdentifier == $0.testCaseIdentifier }) == false
             }
 
-            return failedCandidates.map { TestCaseResult(node: node, xcResultPath: resultPath, suite: $0.suite, name: $0.name, status: .failed, duration: -1, testCaseIDs: $0.testCaseIDs, testTags: $0.tags) }
+            return failedCandidates.map {
+                TestCaseResult(
+                    node: node,
+                    xcResultPath: resultPath,
+                    suite: $0.suite,
+                    name: $0.name,
+                    status: .failed,
+                    duration: -1,
+                    testCaseIDs: $0.testCaseIDs,
+                    testTags: $0.tags
+                )
+            }
         }
 
         return nil
@@ -622,14 +618,14 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
 
         guard
             let testResult = testResultsPaths.first, !testResult.isEmpty else {
-            throw Error("No test result found", logger: executer.logger)
+                throw Error("No test result found", logger: executer.logger)
         }
 
         if testResultsPaths.count > 1 {
             let timeStamp = Int64(Date().timeIntervalSince1970 * 1000)
 
             let mergedDestinationPath = "\(resultPath)/Test\(timeStamp)\(Environment.xcresultType)"
-            let mergeCmd = "xcrun xcresulttool merge " + testResultsPaths.joined(separator: " ") + " --output-path '\(mergedDestinationPath)'"
+            let mergeCmd = "xcrun xcresulttool merge " + testResultsPaths.map { $0.replacingOccurrences(of: " ", with: #"\ "#) }.joined(separator: " ") + " --output-path '\(mergedDestinationPath)'"
             let output = try executer.execute(mergeCmd)
 
             guard let path = output.components(separatedBy: "Merged to:").last else {
@@ -693,14 +689,14 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
     }
 
     private func testsDidFailBootstrapping(in output: String) -> Bool {
-        output.contains("Test runner exited before starting test execution")
+        return output.contains("Test runner exited before starting test execution")
     }
 
     private func testDidFailBecauseOfDamagedBuild(in output: String) -> Bool {
-        output.contains("The application may be damaged or incomplete")
+        return output.contains("The application may be damaged or incomplete")
     }
 
-    private func printOutput(status: XcodebuildLineEvent, testCase: TestCase, completedTests: Int, totalTests: Int, duration: String, runnerIndex: Int, verbose: Bool) {
+    private func printOutput(status: XcodebuildLineEvent?, testCase: TestCase, completedTests: Int, totalTests: Int, duration: String, runnerIndex: Int, verbose: Bool) {
         var log = [String]()
         var updateTextColour = false
         var logOutput: String

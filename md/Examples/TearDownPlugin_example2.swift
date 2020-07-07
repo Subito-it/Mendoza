@@ -70,9 +70,9 @@ struct TearDownPlugin {
 
         let testStatus = groupedItems.map { (arg: (key: String, value: [TestCaseResult])) -> [String] in
             let (key, value) = arg
-            let passTestCases   = value.filter { $0.status == .passed }.unique()
+            let passTestCases = value.filter { $0.status == .passed }.unique()
             let failedTestCases = value.filter { $0.status == .failed }.unique()
-            let totalTestCases  = passTestCases + failedTestCases
+            let totalTestCases = passTestCases + failedTestCases
 
             return [key, String(passTestCases.count), String(failedTestCases.count), String(totalTestCases.count)]
         }
@@ -80,7 +80,7 @@ struct TearDownPlugin {
         let totalPassed = String(testSessionResult.passedTests.unique().count)
         let totalFailed = String(testSessionResult.failedTests.unique().count)
         let total = String(testResults.unique().count)
-        
+
         resultsTable.append(["Tags", "Passed", "Failed", "Total"])
         resultsTable.append(contentsOf: testStatus)
         resultsTable.append(["", totalPassed, totalFailed, total])
@@ -88,17 +88,17 @@ struct TearDownPlugin {
         var table = Table()
 
         print("\n")
-        table.put(resultsTable)  
+        table.put(resultsTable)
         print("\n")
 
-        if testSessionResult.failedTests.count > 0 {
+        if !testSessionResult.failedTests.isEmpty {
             var failedTestsTable = [[String]]()
 
             let testCases = testSessionResult.failedTests.map { [$0.name, $0.testCaseIDs.joined(separator: " ")] }
 
             failedTestsTable.append(["Failed Tests", "TestCase IDs"])
             failedTestsTable.append(contentsOf: testCases)
-        
+
             table.put(failedTestsTable)
             print("\n")
         }
@@ -107,16 +107,16 @@ struct TearDownPlugin {
 
 extension Sequence where Iterator.Element == TestCaseResult {
     func unique() -> [Iterator.Element] {
-        var result:[TestCaseResult] = []
+        var result: [TestCaseResult] = []
 
-        self.forEach { (testcase) -> () in
+        forEach { (testcase) -> Void in
             if !result.contains(where: { $0.suite == testcase.suite && $0.name == testcase.name }) {
                 result.append(testcase)
             }
         }
 
         return result
-    }  
+    }
 }
 
 protocol PrinterType {
@@ -130,7 +130,6 @@ struct Printer: PrinterType {
 }
 
 public struct Table {
-
     lazy var printer: PrinterType = {
         Printer()
     }()
@@ -160,18 +159,17 @@ public struct Table {
 
     func columns<T>(_ data: [[T]]) -> [[T]] {
         var result = [[T]]()
-        for i in (0..<(data.first?.count ?? 0)) {
+        for i in 0 ..< (data.first?.count ?? 0) {
             result.append(data.map { $0[i] })
         }
         return result
     }
-
 }
 
 extension Array {
     func maxWidth() -> Int {
         guard let maxElement = self.max(by: { a, b in
-            return String(describing: a).count < String(describing: b).count
+            String(describing: a).count < String(describing: b).count
         }) else { return 0 }
         return String(describing: maxElement).count
     }
@@ -179,7 +177,7 @@ extension Array {
 
 extension String {
     func padding(_ padding: Int) -> String {
-        let padding = padding + 1 - self.count
+        let padding = padding + 1 - count
         guard padding >= 0 else { return self }
         return " " + self + " ".repeated(padding)
     }
