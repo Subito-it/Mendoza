@@ -106,7 +106,7 @@ class ConfigurationValidator {
             throw Error("Missing apple ID credentials. Configuration file needs to be updated! Please run `\(ConfigurationRootCommand().name!) \(ConfigurationAuthententicationUpdateCommand().name!)` command".red)
         }
 
-        // TODO: validate that apple credentials are valid
+        // TBD: validate that apple credentials are valid
         _ = credentials
     }
 
