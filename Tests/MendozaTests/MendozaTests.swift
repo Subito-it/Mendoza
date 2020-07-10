@@ -42,6 +42,6 @@ final class MendozaTests: XCTestCase {
     }
 
     static var allTests = [
-        ("testExample", testExample)
+        ("testExample", testExample),
     ]
 }
