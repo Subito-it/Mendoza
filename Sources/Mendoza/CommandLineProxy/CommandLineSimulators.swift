@@ -31,16 +31,14 @@ extension CommandLineProxy {
         func reset() throws {
             try close()
             
-            let commands = ["pkill -9 SpringBoard",
-                            "killall -9 com.apple.CoreSimulator.CoreSimulatorService",
-                            "sleep 5"]
-                        
+            let commands = ["osascript -e 'quit app \"$(xcode-select -p)/Applications/Simulator.app\"'",
+                            "sleep 3"]
             try commands.forEach { _ = try executer.execute("\($0) 2>/dev/null || true") }
         }
         
         func close() throws {
             let commands = ["mendoza mendoza close_simulator_app",
-                            "sleep 1"]
+                            "defaults read com.apple.iphonesimulator &>/dev/null"]
             
             try commands.forEach { _ = try executer.execute("\($0) 2>/dev/null || true") }
 
@@ -49,7 +47,7 @@ extension CommandLineProxy {
         func launch() throws {
             let commands = ["defaults read com.apple.iphonesimulator &>/dev/null",
                             "open -a \"$(xcode-select -p)/Applications/Simulator.app\"",
-                            "sleep 1"]
+                            "sleep 3"]
             
             try commands.forEach { _ = try executer.execute("\($0) 2>/dev/null || true") }
         }
