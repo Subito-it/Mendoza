@@ -104,7 +104,7 @@ extension Node {
 
         if let authentication = authentication {
             let keychain = KeychainAccess.Keychain(service: Environment.bundle)
-            let keychainAuthentication = Authentication(ssh: authentication, administratorPassword: administratorPassword ?? nil)
+            let keychainAuthentication = Authentication(ssh: authentication, administratorPassword: administratorPassword ?? nil) // swiftlint:disable:this redundant_nil_coalescing
             try keychain.set(try JSONEncoder().encode(keychainAuthentication), key: "\(name)_authentication")
         }
 

@@ -33,7 +33,7 @@ class WakeupOperation: BaseOperation<Void> {
                 let node = source.node
 
                 guard AddressType(node: node) == .remote else { return }
-                guard let password = node.administratorPassword ?? nil else {
+                guard let password = node.administratorPassword ?? nil else { // swiftlint:disable:this redundant_nil_coalescing
                     print("ℹ️  Skipping wake up for node `\(node.address)` because no administrator password was provided".bold)
                     return
                 }

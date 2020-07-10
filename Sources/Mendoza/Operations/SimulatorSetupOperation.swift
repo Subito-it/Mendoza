@@ -45,7 +45,7 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
 
                 let proxy = CommandLineProxy.Simulators(executer: executer, verbose: self.verbose)
 
-                try proxy.installRuntimeIfNeeded(self.device.runtime, nodeAddress: node.address, appleIdCredentials: appleIdCredentials, administratorPassword: node.administratorPassword ?? nil)
+                try proxy.installRuntimeIfNeeded(self.device.runtime, nodeAddress: node.address, appleIdCredentials: appleIdCredentials, administratorPassword: node.administratorPassword ?? nil) // swiftlint:disable:this redundant_nil_coalescing
 
                 let concurrentTestRunners: Int
                 switch node.concurrentTestRunners {
@@ -114,7 +114,7 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
 
         guard settings.ScreenConfigurations?.keys.count == 1 else { return false }
 
-        let screenIdentifier = settings.ScreenConfigurations!.keys.first!
+        let screenIdentifier = settings.ScreenConfigurations!.keys.first! // swiftlint:disable:this force_unwrapping
 
         guard let geometries = settings.DevicePreferences?.values.map({ $0.SimulatorWindowGeometry }) else { return false }
 
