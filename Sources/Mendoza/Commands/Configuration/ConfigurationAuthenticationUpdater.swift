@@ -1,4 +1,3 @@
-
 //
 //  ConfigurationAuthenticationUpdater.swift
 //  Mendoza
