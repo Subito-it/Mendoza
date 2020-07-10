@@ -8,7 +8,7 @@
 import Foundation
 
 extension Executer {
-    func rsync(sourcePath: String, destinationPath: String, exclude: [String] = [], on destinationNode: Node) throws {
+    func rsync(sourcePath: String, destinationPath: String, exclude: [String] = [], on destinationNode: Node) throws { // swiftlint:disable:this function_default_parameter_at_end
         // https://gist.github.com/KartikTalwar/4393116
         let excludes = exclude.map { "--exclude=\($0)" }.joined(separator: " ")
 
