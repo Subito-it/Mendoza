@@ -130,7 +130,7 @@ class ExecuterLogger: Logger, CustomDebugStringConvertible {
             case let .start(command):
                 detailCommand = command
             default:
-                fatalError()
+                fatalError("Failed writing logs #1")
             }
 
             let detailStatusCode: Int32
@@ -146,7 +146,7 @@ class ExecuterLogger: Logger, CustomDebugStringConvertible {
                 detailError = true
                 detailStatusCode = 0
             default:
-                fatalError()
+                fatalError("Failed writing logs #2")
             }
 
             var detailStatusMessage = "<p>\(detailOutput)</p>"

@@ -73,7 +73,7 @@ extension SSHAuthentication {
         } else if let username = try container.decodeIfPresent(String.self, forKey: .noneUsername) {
             self = .none(username: username)
         } else {
-            fatalError()
+            fatalError("Did fail decoding SSHAuthentication")
         }
     }
 

@@ -132,7 +132,7 @@ extension _AnyEncodable {
                 try container.encode(nsnumber.doubleValue)
             #if swift(>=5.0)
                 @unknown default:
-                    fatalError()
+                    fatalError("Unhandled case")
             #endif
             }
         }

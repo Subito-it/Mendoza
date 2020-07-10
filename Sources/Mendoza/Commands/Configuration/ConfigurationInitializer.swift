@@ -214,7 +214,7 @@ struct ConfigurationInitializer {
             let count: UInt = Bariloche.ask("\nConcurrent simulators:".underline)
             return .manual(count: count)
         default:
-            fatalError()
+            fatalError("Unexpected case \(result.index)")
         }
     }
 
@@ -243,7 +243,7 @@ struct ConfigurationInitializer {
 
             return .agent(username: username)
         default:
-            fatalError()
+            fatalError("Unexpected case \(authenticationType.index)")
         }
     }
 
