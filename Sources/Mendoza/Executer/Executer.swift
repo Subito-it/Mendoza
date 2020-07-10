@@ -41,7 +41,7 @@ extension Executer {
     }
 
     func capture(_ command: String) throws -> (status: Int32, output: String) {
-        return try capture(command, currentUrl: nil, progress: nil, rethrow: nil)
+        try capture(command, currentUrl: nil, progress: nil, rethrow: nil)
     }
 }
 
@@ -53,7 +53,7 @@ extension Executer {
     }
 
     func capture(_ command: String, progress: ((String) -> Void)?) throws -> (status: Int32, output: String) {
-        return try capture(command, currentUrl: nil, progress: progress, rethrow: nil)
+        try capture(command, currentUrl: nil, progress: progress, rethrow: nil)
     }
 }
 
@@ -65,7 +65,7 @@ extension Executer {
     }
 
     func capture(_ command: String, progress: ((String) -> Void)?, rethrow: @escaping ((status: Int32, output: String), Error) throws -> Void) throws -> (status: Int32, output: String) {
-        return try capture(command, currentUrl: nil, progress: progress, rethrow: rethrow)
+        try capture(command, currentUrl: nil, progress: progress, rethrow: rethrow)
     }
 }
 
@@ -77,7 +77,7 @@ extension Executer {
     }
 
     func capture(_ command: String, rethrow: @escaping ((status: Int32, output: String), Error) throws -> Void) throws -> (status: Int32, output: String) {
-        return try capture(command, currentUrl: nil, progress: nil, rethrow: rethrow)
+        try capture(command, currentUrl: nil, progress: nil, rethrow: rethrow)
     }
 }
 
@@ -89,7 +89,7 @@ extension Executer {
     }
 
     func capture(_ command: String, currentUrl: URL) throws -> (status: Int32, output: String) {
-        return try capture(command, currentUrl: currentUrl, progress: nil, rethrow: nil)
+        try capture(command, currentUrl: currentUrl, progress: nil, rethrow: nil)
     }
 }
 
@@ -101,6 +101,6 @@ extension Executer {
     }
 
     func capture(_ command: String, currentUrl: URL, rethrow: @escaping ((status: Int32, output: String), Error) throws -> Void) throws -> (status: Int32, output: String) {
-        return try capture(command, currentUrl: currentUrl, progress: nil, rethrow: rethrow)
+        try capture(command, currentUrl: currentUrl, progress: nil, rethrow: rethrow)
     }
 }
