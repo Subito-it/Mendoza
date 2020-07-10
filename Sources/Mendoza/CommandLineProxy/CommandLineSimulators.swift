@@ -121,6 +121,11 @@ extension CommandLineProxy {
             }
         }
 
+        func disableSimulatorBezel() throws {
+            _ = try executer.execute("defaults write com.apple.iphonesimulator FloatingNameMode 3")
+            _ = try executer.execute("defaults write com.apple.iphonesimulator ShowChrome -bool false")
+        }
+
         func enablePasteboardWorkaround() throws {
             // See https://twitter.com/objcandtwits/status/1227459913594658816?s=21
             _ = try executer.execute("defaults write com.apple.iphonesimulator PasteboardAutomaticSync -bool false")

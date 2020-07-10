@@ -35,6 +35,7 @@ class SimulatorBootOperation: BaseOperation<Void> {
 
                 try proxy.enablePasteboardWorkaround()
                 try proxy.enableLowQualityGraphicOverrides()
+                try proxy.disableSimulatorBezel()
 
                 try proxy.boot(simulator: source.value)
 
