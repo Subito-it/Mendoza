@@ -71,7 +71,7 @@ struct ConfigurationInitializer {
                 let password: String = Bariloche.ask("\nAppleID password:".underline, secure: true) { guard !$0.isEmpty else { throw Error("Invalid value") }; return $0 }
 
                 let keychain = KeychainAccess.Keychain(service: Environment.bundle)
-                try! keychain.set(try! JSONEncoder().encode(Credentials(username: username, password: password)), key: "appleID")
+                try keychain.set(try JSONEncoder().encode(Credentials(username: username, password: password)), key: "appleID")
             }
         }
 
@@ -141,7 +141,7 @@ struct ConfigurationInitializer {
 
         let address = try askAddress()
         if ["127.0.0.1", "localhost"].contains(address) {
-            let currentUser = try! LocalExecuter().execute("whoami")
+            let currentUser = try LocalExecuter().execute("whoami")
             sshAuthentication = .none(username: currentUser)
 
             switch sdk {

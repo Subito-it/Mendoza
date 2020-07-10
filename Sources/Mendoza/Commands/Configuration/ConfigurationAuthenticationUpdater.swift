@@ -35,7 +35,7 @@ struct ConfigurationAuthenticationUpdater {
             let password: String = Bariloche.ask("\npassword:".underline, secure: true) { guard !$0.isEmpty else { throw Error("Invalid value") }; return $0 }
 
             let keychain = KeychainAccess.Keychain(service: Environment.bundle)
-            try! keychain.set(try! JSONEncoder().encode(Credentials(username: username, password: password)), key: "appleID")
+            try keychain.set(try JSONEncoder().encode(Credentials(username: username, password: password)), key: "appleID")
         }
 
         var updatedNodes = [Node]()
@@ -48,7 +48,7 @@ struct ConfigurationAuthenticationUpdater {
 
                 switch AddressType(node: node) {
                 case .local:
-                    let currentUser = try! LocalExecuter().execute("whoami")
+                    let currentUser = try LocalExecuter().execute("whoami")
                     authentication = .none(username: currentUser)
                 case .remote:
                     if let lastNode = lastNode, AddressType(node: lastNode) == .remote {
@@ -79,8 +79,8 @@ struct ConfigurationAuthenticationUpdater {
 
         let encoder = JSONEncoder()
         encoder.outputFormatting = .prettyPrinted
-        let configurationData = try! encoder.encode(updatedConfiguration)
-        try! configurationData.write(to: configurationUrl)
+        let configurationData = try encoder.encode(updatedConfiguration)
+        try configurationData.write(to: configurationUrl)
 
         if !modified {
             print("\n\n🎉 Valid configuration!".green)
