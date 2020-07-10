@@ -82,7 +82,7 @@ struct ConfigurationInitializer {
         if resultDestinationNodeName.value == "Other" {
             destinationNode = try askNode(sdk: sdk)
         } else {
-            destinationNode = nodes.first(where: { $0.name == resultDestinationNodeName.value })!
+            destinationNode = nodes.first(where: { $0.name == resultDestinationNodeName.value })! // swiftlint:disable:this force_unwrapping
         }
 
         let resultDestinationPath: String = Bariloche.ask("\nPlease select at which path on `\(resultDestinationNodeName.value)` results should be saved".underline)

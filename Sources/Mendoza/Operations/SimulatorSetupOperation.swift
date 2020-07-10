@@ -126,14 +126,14 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
         let expectSimulatorLocations = (0 ..< simulators.count).compactMap {
             try? arrangedSimulatorCenter(index: $0,
                                          executer: executer,
-                                         device: simulators.first!.device,
+                                         device: simulators.first!.device, // swiftlint:disable:this force_unwrapping
                                          displayMargin: arrangeDisplayMargin,
                                          totalSimulators: simulators.count,
                                          maxSimulatorsPerRow: arrangeMaxSimulatorsPerRow)
         }
 
         let expectedScaleFactor = try arrangedScaleFactor(executer: executer,
-                                                          device: simulators.first!.device,
+                                                          device: simulators.first!.device, // swiftlint:disable:this force_unwrapping
                                                           displayMargin: arrangeDisplayMargin,
                                                           totalSimulators: simulators.count,
                                                           maxSimulatorsPerRow: arrangeMaxSimulatorsPerRow)
@@ -226,7 +226,7 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
         }
 
         let scaleFactor = try arrangedScaleFactor(executer: executer,
-                                                  device: simulators.first!.device,
+                                                  device: simulators.first!.device, // swiftlint:disable:this force_unwrapping
                                                   displayMargin: arrangeDisplayMargin,
                                                   totalSimulators: simulators.count,
                                                   maxSimulatorsPerRow: arrangeMaxSimulatorsPerRow)
@@ -234,7 +234,7 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
         for (index, simulator) in simulators.enumerated() {
             let center = try arrangedSimulatorCenter(index: index,
                                                      executer: executer,
-                                                     device: simulators.first!.device,
+                                                     device: simulators.first!.device, // swiftlint:disable:this force_unwrapping
                                                      displayMargin: arrangeDisplayMargin,
                                                      totalSimulators: simulators.count,
                                                      maxSimulatorsPerRow: arrangeMaxSimulatorsPerRow)

@@ -54,7 +54,7 @@ class Plugin<Input: DefaultInitializable, Output: DefaultInitializable> {
             inputString = ""
         } else {
             let inputJson = try JSONEncoder().encode(input)
-            inputString = String(data: inputJson, encoding: .utf8)!
+            inputString = String(data: inputJson, encoding: .utf8)! // swiftlint:disable:this force_unwrapping
         }
 
         let escape: (String?) -> String = { input in

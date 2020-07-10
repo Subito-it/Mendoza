@@ -71,7 +71,7 @@ struct ConfigurationAuthenticationUpdater {
             }
 
             lastNode = Node(name: node.name, address: node.address, authentication: authentication, administratorPassword: password, concurrentTestRunners: node.concurrentTestRunners, ramDiskSizeMB: node.ramDiskSizeMB)
-            updatedNodes.append(lastNode!)
+            updatedNodes.append(lastNode!) // swiftlint:disable:this force_unwrapping
         }
 
         let updatedConfiguration = Configuration(projectPath: configuration.projectPath, workspacePath: configuration.workspacePath, buildBundleIdentifier: configuration.buildBundleIdentifier, testBundleIdentifier: configuration.testBundleIdentifier, scheme: configuration.scheme, buildConfiguration: configuration.buildConfiguration, storeAppleIdCredentials: configuration.storeAppleIdCredentials, resultDestination: configuration.resultDestination, nodes: updatedNodes, compilation: configuration.compilation, sdk: configuration.sdk)

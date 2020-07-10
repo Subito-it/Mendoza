@@ -114,7 +114,7 @@ extension CommandLineProxy {
                 throw Error("Failed installing runtime!", logger: executer.logger)
             }
             guard !result.output.contains("specified Apple developer account credentials are incorrect") else {
-                throw Error("The provided Apple developer account credentials are incorrect. Please run `\(ConfigurationRootCommand().name!) \(ConfigurationAuthententicationUpdateCommand().name!)` command", logger: executer.logger)
+                throw Error("The provided Apple developer account credentials are incorrect. Please run `\(ConfigurationRootCommand().name!) \(ConfigurationAuthententicationUpdateCommand().name!)` command", logger: executer.logger) // swiftlint:disable:this force_unwrapping
             }
             guard try isRuntimeInstalled() else {
                 throw Error("Failed installing runtime, after install simulator runtime still not installed!", logger: executer.logger)

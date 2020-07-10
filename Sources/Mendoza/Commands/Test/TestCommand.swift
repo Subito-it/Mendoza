@@ -39,7 +39,7 @@ class TestCommand: Command {
             let filePatterns = FilePatterns(commaSeparatedIncludePattern: includePatternField.value, commaSeparatedExcludePattern: excludePatternField.value)
             let failingTestsRetryCount = failingTestsRetryCountField.value ?? 0
 
-            let test = try Test(configurationUrl: configurationPathField.value!,
+            let test = try Test(configurationUrl: configurationPathField.value!, // swiftlint:disable:this force_unwrapping
                                 device: device,
                                 runHeadless: !nonHeadlessSimulatorsFlag.value,
                                 filePatterns: filePatterns,

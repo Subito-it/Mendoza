@@ -17,7 +17,7 @@ class ConfigurationAuthententicationUpdateCommand: Command {
 
     func run() -> Bool {
         do {
-            try ConfigurationAuthenticationUpdater(configurationUrl: configuration.value!).run()
+            try ConfigurationAuthenticationUpdater(configurationUrl: configuration.value!).run() // swiftlint:disable:this force_unwrapping
         } catch {
             print(error.localizedDescription.red.bold)
             exit(-1)

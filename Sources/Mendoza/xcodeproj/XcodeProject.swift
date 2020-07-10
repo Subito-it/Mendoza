@@ -138,7 +138,7 @@ class XcodeProject: NSObject {
         guard uitestTargets.count == 1 else { throw Error("Expecting 1 uitest target in scheme \(name), found \(uitestTargets.count)") }
         guard buildTargets.count == 1 else { throw Error("Expecting 1 application target in scheme \(name), found \(buildTargets.count)") }
 
-        return (build: buildTargets.first!, test: uitestTargets.first!)
+        return (build: buildTargets.first!, test: uitestTargets.first!) // swiftlint:disable:this force_unwrapping
     }
 
     func getTargetsBundleIdentifiers(for schemeName: String) throws -> (build: String, test: String) {

@@ -37,7 +37,7 @@ class PluginInitCommand: Command {
 
     func run() -> Bool {
         do {
-            let initer = PluginInit(configurationUrl: configuration.value!, name: pluginName.value!)
+            let initer = PluginInit(configurationUrl: configuration.value!, name: pluginName.value!) // swiftlint:disable:this force_unwrapping
             try initer.run()
         } catch {
             print(error.localizedDescription.red)

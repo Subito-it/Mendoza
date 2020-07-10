@@ -95,7 +95,7 @@ class ConfigurationValidator {
                 _ = try executer.execute("ls")
             }
         } catch {
-            throw Error("Invalid credentials for connection. Configuration file needs to be updated! Please run `\(ConfigurationRootCommand().name!) \(ConfigurationAuthententicationUpdateCommand().name!)` command. Got \(error)".red)
+            throw Error("Invalid credentials for connection. Configuration file needs to be updated! Please run `\(ConfigurationRootCommand().name!) \(ConfigurationAuthententicationUpdateCommand().name!)` command. Got \(error)".red) // swiftlint:disable:this force_unwrapping
         }
     }
 
@@ -103,7 +103,7 @@ class ConfigurationValidator {
         guard configuration.storeAppleIdCredentials else { return }
 
         guard let credentials = configuration.appleIdCredentials() else {
-            throw Error("Missing apple ID credentials. Configuration file needs to be updated! Please run `\(ConfigurationRootCommand().name!) \(ConfigurationAuthententicationUpdateCommand().name!)` command".red)
+            throw Error("Missing apple ID credentials. Configuration file needs to be updated! Please run `\(ConfigurationRootCommand().name!) \(ConfigurationAuthententicationUpdateCommand().name!)` command".red) // swiftlint:disable:this force_unwrapping
         }
 
         // TBD: validate that apple credentials are valid
@@ -112,13 +112,13 @@ class ConfigurationValidator {
 
     private func validateAuthentication() throws {
         guard configuration.nodes.allSatisfy({ validAuthentication(node: $0) }) else {
-            throw Error("Invalid credentials found. Configuration file needs to be updated! Please run `\(ConfigurationRootCommand().name!) \(ConfigurationAuthententicationUpdateCommand().name!)` command".red)
+            throw Error("Invalid credentials found. Configuration file needs to be updated! Please run `\(ConfigurationRootCommand().name!) \(ConfigurationAuthententicationUpdateCommand().name!)` command".red) // swiftlint:disable:this force_unwrapping
         }
     }
 
     private func validateAdministratorPassword() throws {
         guard configuration.nodes.allSatisfy({ validAdministratorPassword(node: $0) }) else {
-            throw Error("Invalid administrator password found. Configuration file needs to be updated! Please run `\(ConfigurationRootCommand().name!) \(ConfigurationAuthententicationUpdateCommand().name!)` command".red)
+            throw Error("Invalid administrator password found. Configuration file needs to be updated! Please run `\(ConfigurationRootCommand().name!) \(ConfigurationAuthententicationUpdateCommand().name!)` command".red) // swiftlint:disable:this force_unwrapping
         }
     }
 }

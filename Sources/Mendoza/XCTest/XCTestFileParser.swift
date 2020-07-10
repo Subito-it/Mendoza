@@ -31,7 +31,7 @@ struct XCTestFileParser {
                     return nil
                 }
 
-                return methods.map { TestCase(name: $0.name!.replacingOccurrences(of: "()", with: ""), suite: suite) }
+                return methods.map { TestCase(name: $0.name!.replacingOccurrences(of: "()", with: ""), suite: suite) } // swiftlint:disable:this force_unwrapping
             }
 
             result += testCases.flatMap { $0 }
