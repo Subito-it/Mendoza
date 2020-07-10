@@ -11,25 +11,25 @@ extension CommandLineProxy.Simulators {
     class Settings: Codable {
         class DevicePreferences: Codable {
             class WindowGeometry: Codable {
-                var WindowCenter: String? = nil
-                var WindowScale: Double? = nil
+                var WindowCenter: String?
+                var WindowScale: Double?
             }
 
-            var SimulatorExternalDisplay: Double? = nil
-            var SimulatorWindowRotationAngle: Double? = nil
-            var SimulatorWindowOrientation: String? = nil
-            var SimulatorWindowGeometry: [String: DevicePreferences.WindowGeometry]? = nil
+            var SimulatorExternalDisplay: Double?
+            var SimulatorWindowRotationAngle: Double?
+            var SimulatorWindowOrientation: String?
+            var SimulatorWindowGeometry: [String: DevicePreferences.WindowGeometry]?
         }
 
-        var ConnectHardwareKeyboard: Bool? = nil
-        var AllowFullscreenMode: Bool? = nil
-        var LocationMode: Double? = nil
-        var SlowMotionAnimation: Bool? = nil
-        var ShowChrome: Bool? = nil
-        var ScreenConfigurations: [String: [String]]? = nil
-        var PasteboardAutomaticSync: Bool? = nil
-        var CurrentDeviceUDID: String? = nil
-        var DevicePreferences: [String: Settings.DevicePreferences]? = nil
-        var OptimizeRenderingForWindowScale: Bool? = nil
+        var ConnectHardwareKeyboard: Bool?
+        var AllowFullscreenMode: Bool?
+        var LocationMode: Double?
+        var SlowMotionAnimation: Bool?
+        var ShowChrome: Bool?
+        var ScreenConfigurations: [String: [String]]?
+        var PasteboardAutomaticSync: Bool?
+        var CurrentDeviceUDID: String?
+        var DevicePreferences: [String: Settings.DevicePreferences]?
+        var OptimizeRenderingForWindowScale: Bool?
     }
 }
