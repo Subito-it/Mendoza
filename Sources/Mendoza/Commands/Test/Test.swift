@@ -10,6 +10,7 @@ import Foundation
 class Test {
     var didFail: ((Swift.Error) -> Void)?
 
+    // swiftlint:disable:next large_tuple
     private let userOptions: (configuration: Configuration, device: Device, runHeadless: Bool, filePatterns: FilePatterns, testTimeoutSeconds: Int, failingTestsRetryCount: Int, dispatchOnLocalHost: Bool, verbose: Bool)
     private let plugin: (data: String?, debug: Bool)
     private let eventPlugin: EventPlugin
