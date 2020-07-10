@@ -33,11 +33,13 @@ class SimulatorBootOperation: BaseOperation<Void> {
                 
                 let proxy = CommandLineProxy.Simulators(executer: executer, verbose: self.verbose)
                 
+                try proxy.enablePasteboardWorkaround()
+                try proxy.enableLowQualityGraphicOverrides()
+                
                 try proxy.boot(simulator: source.value)
                 
-                try proxy.runXcode11ReleaseNotesWorkarounds(on: source.value)
-                
-                try proxy.runPasteboardWorkaround()
+                try proxy.enableXcode11ReleaseNotesWorkarounds(on: source.value)
+                try proxy.disableSlideToType(on: source.value)                
             }
             
             didEnd?(())

@@ -122,14 +122,22 @@ extension CommandLineProxy {
             }
         }
         
-        func runXcode11ReleaseNotesWorkarounds(on simulator: Simulator) throws {
+        func enablePasteboardWorkaround() throws {
+            // See https://twitter.com/objcandtwits/status/1227459913594658816?s=21
+            _ = try executer.execute("defaults write com.apple.iphonesimulator PasteboardAutomaticSync -bool false")
+        }
+        
+        func enableLowQualityGraphicOverrides() throws {
+            _ = try executer.execute("defaults write com.apple.iphonesimulator GraphicsQualityOverride 10")
+        }
+        
+        func enableXcode11ReleaseNotesWorkarounds(on simulator: Simulator) throws {
             // See release notes workarounds: https://developer.apple.com/documentation/xcode_release_notes/xcode_11_release_notes?language=objc
             _ = try executer.execute("xcrun simctl spawn '\(simulator.id)' defaults write com.apple.springboard FBLaunchWatchdogScale 2")
         }
-        
-        func runPasteboardWorkaround() throws {
-            // See https://twitter.com/objcandtwits/status/1227459913594658816?s=21
-            _ = try executer.execute("defaults write com.apple.iphonesimulator PasteboardAutomaticSync -bool false")
+                
+        func disableSlideToType(on simulator: Simulator) throws {
+            _ = try executer.execute("xcrun simctl spawn '\(simulator.id)' defaults write com.apple.Preferences DidShowContinuousPathIntroduction -bool true")
         }
 
         /// This method instantiates a Simulator given a name.
