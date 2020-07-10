@@ -1,3 +1,4 @@
+// swiftlint:disable force_try
 //
 //  AddressType.swift
 //  Mendoza
