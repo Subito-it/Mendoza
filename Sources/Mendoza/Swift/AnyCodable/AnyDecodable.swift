@@ -52,6 +52,7 @@ public struct AnyDecodable: Decodable {
 
 extension AnyDecodable: _AnyDecodable {}
 
+// swiftlint:disable:next extension_access_modifier
 extension _AnyDecodable {
     public init(from decoder: Decoder) throws {
         let container = try decoder.singleValueContainer()

@@ -214,6 +214,7 @@ extension AnyEncodable: ExpressibleByStringLiteral {}
 extension AnyEncodable: ExpressibleByArrayLiteral {}
 extension AnyEncodable: ExpressibleByDictionaryLiteral {}
 
+// swiftlint:disable:next extension_access_modifier
 extension _AnyEncodable {
     public init(nilLiteral _: ()) {
         self.init(nil as Any?)
