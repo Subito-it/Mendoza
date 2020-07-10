@@ -10,11 +10,11 @@ import Foundation
 extension Array {
     func split(in parts: Int) -> [[Element]] {
         var processedSize = 0
-        
-        return (0..<parts).map {
+
+        return (0 ..< parts).map {
             let size = Int((Float(count - processedSize) / Float(parts - $0)).rounded())
             defer { processedSize += size }
-            return Array(self[processedSize..<processedSize + size])
+            return Array(self[processedSize ..< processedSize + size])
         }
     }
 }

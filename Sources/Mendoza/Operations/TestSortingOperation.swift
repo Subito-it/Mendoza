@@ -11,11 +11,11 @@ import Foundation
 
 class TestSortingOperation: BaseOperation<[TestCase]> {
     var testCases: [TestCase]?
-    
+
     private let device: Device
     private let plugin: TestSortingPlugin
     private let verbose: Bool
-    
+
     init(device: Device, plugin: TestSortingPlugin, verbose: Bool) {
         self.device = device
         self.plugin = plugin
@@ -26,12 +26,12 @@ class TestSortingOperation: BaseOperation<[TestCase]> {
 
     override func main() {
         guard !isCancelled else { return }
-        
+
         do {
             guard let testCases = testCases else { fatalError("💣 Required fields not set") }
-            
+
             didStart?()
-            
+
             if plugin.isInstalled {
                 let input = TestOrderInput(tests: testCases, device: device)
                 didEnd?(try plugin.run(input: input))
@@ -42,7 +42,7 @@ class TestSortingOperation: BaseOperation<[TestCase]> {
             didThrow?(error)
         }
     }
-    
+
     override func cancel() {
         if isExecuting {
             plugin.terminate()

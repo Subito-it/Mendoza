@@ -5,27 +5,27 @@
 //  Created by Tomas Camin on 23/01/2019.
 //
 
-import Foundation
 import Bariloche
+import Foundation
 
 struct PluginInit {
     private let configurationUrl: URL
     private let name: String
-    
+
     init(configurationUrl: URL, name: String) {
         self.configurationUrl = configurationUrl
         self.name = name
     }
-    
-    func run() throws -> Void {
+
+    func run() throws {
         let fileManager = FileManager.default
-        
+
         guard fileManager.fileExists(atPath: configurationUrl.path) else {
             throw Error("Configuration fila path does not exist")
         }
-        
+
         let currentUrl = configurationUrl.deletingLastPathComponent()
-        
+
         switch name {
         case "event":
             if Bariloche.ask("\nDo you want to install the `Test Event` plugin?\n".underline + "This plugin allows to perform actions (e.g. notifications) based on dispatching events") {

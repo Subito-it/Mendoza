@@ -16,6 +16,6 @@ struct GitStatus: Codable {
 
 extension GitStatus: DefaultInitializable {
     static func defaultInit() -> GitStatus {
-        return GitStatus(url: URL(fileURLWithPath: ""), branch: "", commitMessage: "", commitHash: "")
+        GitStatus(url: URL(fileURLWithPath: ""), branch: "", commitMessage: "", commitHash: "")
     }
 }

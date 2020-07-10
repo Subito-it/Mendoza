@@ -13,6 +13,6 @@ struct PostCompilationInput: Codable {
 
 extension PostCompilationInput: DefaultInitializable {
     static func defaultInit() -> PostCompilationInput {
-        return PostCompilationInput(compilationSucceeded: false)
+        PostCompilationInput(compilationSucceeded: false)
     }
 }

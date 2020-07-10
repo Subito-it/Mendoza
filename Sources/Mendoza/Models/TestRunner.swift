@@ -15,5 +15,5 @@ protocol TestRunner {
 extension Simulator: TestRunner {}
 
 extension Node: TestRunner {
-    var id: String { return address }
+    var id: String { address }
 }

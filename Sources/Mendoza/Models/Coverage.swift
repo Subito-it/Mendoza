@@ -29,14 +29,14 @@ extension Coverage.Data {
         let expansions: [Expansion]?
         let summary: Stats?
     }
-    
+
     struct Function: Codable {
         let name: String?
         let count: Int?
         let regions: [[Int]]?
         let filenames: [String]?
     }
-    
+
     struct Stats: Codable {
         struct Item: Codable {
             let count: Int?
@@ -44,7 +44,7 @@ extension Coverage.Data {
             let notcovered: Int?
             let percent: Int?
         }
-        
+
         let lines: Item?
         let functions: Item?
         let instantiations: Item?
@@ -57,7 +57,7 @@ extension Coverage.Data.File {
         let sourceRegion: [Int]?
         let targetRegions: [[Int]]?
         let filenames: [String]?
-        
+
         enum CodingKeys: String, CodingKey {
             case sourceRegion = "source_region"
             case targetRegions = "target_regions"

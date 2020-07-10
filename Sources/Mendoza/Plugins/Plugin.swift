@@ -9,46 +9,46 @@ import Foundation
 
 class Plugin<Input: DefaultInitializable, Output: DefaultInitializable> {
     var isInstalled: Bool {
-        return fileManager.fileExists(atPath: baseUrl.appendingPathComponent(filename).path)
+        fileManager.fileExists(atPath: baseUrl.appendingPathComponent(filename).path)
     }
-    
+
     let logger: ExecuterLogger
     let plugin: (data: String?, debug: Bool)
-    
+
     private let executer: Executer
     private let name: String
     private let baseUrl: URL
-    private var filename: String { return "\(name).swift" }
+    private var filename: String { "\(name).swift" }
     private let fileManager = FileManager.default
-    
+
     private let pluginOutputMarker = "# plugin-result"
-    
+
     init(name: String, baseUrl: URL, plugin: (data: String?, debug: Bool)) {
-        self.logger = ExecuterLogger(name: "Plugin-\(name)", address: "localhost")
-        self.executer = LocalExecuter(logger: logger)
+        logger = ExecuterLogger(name: "Plugin-\(name)", address: "localhost")
+        executer = LocalExecuter(logger: logger)
         self.name = name
         self.baseUrl = baseUrl
         self.plugin = plugin
     }
-    
+
     func terminate() {
-        self.executer.terminate()
+        executer.terminate()
     }
-    
+
     func run(input: Input) throws -> Output {
         let pluginUrl = baseUrl.appendingPathComponent(filename)
         let pluginRunUrl = baseUrl.appendingPathComponent("_\(filename)_\(CFAbsoluteTimeGetCurrent())")
-        
+
         try? fileManager.removeItem(at: pluginRunUrl)
         defer { if !plugin.debug { try? fileManager.removeItem(at: pluginRunUrl) } }
-        
+
         try fileManager.copyItem(at: pluginUrl, to: pluginRunUrl)
-        
+
         var runContent = try String(contentsOf: pluginRunUrl)
         runContent += runnerCode()
-        
+
         try runContent.data(using: .utf8)?.write(to: pluginRunUrl)
-        
+
         let inputString: String
         if input is PluginVoid {
             inputString = ""
@@ -56,9 +56,9 @@ class Plugin<Input: DefaultInitializable, Output: DefaultInitializable> {
             let inputJson = try JSONEncoder().encode(input)
             inputString = String(data: inputJson, encoding: .utf8)!
         }
-        
+
         let escape: (String?) -> String = { input in
-            return input?
+            input?
                 .replacingOccurrences(of: "'", with: "’")
                 .replacingOccurrences(of: #"\"#, with: #"\\"#)
                 .replacingOccurrences(of: #"\\/"#, with: #"\/"#)
@@ -70,48 +70,48 @@ class Plugin<Input: DefaultInitializable, Output: DefaultInitializable> {
             let timestamp = Int(Date().timeIntervalSince1970)
             try command.data(using: .utf8)?.write(to: baseUrl.appendingPathComponent(filename + ".debug-\(timestamp)"))
         }
-        
+
         do {
             let output = try executer.capture(command).output
-            guard let result = output.components(separatedBy: pluginOutputMarker).last
-                , let resultData = result.data(using: .utf8) , resultData.count > 0
-                , let ret = try? JSONDecoder().decode(Output.self, from: resultData) else {
-                    throw Error("Failed running plugin `\(filename)`, got \(output)", logger: executer.logger)
+            guard let result = output.components(separatedBy: pluginOutputMarker).last,
+                let resultData = result.data(using: .utf8), !resultData.isEmpty,
+                let ret = try? JSONDecoder().decode(Output.self, from: resultData) else {
+                throw Error("Failed running plugin `\(filename)`, got \(output)", logger: executer.logger)
             }
             if plugin.debug {
                 print("⚠️ plugin output:\n\(output)")
             }
-            
+
             return ret
         } catch {
             print(error)
             throw Error(error.localizedDescription)
         }
     }
-    
-    func  writeTemplate() throws {
+
+    func writeTemplate() throws {
         let destinationUrl = baseUrl.appendingPathComponent(filename)
         var content = [String]()
-        
+
         content += ["#!/usr/bin/swift", ""]
         content += ["import Foundation", ""]
-        
+
         let dependencies: [DefaultInitializable.Type] = [Input.self, Output.self]
         let reflections = dependencies.flatMap { $0.reflections() }
         let uniqueSubject = Set(reflections.map { $0.subject })
         let uniqueReflections = uniqueSubject.compactMap { uniqueSubject in reflections.first(where: { reflection in reflection.subject == uniqueSubject }) }.map { $0.reflection }
-        
+
         let dependenciesReflection = uniqueReflections.flatMap { $0.components(separatedBy: "\n") }
-        let dependenciesReflectionComment = dependenciesReflection.map({ "// \($0)" })
+        let dependenciesReflectionComment = dependenciesReflection.map { "// \($0)" }
         content += dependenciesReflectionComment
         content += body().components(separatedBy: "\n")
-        
+
         let data = content.joined(separator: "\n").data(using: .utf8)
         try data?.write(to: destinationUrl)
-        
-        try fileManager.setAttributes([.posixPermissions : 0o777], ofItemAtPath: destinationUrl.path)
+
+        try fileManager.setAttributes([.posixPermissions: 0o777], ofItemAtPath: destinationUrl.path)
     }
-    
+
     private func body() -> String {
         let handleSignature: String
         switch (Input.self, Output.self) {
@@ -126,25 +126,25 @@ class Plugin<Input: DefaultInitializable, Output: DefaultInitializable> {
         }
 
         return """
-struct \(name) {
-    \(handleSignature)
-        // write your implementation here
+        struct \(name) {
+            \(handleSignature)
+                // write your implementation here
+            }
+        }
+        """
     }
-}
-"""
-    }
-    
+
     private func runnerCode() -> String {
         var result = ["\n"]
-        
+
         let dependencies: [DefaultInitializable.Type] = [Input.self, Output.self]
         let reflections = dependencies.flatMap { $0.reflections() }
         let uniqueSubject = Set(reflections.map { $0.subject })
         let uniqueReflections = uniqueSubject.compactMap { uniqueSubject in reflections.first(where: { reflection in reflection.subject == uniqueSubject }) }.map { $0.reflection }
-        
+
         let dependenciesReflection = uniqueReflections.flatMap { $0.components(separatedBy: "\n") }
         result += dependenciesReflection
-        
+
         result += ["let pluginData = CommandLine.arguments[2]", ""]
 
         switch (Input.self, Output.self) {
@@ -172,7 +172,7 @@ struct \(name) {
             result += ["print(\"\(pluginOutputMarker)\")"]
             result += ["print(String(data: outputData, encoding: .utf8)!)"]
         }
-        
+
         return result.joined(separator: "\n")
     }
 }

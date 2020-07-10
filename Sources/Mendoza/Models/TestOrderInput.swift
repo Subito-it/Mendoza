@@ -14,6 +14,6 @@ struct TestOrderInput: Codable {
 
 extension TestOrderInput: DefaultInitializable {
     static func defaultInit() -> TestOrderInput {
-        return TestOrderInput(tests: [], device: Device.defaultInit())
+        TestOrderInput(tests: [], device: Device.defaultInit())
     }
 }

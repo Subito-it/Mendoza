@@ -9,11 +9,10 @@
 import XCTest
 
 class MendozaSandboxUITests: XCTestCase {
-
     override func setUp() {
         XCUIApplication().launch()
     }
 
-    //func testExample1() { XCTAssert(true) }
+    // func testExample1() { XCTAssert(true) }
     func testExampleFail() { XCTAssert(false) }
 }

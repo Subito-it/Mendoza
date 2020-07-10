@@ -16,9 +16,9 @@ class CompileOperation: BaseOperation<Void> {
     private let postCompilationPlugin: PostCompilationPlugin
     private let sdk: XcodeProject.SDK
     private lazy var executer: Executer = {
-        return self.makeLocalExecuter()
+        self.makeLocalExecuter()
     }()
-        
+
     init(configuration: Configuration, baseUrl: URL, project: XcodeProject, scheme: String, preCompilationPlugin: PreCompilationPlugin, postCompilationPlugin: PostCompilationPlugin, sdk: XcodeProject.SDK) {
         self.configuration = configuration
         self.baseUrl = baseUrl
@@ -30,13 +30,13 @@ class CompileOperation: BaseOperation<Void> {
         super.init()
         loggers = loggers.union([preCompilationPlugin.logger, postCompilationPlugin.logger])
     }
-    
+
     override func main() {
         guard !isCancelled else { return }
-        
-        do {            
+
+        do {
             didStart?()
-            
+
             let schemeBackup = try project.backupScheme(name: configuration.scheme, baseUrl: baseUrl)
             try project.disableDebugger(schemeName: configuration.scheme)
             defer { try? project.restoreScheme(name: configuration.scheme, with: schemeBackup) }
@@ -59,7 +59,7 @@ class CompileOperation: BaseOperation<Void> {
 
                 didEnd?(())
             }
-            
+
             let command: String
             switch sdk {
             case .ios:
@@ -67,7 +67,7 @@ class CompileOperation: BaseOperation<Void> {
             case .macos:
                 command = "$(xcode-select -p)/usr/bin/xcodebuild \(projectFlag) -scheme '\(configuration.scheme)' -configuration \(configuration.buildConfiguration) -derivedDataPath '\(Path.build.rawValue)' -sdk 'macosx' COMPILER_INDEX_STORE_ENABLE=NO ONLY_ACTIVE_ARCH=\(configuration.compilation.onlyActiveArchitecture) VALID_ARCHS='\(configuration.compilation.architectures)' \(configuration.compilation.buildSettings) -UseNewBuildSystem=\(configuration.compilation.useNewBuildSystem) -enableCodeCoverage YES build-for-testing"
             }
-            
+
             _ = try executer.execute(command, currentUrl: baseUrl) { result, originalError in
                 if result.output.contains("** TEST BUILD FAILED **") {
                     throw Error("Compilation failed!")
@@ -81,7 +81,7 @@ class CompileOperation: BaseOperation<Void> {
             didThrow?(error)
         }
     }
-    
+
     override func cancel() {
         if isExecuting {
             preCompilationPlugin.terminate()
@@ -89,5 +89,5 @@ class CompileOperation: BaseOperation<Void> {
             executer.terminate()
         }
         super.cancel()
-    }    
+    }
 }

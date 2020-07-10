@@ -13,18 +13,19 @@ final class TestSessionResult: Codable {
         var address = ""
         var path = ""
     }
+
     final class NodeStatistics: Codable {
         var executionTime: TimeInterval
         var totalTests: Int
-        
+
         init(executionTime: TimeInterval, totalTests: Int) {
             self.executionTime = executionTime
             self.totalTests = totalTests
         }
     }
-    
-    var operationExecutionTime = [String : TimeInterval]()
-    var nodes = [String : NodeStatistics]()
+
+    var operationExecutionTime = [String: TimeInterval]()
+    var nodes = [String: NodeStatistics]()
     var git: GitStatus?
     var passedTests = [TestCaseResult]()
     var failedTests = [TestCaseResult]()
@@ -37,18 +38,18 @@ final class TestSessionResult: Codable {
 
 extension TestSessionResult: DefaultInitializable {
     static func defaultInit() -> TestSessionResult {
-        return TestSessionResult()
+        TestSessionResult()
     }
 }
 
 extension TestSessionResult.Destination: DefaultInitializable {
     static func defaultInit() -> TestSessionResult.Destination {
-        return TestSessionResult.Destination()
+        TestSessionResult.Destination()
     }
 }
 
 extension TestSessionResult.NodeStatistics: DefaultInitializable {
     static func defaultInit() -> TestSessionResult.NodeStatistics {
-        return TestSessionResult.NodeStatistics(executionTime: 0.0, totalTests: 0)
+        TestSessionResult.NodeStatistics(executionTime: 0.0, totalTests: 0)
     }
 }

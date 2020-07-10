@@ -15,10 +15,10 @@ extension Sequence where Element == Node {
     func unique() -> [Element] {
         var ret = [Element]()
         var localAdded = false
-        
+
         for node in self {
             guard !ret.contains(node) else { continue }
-            
+
             switch AddressType(node: node) {
             case .local where localAdded == false:
                 ret.append(node)
@@ -29,7 +29,7 @@ extension Sequence where Element == Node {
                 break
             }
         }
-        
+
         return ret
     }
 
@@ -37,6 +37,6 @@ extension Sequence where Element == Node {
     ///
     /// - Returns: array of remote nodes
     func remote() -> [Element] {
-        return filter { AddressType(node: $0) == .remote }
+        filter { AddressType(node: $0) == .remote }
     }
 }

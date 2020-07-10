@@ -10,13 +10,13 @@ import Foundation
 struct TestCase: Codable, Hashable {
     let name: String
     let suite: String
-    
-    var testIdentifier: String { return "\(suite)/\(name)" }
+
+    var testIdentifier: String { "\(suite)/\(name)" }
 }
 
 extension TestCase: DefaultInitializable {
     static func defaultInit() -> TestCase {
-        return TestCase(name: "", suite: "")
+        TestCase(name: "", suite: "")
     }
 }
 

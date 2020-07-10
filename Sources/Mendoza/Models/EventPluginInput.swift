@@ -14,6 +14,6 @@ struct EventPluginInput: Codable {
 
 extension EventPluginInput: DefaultInitializable {
     static func defaultInit() -> EventPluginInput {
-        return EventPluginInput(event: Event.defaultInit(), device: Device.defaultInit())
+        EventPluginInput(event: Event.defaultInit(), device: Device.defaultInit())
     }
 }

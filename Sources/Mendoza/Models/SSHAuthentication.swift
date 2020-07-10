@@ -15,16 +15,16 @@ enum SSHAuthentication: Codable, Hashable {
     case agent(username: String)
     // For localhost connections
     case none(username: String)
-    
+
     var username: String {
         switch self {
-        case .credentials(let username, _):
+        case let .credentials(username, _):
             return username
-        case .key(let username, _, _, _):
+        case let .key(username, _, _, _):
             return username
-        case .agent(let username):
+        case let .agent(username):
             return username
-        case .none(let username):
+        case let .none(username):
             return username
         }
     }
@@ -56,18 +56,18 @@ extension SSHAuthentication {
         case agentUsername
         case noneUsername
     }
-    
+
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        
+
         if let username = try container.decodeIfPresent(String.self, forKey: .credentialUsername),
             let password = try container.decodeIfPresent(String.self, forKey: .credentialPassword) {
             self = .credentials(username: username, password: password)
         } else if let username = try container.decodeIfPresent(String.self, forKey: .keyUsername) {
             self = .key(username: username,
-                        privateKey: (try container.decode(String.self, forKey: .keyPrivateKey)),
-                        publicKey: (try container.decodeIfPresent(String.self, forKey: .keyPublicKey)),
-                        passphrase: (try container.decodeIfPresent(String.self, forKey: .keyPassphrase)))
+                        privateKey: try container.decode(String.self, forKey: .keyPrivateKey),
+                        publicKey: try container.decodeIfPresent(String.self, forKey: .keyPublicKey),
+                        passphrase: try container.decodeIfPresent(String.self, forKey: .keyPassphrase))
         } else if let username = try container.decodeIfPresent(String.self, forKey: .agentUsername) {
             self = .agent(username: username)
         } else if let username = try container.decodeIfPresent(String.self, forKey: .noneUsername) {
@@ -76,21 +76,21 @@ extension SSHAuthentication {
             fatalError()
         }
     }
-    
+
     func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         switch self {
-        case .credentials(let username, let password):
+        case let .credentials(username, password):
             try container.encode(username, forKey: .credentialUsername)
             try container.encode(password, forKey: .credentialPassword)
-        case .key(let username, let privateKey, let publicKey, let passphrase):
+        case let .key(username, privateKey, publicKey, passphrase):
             try container.encode(username, forKey: .keyUsername)
             try container.encodeIfPresent(privateKey, forKey: .keyPrivateKey)
             try container.encodeIfPresent(publicKey, forKey: .keyPublicKey)
             try container.encodeIfPresent(passphrase, forKey: .keyPassphrase)
-        case .agent(let username):
+        case let .agent(username):
             try container.encode(username, forKey: .agentUsername)
-        case .none(let username):
+        case let .none(username):
             try container.encode(username, forKey: .noneUsername)
         }
     }

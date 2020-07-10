@@ -8,14 +8,14 @@
 import Foundation
 
 struct Error: LocalizedError {
-    var errorDescription: String? { return description }
+    var errorDescription: String? { description }
     let didLogError: Bool
-    
+
     private let description: String
 
     init(_ description: String, logger: ExecuterLogger? = nil) {
         self.description = description
-        self.didLogError = (logger != nil)
+        didLogError = (logger != nil)
         logger?.log(exception: description)
     }
 }

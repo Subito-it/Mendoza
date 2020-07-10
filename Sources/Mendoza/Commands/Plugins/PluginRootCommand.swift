@@ -13,8 +13,8 @@ class PluginRootCommand: Command {
     let usage: String? = "Plugins allow to customize and extend the dispatcher's functionality"
     let help: String? = "Customize and extend the dispatcher's functionality"
     let subcommands: [Command] = [PluginInitCommand()]
-    
+
     func run() -> Bool {
-        return true
+        true
     }
 }

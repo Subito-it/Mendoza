@@ -13,7 +13,7 @@ extension Dictionary where Key == String {
             if let arrayValues = value as? [Any] {
                 for (index, arrayValue) in arrayValues.enumerated() {
                     let indexedKey = "\(key).\\\(index)"
-                    
+
                     if let subArrayValues = arrayValue as? [Any] {
                         if predicate((indexedKey, subArrayValues)) {
                             return indexedKey
@@ -23,10 +23,10 @@ extension Dictionary where Key == String {
                             return indexedKey
                         } else {
                             let subKeyPath = subDictionary.firstKeyPath { k1, v1 in
-                                return predicate(("\(indexedKey).\(k1)", v1))
+                                predicate(("\(indexedKey).\(k1)", v1))
                             }
-                            
-                            if subKeyPath.count > 0 {
+
+                            if !subKeyPath.isEmpty {
                                 return "\(indexedKey).\(subKeyPath)"
                             }
                         }
@@ -41,10 +41,10 @@ extension Dictionary where Key == String {
                     return key
                 } else {
                     let subKeyPath = subDictionary.firstKeyPath { k1, v1 in
-                        return predicate(("\(key).\(k1)", v1))
+                        predicate(("\(key).\(k1)", v1))
                     }
-                    
-                    if subKeyPath.count > 0 {
+
+                    if !subKeyPath.isEmpty {
                         return "\(key).\(subKeyPath)"
                     }
                 }
@@ -54,7 +54,7 @@ extension Dictionary where Key == String {
                 }
             }
         }
-        
+
         return ""
     }
 }
@@ -66,7 +66,7 @@ extension Dictionary where Key == String {
             guard let head = segments.first, head.isEmpty == false else {
                 return self
             }
-            
+
             if segments.count > 1, segments[1].hasPrefix("\\"), let arrayIndex = Int(segments[1].dropFirst()), let array = self[head] as? [Any] {
                 if let subDictionary = array[arrayIndex] as? [String: Any] {
                     let subDictionaryKeyPath = segments.dropFirst().dropFirst().joined(separator: ".")
@@ -85,7 +85,7 @@ extension Dictionary where Key == String {
             guard let head = segments.first else {
                 return
             }
-            
+
             if segments.count > 1, segments[1].hasPrefix("\\"), let arrayIndex = Int(segments[1].dropFirst()), var array = self[head] as? [Any] {
                 if var subDictionary = array[arrayIndex] as? [String: Any] {
                     let subDictionaryKeyPath = segments.dropFirst().dropFirst().joined(separator: ".")
@@ -101,7 +101,7 @@ extension Dictionary where Key == String {
                             array[arrayIndex] = subDictionary
                         }
                     }
-                    
+
                     self[head] = array as? Value
                 } else {
                     switch newValue {
@@ -114,7 +114,7 @@ extension Dictionary where Key == String {
                 }
             } else if var subDictionary = self[head] as? [String: Any] {
                 let subDictionaryKeyPath = segments.dropFirst().joined(separator: ".")
-                
+
                 switch newValue {
                 case let .some(value):
                     subDictionary[keyPath: subDictionaryKeyPath] = value
@@ -125,7 +125,7 @@ extension Dictionary where Key == String {
                         subDictionary[keyPath: subDictionaryKeyPath] = nil
                     }
                 }
-                
+
                 self[head] = subDictionary as? Value
             } else {
                 switch newValue {

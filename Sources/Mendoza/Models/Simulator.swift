@@ -11,8 +11,8 @@ struct Simulator: Codable, Equatable {
     let id: String
     let name: String
     let device: Device
-    
-    static func ==(lhs: Simulator, rhs: Simulator) -> Bool {
-        return lhs.id == rhs.id
+
+    static func == (lhs: Simulator, rhs: Simulator) -> Bool {
+        lhs.id == rhs.id
     }
 }

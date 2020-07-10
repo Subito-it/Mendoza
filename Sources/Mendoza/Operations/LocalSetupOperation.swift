@@ -10,22 +10,23 @@ import Foundation
 class LocalSetupOperation: BaseOperation<Void> {
     private let fileManager: FileManager
     private lazy var git = {
-        return Git(executer: self.executer)
+        Git(executer: self.executer)
     }()
+
     private lazy var executer: Executer = {
-        return makeLocalExecuter()
+        makeLocalExecuter()
     }()
-    
+
     init(fileManager: FileManager = .default) {
         self.fileManager = fileManager
     }
 
     override func main() {
         guard !isCancelled else { return }
-        
+
         do {
             didStart?()
-            
+
             for path in Path.allCases {
                 switch path {
                 case .base, .build:
@@ -36,13 +37,13 @@ class LocalSetupOperation: BaseOperation<Void> {
 
                 _ = try executer.execute("mkdir -p '\(path.rawValue)' || true")
             }
-            
+
             didEnd?(())
         } catch {
             didThrow?(error)
         }
     }
-    
+
     override func cancel() {
         if isExecuting {
             executer.terminate()

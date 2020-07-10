@@ -10,20 +10,20 @@ import Foundation
 class RemoteSetupOperation: BaseOperation<Void> {
     private let nodes: [Node]
     private lazy var pool: ConnectionPool = {
-        return makeConnectionPool(sources: nodes)
+        makeConnectionPool(sources: nodes)
     }()
-    
+
     init(nodes: [Node]) {
         self.nodes = nodes
     }
 
     override func main() {
         guard !isCancelled else { return }
-        
+
         do {
             didStart?()
-            
-            try pool.execute { (executer, source) in
+
+            try pool.execute { executer, source in
                 let ramDisks = CommandLineProxy.RamDisk(executer: executer)
                 try ramDisks.eject(name: Environment.ramDiskName, throwOnError: false)
 
@@ -51,13 +51,13 @@ class RemoteSetupOperation: BaseOperation<Void> {
                     break // never create ram disk on local address because we already wrote critical files to Path.base
                 }
             }
-            
+
             didEnd?(())
         } catch {
             didThrow?(error)
         }
     }
-    
+
     override func cancel() {
         if isExecuting {
             pool.terminate()

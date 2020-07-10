@@ -53,49 +53,49 @@ import Foundation
 // }
 //
 struct TearDownPlugin {
-    func handle(_ input: TestSessionResult, pluginData: String?) {
+    func handle(_ input: TestSessionResult, pluginData _: String?) {
         let username = input.destination.username
         let address = input.destination.address
-        
+
         for (plistPath, node) in input.summaryPlistPath {
             let customization = ["GroupingIdentifier": input.date,
                                  "BranchName": input.git?.branch ?? "",
                                  "CommitMessage": input.git?.lastMessage ?? "",
                                  "CommitHash": input.git?.lastHash ?? ""]
-            
+
             let plistPath = "\(input.destination.path)/\(plistPath)".replacingOccurrences(of: "~/", with: "/Users/\(username)/")
-            
+
             var commands = [String]()
             for (key, value) in customization {
                 let escapedValue = value.replacingOccurrences(of: "'", with: "&quote;").replacingOccurrences(of: "\n", with: "<br />")
                 commands.append("plutil -insert \(key) -string '\(escapedValue)' '\(plistPath)'")
             }
-            
+
             let result = Process().capture("ssh \(username)@\(address) \"\(commands.joined(separator: "; "))\"")
-            
+
             guard result.status == 0 else {
                 print("Failed applying customization in \(plistPath) on node `\(node)`, got \(result.output)")
                 return
             }
         }
-         
+
         let totalExecutionTime = Int(CFAbsoluteTimeGetCurrent() - input.startTime)
-        
+
         var fieldStrings = [(title: String, value: String)]()
         fieldStrings.append((title: "Total time", value: "\(totalExecutionTime) seconds"))
         if let testTime = input.operationExecutionTime["testRunnerOperation"] as? Double {
             fieldStrings.append((title: "Test time", value: "\(Int(testTime)) seconds"))
         }
         fieldStrings.append((title: "Successful tests", value: "\(input.passedTests.count)"))
-        fieldStrings.append((title: "Failed tests", value: "\(input.failedTests.count)"))        
+        fieldStrings.append((title: "Failed tests", value: "\(input.failedTests.count)"))
     }
-    
+
     @discardableResult
     private func executeRequest(url: String) -> String {
         let url = URL(string: url)!
-        
+
         var result: String = ""
-        
+
         let sem = DispatchSemaphore(value: 0)
         URLSession.shared.dataTask(with: url) { data, _, error in
             defer { sem.signal() }
@@ -109,7 +109,7 @@ struct TearDownPlugin {
             print("Failed fetching execution time results\n\n")
             return ""
         }
-        
+
         return result
     }
 }
@@ -118,20 +118,20 @@ extension Process {
     @discardableResult
     func capture(_ command: String) -> (status: Int32, output: String) {
         arguments = ["-c", "source ~/.bash_profile; \(command)"]
-        
+
         let stdout = Pipe()
         standardOutput = stdout
         qualityOfService = .userInitiated
-        
+
         launchPath = "/bin/bash"
         guard FileManager.default.fileExists(atPath: "/bin/bash") else {
             fatalError("/bin/bash does not exists")
         }
-        
+
         launch()
-        
+
         waitUntilExit()
-        
+
         let data = stdout.fileHandleForReading.readDataToEndOfFile()
         let result = String(data: data, encoding: String.Encoding.utf8) ?? ""
         return (terminationStatus, result.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines))

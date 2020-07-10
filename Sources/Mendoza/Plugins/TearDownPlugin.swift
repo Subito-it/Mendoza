@@ -10,5 +10,5 @@ import Foundation
 class TearDownPlugin: Plugin<TestSessionResult, PluginVoid> {
     init(baseUrl: URL, plugin: (data: String?, debug: Bool) = (nil, false)) {
         super.init(name: "TearDownPlugin", baseUrl: baseUrl, plugin: plugin)
-    }    
+    }
 }

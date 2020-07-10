@@ -10,11 +10,11 @@ import Foundation
 extension CommandLineProxy {
     struct Keychain {
         private let executer: Executer
-        
+
         init(executer: Executer) {
             self.executer = executer
         }
-        
+
         func unlock(password: String) throws {
             _ = try executer.execute("security unlock-keychain -p '\(password)' '\(executer.homePath)/Library/Keychains/login.keychain-db'")
         }

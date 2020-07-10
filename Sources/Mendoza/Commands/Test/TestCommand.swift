@@ -12,7 +12,7 @@ class TestCommand: Command {
     let name: String? = "test"
     let usage: String? = "Dispatch UI tests as specified in the `configuration_file`"
     let help: String? = "Dispatch UI tests"
-    
+
     let debugPluginsFlag = Flag(short: nil, long: "plugin_debug", help: "Dump plugin invocation commands")
     let dispatchOnLocalHostFlag = Flag(short: "l", long: "use_localhost", help: "Use localhost to execute tests")
     let verboseFlag = Flag(short: nil, long: "verbose", help: "Dump debug messages")
@@ -49,23 +49,23 @@ class TestCommand: Command {
                                 pluginData: pluginCustomField.value,
                                 debugPlugins: debugPluginsFlag.value,
                                 verbose: verboseFlag.value)
-            
+
             test.didFail = { [weak self] in self?.handleError($0) }
             try test.run()
         } catch {
             handleError(error)
         }
-        
+
         return true
     }
-    
+
     private func handleError(_ error: Swift.Error) {
         print(error.localizedDescription)
-        
+
         if !(error is Error) {
             print("\n\(String(describing: error))")
         }
-        
+
         exit(-1)
     }
 }

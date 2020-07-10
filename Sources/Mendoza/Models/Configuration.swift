@@ -8,7 +8,7 @@
 import Foundation
 import KeychainAccess
 
-struct Configuration: Codable {    
+struct Configuration: Codable {
     let projectPath: String
     let workspacePath: String?
     let buildBundleIdentifier: String
@@ -28,7 +28,7 @@ extension Configuration {
         let onlyActiveArchitecture: String
         let architectures: String
         let useNewBuildSystem: String
-        
+
         init(buildSettings: String = "GCC_OPTIMIZATION_LEVEL='s' SWIFT_OPTIMIZATION_LEVEL='-Osize'",
              onlyActiveArchitecture: String = "YES",
              architectures: String = "x86_64",
@@ -39,22 +39,22 @@ extension Configuration {
             self.useNewBuildSystem = useNewBuildSystem
         }
     }
-    
+
     struct ResultDestination: Codable {
         let node: Node
         let path: String
-    }    
+    }
 }
 
 extension Configuration {
     func appleIdCredentials() -> Credentials? {
         let keychain = KeychainAccess.Keychain(service: Environment.bundle)
-        
-        guard let data = try? keychain.getData("appleID")
-            , let credentials = try? JSONDecoder().decode(Credentials.self, from: data) else {
-                return nil
+
+        guard let data = try? keychain.getData("appleID"),
+            let credentials = try? JSONDecoder().decode(Credentials.self, from: data) else {
+            return nil
         }
-        
+
         return credentials
     }
 }
