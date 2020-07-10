@@ -164,7 +164,7 @@ class XcodeProject: NSObject {
     func getBuildSDK(for schemeName: String) throws -> SDK {
         let (buildTarget, _) = try getTargetsInScheme(schemeName)
 
-        guard let buildProject = project.pbxproj.projects.filter({ project in project.targets.map { $0.name }.contains(buildTarget.name) }).first else {
+        guard let buildProject = project.pbxproj.projects.first(where: { project in project.targets.map { $0.name }.contains(buildTarget.name) }) else {
             throw Error("Failed to extract build project")
         }
 
