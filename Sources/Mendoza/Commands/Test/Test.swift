@@ -25,7 +25,7 @@ class Test {
         let configurationData = try Data(contentsOf: configurationUrl)
         var configuration = try JSONDecoder().decode(Configuration.self, from: configurationData)
 
-        if dispatchOnLocalHost, configuration.nodes.first(where: { AddressType(node: $0) == .local }) == nil { // add localhost
+        if dispatchOnLocalHost, !configuration.nodes.contains(where: { AddressType(node: $0) == .local }) { // add localhost
             let updatedNodes = configuration.nodes + [Node.localhost()]
             let updatedConfiguration = Configuration(projectPath: configuration.projectPath, workspacePath: configuration.workspacePath, buildBundleIdentifier: configuration.buildBundleIdentifier, testBundleIdentifier: configuration.testBundleIdentifier, scheme: configuration.scheme, buildConfiguration: configuration.buildConfiguration, storeAppleIdCredentials: configuration.storeAppleIdCredentials, resultDestination: configuration.resultDestination, nodes: updatedNodes, compilation: configuration.compilation, sdk: configuration.sdk)
             configuration = updatedConfiguration

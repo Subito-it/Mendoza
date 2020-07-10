@@ -59,7 +59,7 @@ class ExecuterLogger: Logger, CustomDebugStringConvertible {
 
     var description: String { "\(address) - \(name)" }
     var debugDescription: String { "\(name), \(address), logs: \(logs.count)" }
-    var hasErrors: Bool { logs.first(where: { $0.isError }) != nil }
+    var hasErrors: Bool { logs.contains(where: { $0.isError }) }
     var filename: String { "\(address)-\(name).html" }
     var isEmpty: Bool { logs.isEmpty }
     var dumpToStandardOutput: Bool = false
