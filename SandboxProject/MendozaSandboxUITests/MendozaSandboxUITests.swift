@@ -10,6 +10,8 @@ import XCTest
 
 class MendozaSandboxUITests: XCTestCase {
     override func setUp() {
+        super.setUp()
+
         XCUIApplication().launch()
     }
 
