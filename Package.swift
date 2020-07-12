@@ -8,6 +8,7 @@ let package = Package(
     products: [
         .executable(name: "Mendoza", targets: ["Mendoza"]),
         .library(name: "MendozaCore", targets: ["MendozaCore"]),
+        .library(name: "MendozaSharedLibrary", targets: ["MendozaSharedLibrary"]),
     ],
     dependencies: [
         .package(url: "https://github.com/tcamin/KeychainAccess.git", .branch("master")),
@@ -24,8 +25,11 @@ let package = Package(
             dependencies: ["MendozaCore"]
         ),
         .target(
+            name: "MendozaSharedLibrary"
+        ),
+        .target(
             name: "MendozaCore",
-            dependencies: ["Bariloche", "Shout", "XcodeProj", "KeychainAccess", "SourceKittenFramework", "ArgumentParser", "Slang"]
+            dependencies: ["Bariloche", "Shout", "XcodeProj", "KeychainAccess", "SourceKittenFramework", "ArgumentParser", "Slang", "MendozaSharedLibrary"]
         ),
         .testTarget(
             name: "MendozaTests",

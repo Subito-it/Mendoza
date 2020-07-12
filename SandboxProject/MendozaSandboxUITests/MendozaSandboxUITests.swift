@@ -41,13 +41,13 @@ class MendozaSandboxUITests: XCTestCase {
         }
     }
 
-    func testExampleTag3() {
+    func testExampleTag3Fail() {
         tags(testTags: [
             .help,
         ])
 
         report(territory: [.uk], testCases: ["APP-T486", "APP-T486"]) {
-            XCTAssert(true)
+            XCTAssertTrue(false)
         }
     }
 

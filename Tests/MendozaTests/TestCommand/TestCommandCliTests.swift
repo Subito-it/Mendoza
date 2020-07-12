@@ -29,4 +29,20 @@ final class TestCommandCliTests: XCTestCase {
             debug: true
         )
     }
+
+    func testCustomTests() throws {
+        let process = ProcessInfo.processInfo
+        if let customLocation = process.environment["MENDOZA_TEST_LOCATION"], let customPluginData = process.environment["MENDOZA_PLUGIN_DATA"] {
+            mendozaTest(
+                config: "mendoza.json",
+                deviceName: "iPhone 11 Pro Max",
+                deviceRuntime: "13.2.2",
+                retryCount: 1,
+                includeTests: "smoketest",
+                excludeTests: nil,
+                pluginData: customPluginData,
+                customLocation: customLocation
+            )
+        }
+    }
 }

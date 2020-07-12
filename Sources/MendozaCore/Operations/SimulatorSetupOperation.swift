@@ -61,7 +61,7 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
                     concurrentTestRunners = try self.physicalCPUs(executer: executer, node: node)
                 }
 
-                let simulatorNames = (1 ... concurrentTestRunners).map { "[\(Mendoza.name)] \(self.device.name)-\($0)" }
+                let simulatorNames = (1 ... concurrentTestRunners).map { "[\(Environment.name)] \(self.device.name)-\($0)" }
 
                 let rawSimulatorStatus = try proxy.rawSimulatorStatus()
                 let nodeSimulators = try simulatorNames.compactMap { try proxy.makeSimulatorIfNeeded(name: $0, device: self.device, cachedSimulatorStatus: rawSimulatorStatus) }

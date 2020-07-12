@@ -44,7 +44,7 @@ class SimulatorTearDownOperation: BaseOperation<Void> {
                     try proxy.launch()
                 }
 
-                let mendozaSimulators = try proxy.installedSimulators().filter { $0.name.contains(Mendoza.name) }
+                let mendozaSimulators = try proxy.installedSimulators().filter { $0.name.contains(Environment.name) }
 
                 for simulator in mendozaSimulators {
                     try proxy.delete(simulator: simulator)

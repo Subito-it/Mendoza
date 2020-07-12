@@ -6,6 +6,5 @@
 //
 
 public enum Mendoza {
-    public static let version = "1.7.0"
-    public static let name = "Mendoza"
+    public static let version = "1.8.3"
 }

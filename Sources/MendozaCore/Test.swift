@@ -6,11 +6,11 @@
 //
 
 import Foundation
+import MendozaSharedLibrary
 
 public class Test {
     public var didFail: ((Swift.Error) -> Void)?
 
-    // swiftlint:disable:next large_tuple
     private let userOptions: (configuration: Configuration, device: Device, runHeadless: Bool, filePatterns: FilePatterns, testFilters: TestFilters, testTimeoutSeconds: Int, testForStabilityCount: Int, failingTestsRetryCount: Int, dispatchOnLocalHost: Bool, verbose: Bool)
     private let plugin: (data: String?, debug: Bool)
     private let eventPlugin: EventPlugin
@@ -18,9 +18,11 @@ public class Test {
     private let syncQueue = DispatchQueue(label: String(describing: Test.self))
     private let timestamp: String
     private var observers = [NSKeyValueObservation]()
+    private var directoryPath: String?
+    private var configurationUrl: URL
 
     public init(
-        configurationUrl: URL,
+        configurationFile: String,
         device: Device,
         runHeadless: Bool,
         filePatterns: FilePatterns,
@@ -31,9 +33,17 @@ public class Test {
         dispatchOnLocalHost: Bool,
         pluginData: String?,
         debugPlugins: Bool,
-        verbose: Bool
+        verbose: Bool,
+        directory: String? = nil
     ) throws {
         plugin = (data: pluginData, debug: debugPlugins)
+        directoryPath = directory
+
+        if let directoryPath = directoryPath {
+            configurationUrl = URL(fileURLWithPath: directoryPath + configurationFile)
+        } else {
+            configurationUrl = URL(fileURLWithPath: configurationFile)
+        }
 
         let configurationData = try Data(contentsOf: configurationUrl)
         var configuration = try JSONDecoder().decode(Configuration.self, from: configurationData)
@@ -96,7 +106,8 @@ public class Test {
         let nodes = Array(Set(userOptions.configuration.nodes.map { $0.address } + (userOptions.dispatchOnLocalHost ? ["localhost"] : []))).sorted()
         print(nodes.joined(separator: "\n").magenta)
 
-        let git = Git(executer: LocalExecuter())
+        let localExecuter = LocalExecuter(currentDirectoryPath: directoryPath)
+        let git = Git(executer: localExecuter)
         let gitStatus = try git.status()
 
         let queue = OperationQueue()
@@ -246,10 +257,11 @@ public class Test {
         }
 
         validationOperation.didStart = { [unowned self] in
-            try? self.eventPlugin.run(event: Event(kind: .start, info: [:]), device: device)
+            try? self.eventPlugin.run(event: Event(kind: .start, info: [:], values: [:]), device: device)
         }
         validationOperation.didThrow = { [unowned self] opError in
-            try? self.eventPlugin.run(event: Event(kind: .error, info: ["error": opError.localizedDescription]), device: device)
+
+            try? self.eventPlugin.run(event: Event(kind: .error, info: ["error": opError.localizedDescription], values: [:]), device: device)
             self.didFail?(opError)
         }
 
@@ -258,10 +270,10 @@ public class Test {
         }
 
         compileOperation.didStart = { [unowned self] in
-            try? self.eventPlugin.run(event: Event(kind: .startCompiling, info: [:]), device: device)
+            try? self.eventPlugin.run(event: Event(kind: .startCompiling, info: [:], values: [:]), device: device)
         }
         compileOperation.didEnd = { [unowned self] _ in
-            try? self.eventPlugin.run(event: Event(kind: .stopCompiling, info: [:]), device: device)
+            try? self.eventPlugin.run(event: Event(kind: .stopCompiling, info: [:], values: [:]), device: device)
         }
 
         switch sdk {
@@ -278,7 +290,7 @@ public class Test {
         }
 
         testRunnerOperation.didStart = { [unowned self] in
-            try? self.eventPlugin.run(event: Event(kind: .startTesting, info: [:]), device: device)
+            try? self.eventPlugin.run(event: Event(kind: .startTesting, info: [:], values: [:]), device: device)
         }
 
         testRunnerOperation.didEnd = { [unowned self] testCaseResults in
@@ -315,7 +327,7 @@ public class Test {
 
             testCollectorOperation.testCaseResults = testCaseResults
             testTearDownOperation.testCaseResults = testCaseResults
-            try? self.eventPlugin.run(event: Event(kind: .stopTesting, info: [:]), device: device)
+            try? self.eventPlugin.run(event: Event(kind: .stopTesting, info: [:], values: [:]), device: device)
         }
 
         tearDownOperation.didStart = { [unowned tearDownOperation] in
@@ -349,14 +361,14 @@ public class Test {
             try syncLogs(destinationPath: logsDestinationPath, destination: destinationNode, timestamp: timestamp, logger: logger)
 
             if let error = error {
-                try eventPlugin.run(event: Event(kind: .error, info: ["error": error.localizedDescription]), device: userOptions.device)
+                try eventPlugin.run(event: Event(kind: .error, info: ["error": error.localizedDescription], values: [:]), device: userOptions.device)
                 didFail?(error)
             } else {
-                try eventPlugin.run(event: Event(kind: .stop, info: [:]), device: userOptions.device)
+                try eventPlugin.run(event: Event(kind: .stop, info: [:], values: [:]), device: userOptions.device)
             }
         } catch {
             try? dumpOperationLogs(operations)
-            try? eventPlugin.run(event: Event(kind: .error, info: ["error": error.localizedDescription]), device: userOptions.device)
+            try? eventPlugin.run(event: Event(kind: .error, info: ["error": error.localizedDescription], values: [:]), device: userOptions.device)
             didFail?(error)
         }
     }

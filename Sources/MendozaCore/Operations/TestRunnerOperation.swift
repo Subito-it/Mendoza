@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import MendozaSharedLibrary
 
 class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
     // An array of TestCases sorted from the longest to the shortest estimated execution time
@@ -241,6 +242,8 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                 return (test: currentRunning.test, duration: duration)
             }
 
+            var values = [String: [String]]()
+
             for (index, event) in events.enumerated() {
                 switch event {
                 case .testSuitedStarted(suite: _):
@@ -253,8 +256,10 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                 case let .testCaseStart(testCase):
                     self.syncQueue.sync {
                         self.currentRunningTest[runnerIndex] = (test: testCase, start: CFAbsoluteTimeGetCurrent())
+                        values["tags"] = testCase.tags
+                        values["testCaseIDs"] = testCase.testCaseIDs
 
-                        try? self.eventPlugin.run(event: Event(kind: .testCaseStarted, info: ["testCaseStarted": testCase.name]), device: self.device)
+                        try? self.eventPlugin.run(event: Event(kind: .testCaseStarted, info: ["testCaseStarted": testCase.name], values: [:]), device: self.device)
 
                         if self.verbose {
                             print(log: "🛫 [\(Date().description)] \(testCase.description) started {\(runnerIndex)}".yellow)
@@ -265,8 +270,9 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                     self.syncQueue.sync { [unowned self] in
                         guard let currentRunning = currentRunningAndDuration(true) else { return }
                         self.currentRunningTest[runnerIndex] = nil
+                        values["testCaseIDs"] = currentRunning.test.testCaseIDs
 
-                        try? self.eventPlugin.run(event: Event(kind: .testPassed, info: [:]), device: self.device)
+                        try? self.eventPlugin.run(event: Event(kind: .testPassed, info: [:], values: [:]), device: self.device)
 
                         self.printOutput(
                             status: event.self,
@@ -286,9 +292,11 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                         let addToCompleted = index > 0 ? events[index - 1].isTestCrashed == false : true
 
                         guard let currentRunning = currentRunningAndDuration(addToCompleted) else { return }
-                        self.currentRunningTest[runnerIndex] = nil
 
-                        try? self.eventPlugin.run(event: Event(kind: .testFailed, info: [:]), device: self.device)
+                        values["tags"] = currentRunning.test.tags
+                        values["testCaseIDs"] = currentRunning.test.testCaseIDs
+
+                        try? self.eventPlugin.run(event: Event(kind: .testFailed, info: [:], values: [:]), device: self.device)
 
                         self.printOutput(
                             status: event.self,
@@ -299,6 +307,7 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                             runnerIndex: runnerIndex,
                             verbose: self.verbose
                         )
+                         self.currentRunningTest[runnerIndex] = nil
                         //
                         //                        print(log: "𝘅 \(self.verbose ? "[\(Date().description)] " : "")\(currentRunning.test.description) failed [\(self.testCasesCompleted.count)/\(self.testCasesCount)]\(self.retryCount > 0 ? " (\(self.retryCount) retries)" : "") in \(currentRunning.duration) {\(runnerIndex)}".red)
                     }
@@ -306,9 +315,11 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                 case .testCaseCrashed:
                     self.syncQueue.sync { [unowned self] in
                         guard let currentRunning = currentRunningAndDuration(true) else { return }
-                        self.currentRunningTest[runnerIndex] = nil
 
-                        try? self.eventPlugin.run(event: Event(kind: .testCrashed, info: [:]), device: self.device)
+                        values["tags"] = currentRunning.test.tags
+                        values["testCaseIDs"] = currentRunning.test.testCaseIDs
+
+                        try? self.eventPlugin.run(event: Event(kind: .testCrashed, info: [:], values: [:]), device: self.device)
 
                         self.printOutput(
                             status: event.self,
@@ -319,7 +330,7 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                             runnerIndex: runnerIndex,
                             verbose: self.verbose
                         )
-
+                         self.currentRunningTest[runnerIndex] = nil
                         //                        print(log: "💥 \(self.verbose ? "[\(Date().description)] " : "")\(currentRunning.test.description) crash [\(self.testCasesCompleted.count)/\(self.testCasesCount)]\(self.retryCount > 0 ? " (\(self.retryCount) retries)" : "") in \(currentRunning.duration) {\(runnerIndex)}".red)
                     }
 

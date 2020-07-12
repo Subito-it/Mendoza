@@ -7,7 +7,7 @@
 
 import Foundation
 
-func formatTime(duration elapsed: Double) -> String {
+public func formatTime(duration elapsed: Double) -> String {
     let formatter = DateComponentsFormatter()
     formatter.allowedUnits = [.hour, .minute, .second]
     formatter.unitsStyle = .full

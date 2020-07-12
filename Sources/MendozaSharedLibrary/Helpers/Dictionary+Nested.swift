@@ -7,7 +7,7 @@
 
 import Foundation
 
-extension Dictionary where Key == String {
+public extension Dictionary where Key == String {
     func firstKeyPath(where predicate: ((key: String, value: Any)) -> Bool) -> String {
         for (key, value) in self {
             if let arrayValues = value as? [Any] {
@@ -59,7 +59,7 @@ extension Dictionary where Key == String {
     }
 }
 
-extension Dictionary where Key == String {
+public extension Dictionary where Key == String {
     subscript(keyPath keyPath: String) -> Any? {
         get {
             let segments = keyPath.components(separatedBy: ".")

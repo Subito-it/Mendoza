@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import MendozaSharedLibrary
 
 class TestTearDownOperation: BaseOperation<Void> {
     var testCaseResults: [TestCaseResult]?

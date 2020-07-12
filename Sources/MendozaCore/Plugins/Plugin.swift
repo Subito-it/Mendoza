@@ -93,7 +93,7 @@ public class Plugin<Input: DefaultInitializable, Output: DefaultInitializable> {
 
             return ret
         } catch {
-            print(error)
+            print(error.localizedDescription)
             throw Error(error.localizedDescription)
         }
     }

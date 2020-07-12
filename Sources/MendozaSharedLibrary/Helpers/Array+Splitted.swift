@@ -7,7 +7,7 @@
 
 import Foundation
 
-extension Array {
+public extension Array {
     func split(in parts: Int) -> [[Element]] {
         var processedSize = 0
 

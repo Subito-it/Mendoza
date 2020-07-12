@@ -5,36 +5,38 @@
 # format options
 
 --allman false
---binarygrouping 4,8
---commas always
---comments indent
---decimalgrouping 3,6
+--binarygrouping none
+--closingparen balanced
+--commas inline
+--conflictmarkers reject
+--decimalgrouping 3,4
 --elseposition same-line
 --empty void
 --exponentcase lowercase
 --exponentgrouping disabled
 --fractiongrouping disabled
+--fragment false
 --header ignore
---hexgrouping 4,8
+--hexgrouping none
 --hexliteralcase uppercase
 --ifdef indent
+--importgrouping alphabetized
 --indent 4
 --indentcase false
---importgrouping testable-bottom
 --linebreaks lf
---maxwidth none
---octalgrouping 4,8
+--octalgrouping none
 --operatorfunc spaced
 --patternlet hoist
---ranges spaced
---self remove
+--nospaceoperators
+--self init-only
+--selfrequired 
 --semicolons inline
---stripunusedargs always
---swiftversion 5.0
---trimwhitespace always
+--stripunusedargs closure-only
+--trailingclosures 
+--trimwhitespace nonblank-lines
 --wraparguments preserve
 --wrapcollections preserve
+--disable redundantObjc
 
-# rules
-
---enable isEmpty
+--exclude Pods
+--exclude Modules/External

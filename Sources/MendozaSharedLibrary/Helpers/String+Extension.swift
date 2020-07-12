@@ -7,7 +7,7 @@
 
 import Foundation
 
-extension String {
+public extension String {
     func capturedGroups(regex: NSRegularExpression) -> [String] {
         var results = [String]()
 
@@ -46,5 +46,15 @@ extension String {
         } else {
             return replacingOccurrences(of: "~", with: NSHomeDirectory())
         }
+    }
+}
+
+public extension String {
+    var toDictionary: [String: String] {
+        return Dictionary(uniqueKeysWithValues: components(separatedBy: ",").map { $0.components(separatedBy: ":") }.compactMap { ($0[0], $0[1]) })
+    }
+
+    var boolValue: Bool {
+        return (self as NSString).boolValue
     }
 }

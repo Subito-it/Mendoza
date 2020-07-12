@@ -103,7 +103,7 @@ public class ConfigurationValidator {
     private func validateAppleIdCredentials() throws {
         guard configuration.storeAppleIdCredentials else { return }
 
-        guard let _credentials = configuration.appleIdCredentials() else {
+        guard let credentials = configuration.appleIdCredentials() else {
             throw Error("Missing apple ID credentials. Configuration file needs to be updated! Please run `\(SharedConstants.configuration) \(SharedConstants.authentication)` command".red)
         }
 

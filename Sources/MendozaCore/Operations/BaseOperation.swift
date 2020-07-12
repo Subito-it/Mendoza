@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import MendozaSharedLibrary
 
 protocol Starting: Operation {
     var didStart: (() -> Void)? { get set }

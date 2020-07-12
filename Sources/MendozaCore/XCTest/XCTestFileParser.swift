@@ -57,7 +57,7 @@ struct XCTestFileParser {
 
     func filter(testCases: [TestCase], include: [String], exclude: [String]) -> [TestCase] {
         return testCases.filter { testcase in
-            var filterTestCase = false
+            var filterTestCase = include.isEmpty ? true : false
 
             var testcaseAttributes = [String]()
 

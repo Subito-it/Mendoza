@@ -10,6 +10,7 @@ import Foundation
 public struct Event: Codable {
     let kind: Kind
     let info: [String: String]
+    let values: [String: [String]]
 
     enum Kind: Int, Codable {
         case start, stop
@@ -49,6 +50,6 @@ extension Event.Kind: DefaultInitializable {
 
 extension Event: DefaultInitializable {
     public static func defaultInit() -> Event {
-        return Event(kind: Event.Kind.defaultInit(), info: [:])
+        return Event(kind: Event.Kind.defaultInit(), info: [:], values: [:])
     }
 }

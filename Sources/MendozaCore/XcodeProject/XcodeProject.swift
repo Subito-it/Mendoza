@@ -7,8 +7,8 @@
 
 import Foundation
 import PathKit
-import TSCBasic
 import XcodeProj
+import MendozaSharedLibrary
 
 public struct Scheme: CustomStringConvertible {
     public var description: String { return name }
@@ -224,6 +224,7 @@ public class XcodeProject: NSObject {
         return try (extractBuildSettings(configuration: configuration).filter { $0.key == key }.first?.value ?? "")
 
     }
+    
     private func extractBuildSettings(configuration: String) throws -> [BuildSetting] {
         let arguments: [String] = [
             "/usr/bin/xcrun",
@@ -238,7 +239,13 @@ public class XcodeProject: NSObject {
         print("Running Command:")
         print(arguments.joined(separator: " "))
 
-        let rawBuildSettings = try TSCBasic.Process.checkNonZeroExit(arguments: arguments)
+        let command = Process().shell(command: arguments.joined(separator: " "))
+
+        if command.status != .zero {
+            throw Error("Failed to get xcodebuild configuration")
+        }
+
+        let rawBuildSettings = command.output
 
         return rawBuildSettings.components(separatedBy: .newlines)
             .map { key in key.components(separatedBy: "=").map { $0.trimmingCharacters(in: .whitespacesAndNewlines) } }

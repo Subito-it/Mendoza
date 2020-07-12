@@ -8,7 +8,7 @@
 
 import Foundation
 
-extension URL {
+public extension URL {
     func relativePath(from base: URL) -> String? {
         guard isFileURL, base.isFileURL else { return nil }
 

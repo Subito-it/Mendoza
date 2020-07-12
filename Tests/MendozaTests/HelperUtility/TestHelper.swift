@@ -263,10 +263,8 @@ public struct ShellResult {
 extension XCTest {
     @discardableResult
     func mendoza(command: String) -> ShellResult {
-        let sandboxProject = URL(fileURLWithPath: #file).pathComponents.prefix(while: { $0 != "Tests" }).joined(separator: "/").dropFirst() + "/SandboxProject"
-
         let mendozaCommand = command.components(separatedBy: .whitespaces).dropFirst().joined(separator: " ")
-        let terminalCommand = "cd \(sandboxProject) && \(mendozaExecutablePath) \(mendozaCommand)"
+        let terminalCommand = "\(mendozaExecutablePath) \(mendozaCommand)"
 
         return shell(terminalCommand)
     }
@@ -283,8 +281,9 @@ extension XCTest {
         includeTests: String? = nil,
         excludeTests: String? = nil,
         timeout _: Int = 120,
-        pluginData _: String? = nil,
-        debug: Bool = false
+        pluginData: String? = nil,
+        debug: Bool = false,
+        customLocation: String? = nil
     ) -> ShellResult {
         var terminalCommand = "mendoza test \(config) "
 
@@ -311,6 +310,12 @@ extension XCTest {
             terminalCommand.append(contentsOf: " --plugin_debug")
         }
 
+        if let pluginData = pluginData {
+            terminalCommand.append(contentsOf: argumentFormat(argName: "plugin_data", argValue: pluginData))
+        }
+
+        terminalCommand.append(contentsOf: argumentFormat(argName: "directory", argValue: customLocation ?? sandboxLocation))
+
         print("Running Command:")
         print(terminalCommand)
 
@@ -323,5 +328,9 @@ extension XCTest {
 
     fileprivate func argumentFormat(argName: String, argValue: String) -> String {
         return "--\(argName)=\"\(argValue)\" "
+    }
+
+    var sandboxLocation: String {
+        return URL(fileURLWithPath: #file).pathComponents.prefix(while: { $0 != "Tests" }).joined(separator: "/").dropFirst() + "/SandboxProject/"
     }
 }

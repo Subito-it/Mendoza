@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import MendozaSharedLibrary
 
 extension CommandLineProxy {
     struct RamDisk {

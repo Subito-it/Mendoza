@@ -21,4 +21,5 @@ public enum Environment {
     public static let xcresultFilename = "merged.xcresult"
     public static let xcresultType = ".xcresult"
     public static let pluginFolder = ".mendoza"
+    public static let name = "Mendoza"
 }
