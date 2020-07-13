@@ -105,8 +105,6 @@ class Test {
         let testExtractionOperation = TestExtractionOperation(configuration: configuration, baseUrl: gitBaseUrl, testTargetSourceFiles: testTargetSourceFiles, filePatterns: filePatterns, device: device, plugin: testExtractionPlugin)
         let testSortingOperation = TestSortingOperation(device: device, plugin: testSortingPlugin, verbose: userOptions.verbose)
         let simulatorSetupOperation = SimulatorSetupOperation(configuration: configuration, nodes: uniqueNodes, device: device, runHeadless: userOptions.runHeadless, verbose: userOptions.verbose)
-        let simulatorBootOperation = SimulatorBootOperation(runHeadless: userOptions.runHeadless, verbose: userOptions.verbose)
-        let simulatorWakeupOperation = SimulatorWakeupOperation(nodes: uniqueNodes, runHeadless: userOptions.runHeadless, verbose: userOptions.verbose)
         let distributeTestBundleOperation = DistributeTestBundleOperation(nodes: uniqueNodes)
         let testRunnerOperation = TestRunnerOperation(configuration: configuration, buildTarget: targets.build.name, testTarget: targets.test.name, sdk: sdk, failingTestsRetryCount: userOptions.failingTestsRetryCount, testTimeoutSeconds: userOptions.testTimeoutSeconds, verbose: userOptions.verbose)
 
@@ -127,8 +125,6 @@ class Test {
              testExtractionOperation,
              testSortingOperation,
              simulatorSetupOperation,
-             simulatorBootOperation,
-             simulatorWakeupOperation,
              distributeTestBundleOperation,
              testRunnerOperation,
              testCollectorOperation,
@@ -142,8 +138,6 @@ class Test {
             macOsValidationOperation.cancel()
         case .macos:
             simulatorTearDownOperation.cancel()
-            simulatorWakeupOperation.cancel()
-            simulatorBootOperation.cancel()
             simulatorSetupOperation.cancel()
         }
 
@@ -163,12 +157,9 @@ class Test {
 
         testSortingOperation.addDependency(testExtractionOperation)
 
-        simulatorBootOperation.addDependency(simulatorSetupOperation)
-        simulatorWakeupOperation.addDependency(simulatorBootOperation)
-
         distributeTestBundleOperation.addDependency(compileOperation)
 
-        testRunnerOperation.addDependencies([simulatorWakeupOperation, distributeTestBundleOperation, testSortingOperation])
+        testRunnerOperation.addDependencies([simulatorSetupOperation, distributeTestBundleOperation, testSortingOperation])
 
         testCollectorOperation.addDependency(testRunnerOperation)
 
@@ -226,8 +217,6 @@ class Test {
             testRunnerOperation.testRunners = uniqueNodes.map { (testRunner: $0, node: $0) }
         case .ios:
             simulatorSetupOperation.didEnd = { simulators in
-                simulatorBootOperation.simulators = simulators
-
                 testRunnerOperation.testRunners = simulators.map { (testRunner: $0.0, node: $0.1) }
             }
         }
