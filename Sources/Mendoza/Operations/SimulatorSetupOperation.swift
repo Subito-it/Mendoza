@@ -12,7 +12,7 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
 
     private let arrangeMaxSimulatorsPerRow = 3
     private let arrangeDisplayMargin = 80
-    private let windowMenubarHeight = 22
+    private let windowMenubarHeight = 38
 
     private let syncQueue = DispatchQueue(label: String(describing: SimulatorSetupOperation.self))
     private let configuration: Configuration
