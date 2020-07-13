@@ -244,10 +244,12 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
 
         settings.CurrentDeviceUDID = nil
 
+        let connectHardwareKeyboardFlag = false
+
         settings.AllowFullscreenMode = false
         settings.PasteboardAutomaticSync = false
         settings.ShowChrome = false
-        settings.ConnectHardwareKeyboard = false
+        settings.ConnectHardwareKeyboard = connectHardwareKeyboardFlag
         settings.OptimizeRenderingForWindowScale = false
 
         if settings.DevicePreferences == nil {
@@ -273,6 +275,7 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
             devicePreferences.SimulatorExternalDisplay = nil
             devicePreferences.SimulatorWindowOrientation = "Portrait"
             devicePreferences.SimulatorWindowRotationAngle = 0
+            devicePreferences.ConnectHardwareKeyboard = connectHardwareKeyboardFlag
             settings.DevicePreferences?[simulator.id] = devicePreferences
 
             if settings.DevicePreferences?[simulator.id]?.SimulatorWindowGeometry == nil {

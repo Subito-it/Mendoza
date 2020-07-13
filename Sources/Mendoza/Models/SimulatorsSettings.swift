@@ -19,6 +19,7 @@ extension CommandLineProxy.Simulators {
             var SimulatorWindowRotationAngle: Double?
             var SimulatorWindowOrientation: String?
             var SimulatorWindowGeometry: [String: DevicePreferences.WindowGeometry]?
+            var ConnectHardwareKeyboard: Bool?
         }
 
         var ConnectHardwareKeyboard: Bool?
