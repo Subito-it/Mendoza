@@ -57,17 +57,30 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
 
                 let simulatorNames = (1 ... concurrentTestRunners).map { "\(self.device.name)-\($0)" }
 
-                let nodeSimulators = try simulatorNames.compactMap { try proxy.makeSimulatorIfNeeded(name: $0, device: self.device) }
+                let rawSimulatorStatus = try proxy.rawSimulatorStatus()
+                let nodeSimulators = try simulatorNames.compactMap { try proxy.makeSimulatorIfNeeded(name: $0, device: self.device, cachedSimulatorStatus: rawSimulatorStatus) }
 
+                try proxy.rewriteSettingsIfNeeded()
+
+                try proxy.enablePasteboardWorkaround()
+                try proxy.enableLowQualityGraphicOverrides()
+                try proxy.disableSimulatorBezel()
+
+                var simulatorsProperlyArranged = true
                 if self.runHeadless == false {
-                    if try self.simulatorsReady(executer: executer, simulators: nodeSimulators) == false {
-                        try? proxy.rewriteSettings()
-                        nodeSimulators.forEach { try? proxy.boot(simulator: $0) }
+                    simulatorsProperlyArranged = try self.simulatorsProperlyArranged(executer: executer, simulators: nodeSimulators)
 
-                        try? proxy.close()
+                    if !simulatorsProperlyArranged {
+                        try proxy.gracefullyQuit()
                         try self.updateSimulatorsArrangement(executer: executer, simulators: nodeSimulators)
-                        try? proxy.launch()
                     }
+                }
+
+                try nodeSimulators.forEach { try proxy.bootSynchronously(simulator: $0) }
+
+                for nodeSimulator in nodeSimulators {
+                    try proxy.enableXcode11ReleaseNotesWorkarounds(on: nodeSimulator)
+                    try proxy.disableSlideToType(on: nodeSimulator)
                 }
 
                 let bootedSimulators = try proxy.bootedSimulators()
@@ -79,6 +92,12 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
                 let unusedSimulators = bootedSimulators.filter { !nodeSimulators.contains($0) }
                 for unusedSimulator in unusedSimulators {
                     try proxy.shutdown(simulator: unusedSimulator)
+                }
+
+                if self.runHeadless == false {
+                    try proxy.launch()
+                } else {
+                    try proxy.gracefullyQuit()
                 }
 
                 self.syncQueue.sync { [unowned self] in
@@ -107,7 +126,7 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
         return concurrentTestRunners
     }
 
-    private func simulatorsReady(executer: Executer, simulators: [Simulator]) throws -> Bool {
+    private func simulatorsProperlyArranged(executer: Executer, simulators: [Simulator]) throws -> Bool {
         let simulatorProxy = CommandLineProxy.Simulators(executer: executer, verbose: verbose)
 
         let settings = try simulatorProxy.loadSimulatorSettings()
@@ -204,12 +223,22 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
     ///   - param1: simulators to arrange
     private func updateSimulatorsArrangement(executer: Executer, simulators: [Simulator]) throws {
         let simulatorProxy = CommandLineProxy.Simulators(executer: executer, verbose: verbose)
-        try simulatorProxy.close()
-        try simulatorProxy.launch()
 
-        let settings = try simulatorProxy.loadSimulatorSettings()
-        guard let screenConfiguration = settings.ScreenConfigurations,
-            let screenIdentifier = Array(screenConfiguration.keys).last else {
+        // Configuration file might not be ready yet
+        var loadSettings: CommandLineProxy.Simulators.Settings?
+        var loadScreenIdentifier: String?
+        for _ in 0 ..< 5 {
+            loadSettings = try simulatorProxy.loadSimulatorSettings()
+            if let keys = loadSettings?.ScreenConfigurations?.keys {
+                loadScreenIdentifier = Array(keys).last ?? ""
+                if loadScreenIdentifier?.isEmpty == false {
+                    break
+                }
+            }
+            Thread.sleep(forTimeInterval: 3.0)
+        }
+
+        guard let settings = loadSettings, let screenIdentifier = loadScreenIdentifier else {
             fatalError("💣 Failed to get screenIdentifier from simulator plist")
         }
 

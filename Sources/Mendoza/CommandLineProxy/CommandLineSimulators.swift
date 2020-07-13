@@ -19,31 +19,27 @@ extension CommandLineProxy {
             self.verbose = verbose
         }
 
-        func wakeUp() throws {
-            _ = try executer.execute("open -a \"$(xcode-select -p)/Applications/Simulator.app\"; sleep 5")
-            let simulatorsBooting = try bootedSimulators()
-            // Be nice to Simulator.app and wait for the default simulator to be booted. Random crashes and error happens doing otherwise
-            for simulatorBooting in simulatorsBooting {
-                try waitForBoot(simulator: simulatorBooting)
-            }
-        }
-
         func reset() throws {
-            try close()
+            try gracefullyQuit()
 
             let commands = ["osascript -e 'quit app \"$(xcode-select -p)/Applications/Simulator.app\"'",
                             "sleep 3"]
             try commands.forEach { _ = try executer.execute("\($0) 2>/dev/null || true") }
         }
 
-        func close() throws {
+        func gracefullyQuit() throws {
             let commands = ["mendoza mendoza close_simulator_app",
+                            "sleep 3",
                             "defaults read com.apple.iphonesimulator &>/dev/null"]
 
             try commands.forEach { _ = try executer.execute("\($0) 2>/dev/null || true") }
         }
 
         func launch() throws {
+            guard try executer.execute("ps aux | grep \"$(xcode-select -p)/Applications/Simulator.app\" | wc -l") != "2" else {
+                return
+            }
+
             let commands = ["defaults read com.apple.iphonesimulator &>/dev/null",
                             "open -a \"$(xcode-select -p)/Applications/Simulator.app\"",
                             "sleep 3"]
@@ -51,18 +47,18 @@ extension CommandLineProxy {
             try commands.forEach { _ = try executer.execute("\($0) 2>/dev/null || true") }
         }
 
-        func rewriteSettings() throws {
-            try? launch()
-            try? close()
+        func rewriteSettingsIfNeeded() throws {
+            let settings = try? loadSimulatorSettings()
+            guard settings?.ScreenConfigurations?.keys.count != 1 else {
+                return
+            }
 
-            let commands = ["rm '\(executer.homePath)/Library/Preferences/com.apple.iphonesimulator.plist'", // Delete iphone simulator settings to remove multiple `ScreenConfigurations` if present
+            let commands = ["defaults delete com.apple.iphonesimulator", // Delete iphone simulator settings to remove multiple `ScreenConfigurations` if present
                             "rm -rf '\(executer.homePath)/Library/Saved Application State/com.apple.iphonesimulator.savedState'"]
-
-            try? launch()
-
             try commands.forEach { _ = try executer.execute("\($0) 2>/dev/null || true") }
 
-            try wakeUp()
+            try? launch()
+            try? gracefullyQuit()
         }
 
         func shutdown(simulator: Simulator) throws {
@@ -137,11 +133,17 @@ extension CommandLineProxy {
 
         func enableXcode11ReleaseNotesWorkarounds(on simulator: Simulator) throws {
             // See release notes workarounds: https://developer.apple.com/documentation/xcode_release_notes/xcode_11_release_notes?language=objc
+            // These settings are hot loaded no reboot of the device is necessary
             _ = try executer.execute("xcrun simctl spawn '\(simulator.id)' defaults write com.apple.springboard FBLaunchWatchdogScale 2")
         }
 
         func disableSlideToType(on simulator: Simulator) throws {
+            // These settings are hot loaded no reboot of the device is necessary
             _ = try executer.execute("xcrun simctl spawn '\(simulator.id)' defaults write com.apple.Preferences DidShowContinuousPathIntroduction -bool true")
+        }
+
+        func rawSimulatorStatus() throws -> String {
+            try executer.execute("$(xcode-select -p)/usr/bin/instruments -s devices")
         }
 
         /// This method instantiates a Simulator given a name.
@@ -152,8 +154,9 @@ extension CommandLineProxy {
         ///   - name: name of the device to create (e.g 'iPhone 6-1')
         ///   - device: the device instance to create
         /// - Returns: an instance of Simulator
-        func makeSimulatorIfNeeded(name: String, device: Device) throws -> Simulator {
-            let simulatorsStatus = try executer.execute("$(xcode-select -p)/usr/bin/instruments -s devices")
+        func makeSimulatorIfNeeded(name: String, device: Device, cachedSimulatorStatus: String? = nil) throws -> Simulator {
+            // We use 'instruments -s devices' instead of 'xcrun simctl list devices' because it gives more complete infos including simulator version
+            let simulatorsStatus = try cachedSimulatorStatus ?? (try rawSimulatorStatus())
 
             let statusRegex = try NSRegularExpression(pattern: #"(.*)\s\((\d+\.\d+(\.\d+)?)\)\s\[(.*)\]\s\(Simulator\)$"#)
             for simulatorStatus in simulatorsStatus.components(separatedBy: "\n") {
@@ -195,8 +198,8 @@ extension CommandLineProxy {
             throw Error("Failed making Simulator", logger: executer.logger)
         }
 
-        func installedSimulators() throws -> [Simulator] {
-            let simulatorsStatus = try executer.execute("$(xcode-select -p)/usr/bin/instruments -s devices")
+        func installedSimulators(cachedSimulatorStatus: String? = nil) throws -> [Simulator] {
+            let simulatorsStatus = try cachedSimulatorStatus ?? (try rawSimulatorStatus())
 
             var simulators = [Simulator]()
             for status in simulatorsStatus.components(separatedBy: "\n") {
@@ -232,17 +235,17 @@ extension CommandLineProxy {
         }
 
         func boot(simulator: Simulator) throws {
-            let booted = try bootedSimulators()
-
-            guard !booted.contains(simulator) else { return }
-
-            // https://gist.github.com/keith/33d3e28de4217f3baecde15357bfe5f6
-            // boot and synchronously wait for device to boot
-            _ = try executer.execute("xcrun simctl bootstatus '\(simulator.id)' -b")
+            _ = try executer.execute("xcrun simctl boot '\(simulator.id)' || true")
         }
 
         func waitForBoot(simulator: Simulator) throws {
             _ = try executer.execute("xcrun simctl bootstatus '\(simulator.id)'")
+        }
+
+        func bootSynchronously(simulator: Simulator) throws {
+            // https://gist.github.com/keith/33d3e28de4217f3baecde15357bfe5f6
+            // boot and synchronously wait for device to boot
+            _ = try executer.execute("xcrun simctl bootstatus '\(simulator.id)' -b || true")
         }
 
         func loadSimulatorSettings() throws -> Simulators.Settings {
@@ -258,15 +261,6 @@ extension CommandLineProxy {
             var settings: Simulators.Settings?
             if try executer.fileExists(atPath: settingsPath) {
                 settings = try? loadSettings()
-            }
-
-            if settings == nil || settings?.ScreenConfigurations?.keys.isEmpty == true {
-                try CommandLineProxy.Simulators(executer: executer, verbose: verbose).rewriteSettings()
-                settings = try? loadSettings()
-
-                if settings?.ScreenConfigurations?.keys.isEmpty == true {
-                    throw Error("Failed to reset simulator plist: ScreenConfigurations key missing", logger: executer.logger)
-                }
             }
 
             guard let result = settings else {

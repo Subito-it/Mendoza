@@ -39,8 +39,8 @@ class SimulatorTearDownOperation: BaseOperation<Void> {
                 }
 
                 if self.resetSimulatorsOnCompletion == true {
-                    try? proxy.close()
-                    try? proxy.launch()
+                    try proxy.gracefullyQuit()
+                    try proxy.launch()
                 }
             }
 
