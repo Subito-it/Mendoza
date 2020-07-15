@@ -29,7 +29,7 @@ protocol Executer {
 
 extension Executer {
     static func executablePathExport() -> String {
-        "export PATH=/usr/bin:/usr/local/bin:/usr/sbin:/sbin:/bin;"
+        "export PATH=~/.rbenv/shims:/usr/bin:/usr/local/bin:/usr/sbin:/sbin:/bin;"
     }
 }
 
