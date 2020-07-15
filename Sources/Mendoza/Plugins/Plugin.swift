@@ -5,6 +5,7 @@
 //  Created by Tomas Camin on 22/01/2019.
 //
 
+import CommonCrypto
 import Foundation
 
 class Plugin<Input: DefaultInitializable, Output: DefaultInitializable> {
@@ -37,7 +38,8 @@ class Plugin<Input: DefaultInitializable, Output: DefaultInitializable> {
 
     func run(input: Input) throws -> Output {
         let pluginUrl = baseUrl.appendingPathComponent(filename)
-        let pluginRunUrl = baseUrl.appendingPathComponent("_\(filename)_\(CFAbsoluteTimeGetCurrent())")
+        // We add a suffix to the pluginname that is based on so that swift-sh has a consistent name for its internal cache
+        let pluginRunUrl = baseUrl.appendingPathComponent("_\(filename)_\(baseUrl.absoluteString.sha256())")
 
         try? fileManager.removeItem(at: pluginRunUrl)
         defer { if !plugin.debug { try? fileManager.removeItem(at: pluginRunUrl) } }
@@ -174,5 +176,17 @@ class Plugin<Input: DefaultInitializable, Output: DefaultInitializable> {
         }
 
         return result.joined(separator: "\n")
+    }
+}
+
+private extension String {
+    func sha256() -> String {
+        let data = Data(utf8)
+        var hash = [UInt8](repeating: 0, count: Int(CC_SHA256_DIGEST_LENGTH))
+        data.withUnsafeBytes {
+            _ = CC_SHA256($0.baseAddress, CC_LONG(data.count), &hash)
+        }
+
+        return hash.map { String(format: "%02x", $0) }.joined()
     }
 }
