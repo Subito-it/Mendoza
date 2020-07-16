@@ -45,9 +45,15 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
 
                 let proxy = CommandLineProxy.Simulators(executer: executer, verbose: self.verbose)
 
-                try proxy.installRuntimeIfNeeded(self.device.runtime, nodeAddress: node.address, appleIdCredentials: appleIdCredentials, administratorPassword: node.administratorPassword ?? nil) // swiftlint:disable:this redundant_nil_coalescing
+                try proxy.installRuntimeIfNeeded(
+                    self.device.runtime,
+                    nodeAddress: node.address,
+                    appleIdCredentials: appleIdCredentials,
+                    administratorPassword: node.administratorPassword ?? nil  // swiftlint:disable:this redundant_nil_coalescing
+                )
 
                 let concurrentTestRunners: Int
+
                 switch node.concurrentTestRunners {
                 case let .manual(count) where count > 0: // swiftlint:disable:this empty_count
                     concurrentTestRunners = Int(count)
@@ -55,7 +61,7 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
                     concurrentTestRunners = try self.physicalCPUs(executer: executer, node: node)
                 }
 
-                let simulatorNames = (1 ... concurrentTestRunners).map { "\(self.device.name)-\($0)" }
+                let simulatorNames = (1 ... concurrentTestRunners).map { "[\(Mendoza.name)] \(self.device.name)-\($0)" }
 
                 let rawSimulatorStatus = try proxy.rawSimulatorStatus()
                 let nodeSimulators = try simulatorNames.compactMap { try proxy.makeSimulatorIfNeeded(name: $0, device: self.device, cachedSimulatorStatus: rawSimulatorStatus) }
@@ -90,6 +96,7 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
                 }
 
                 let unusedSimulators = bootedSimulators.filter { !nodeSimulators.contains($0) }
+
                 for unusedSimulator in unusedSimulators {
                     try proxy.shutdown(simulator: unusedSimulator)
                 }
@@ -119,9 +126,12 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
     }
 
     private func physicalCPUs(executer: Executer, node _: Node) throws -> Int {
-        guard let concurrentTestRunners = Int(try executer.execute("sysctl -n hw.physicalcpu")) else {
+        // TODO: Determine number of simulators based on CPU and testcase count
+        guard let cpuCount = Int(try executer.execute("sysctl -n hw.physicalcpu")) else {
             throw Error("Failed getting concurrent simulators", logger: executer.logger)
         }
+
+        let concurrentTestRunners = cpuCount > 2 ? (cpuCount - 1) : cpuCount
 
         return concurrentTestRunners
     }
@@ -143,12 +153,14 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
         }
 
         let expectSimulatorLocations = (0 ..< simulators.count).compactMap {
-            try? arrangedSimulatorCenter(index: $0,
-                                         executer: executer,
-                                         device: simulators.first!.device, // swiftlint:disable:this force_unwrapping
-                                         displayMargin: arrangeDisplayMargin,
-                                         totalSimulators: simulators.count,
-                                         maxSimulatorsPerRow: arrangeMaxSimulatorsPerRow)
+            try? arrangedSimulatorCenter(
+                index: $0,
+                executer: executer,
+                device: simulators.first!.device, // swiftlint:disable:this force_unwrapping
+                displayMargin: arrangeDisplayMargin,
+                totalSimulators: simulators.count,
+                maxSimulatorsPerRow: arrangeMaxSimulatorsPerRow
+            )
         }
 
         let expectedScaleFactor = try arrangedScaleFactor(executer: executer,

@@ -32,7 +32,9 @@ class TestTearDownOperation: BaseOperation<Void> {
         do {
             didStart?()
 
-            guard let executer = executer else { fatalError("💣 Failed making executer") }
+            guard let executer = executer else {
+                fatalError("💣 Failed making executer")
+            }
 
             try writeHtmlRepeatedTestResultSummary(executer: executer)
             try writeJsonRepeatedTestResultSummary(executer: executer)
@@ -197,37 +199,36 @@ class TestTearDownOperation: BaseOperation<Void> {
 extension TestCaseResult {
     static func html(content: String) -> String {
         let contentMarker = "{{ content }}"
-        return
-            """
-            <html>
-            <meta charset="UTF-8">
-            <head>
-                <style>
-                    body {
-                        font-family: Menlo, Courier;
-                        font-weight: normal;
-                        color: rgb(30, 30, 30);
-                        font-size: 80%;
-                        margin-left: 20px;
-                    }
-                    p {
-                        font-weight: lighter;
-                    }
-                    p.passed {
-                        color: rgb(20,149,61);
-                    }
-                    p.failed {
-                        color: rgb(223,26,33);
-                    }
-                    summary::-webkit-details-marker {
-                        display: none;
-                    }
-                </style>
-            </head>
-            <body>
-            \(contentMarker)
-            </body>
-            </html>
-            """.replacingOccurrences(of: contentMarker, with: content)
+        return """
+        <html>
+        <meta charset="UTF-8">
+        <head>
+            <style>
+                body {
+                    font-family: Menlo, Courier;
+                    font-weight: normal;
+                    color: rgb(30, 30, 30);
+                    font-size: 80%;
+                    margin-left: 20px;
+                }
+                p {
+                    font-weight: lighter;
+                }
+                p.passed {
+                    color: rgb(20,149,61);
+                }
+                p.failed {
+                    color: rgb(223,26,33);
+                }
+                summary::-webkit-details-marker {
+                    display: none;
+                }
+            </style>
+        </head>
+        <body>
+        \(contentMarker)
+        </body>
+        </html>
+        """.replacingOccurrences(of: contentMarker, with: content)
     }
 }

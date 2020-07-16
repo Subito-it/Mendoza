@@ -7,15 +7,12 @@
 
 import Foundation
 
-func hoursMinutesSeconds(in elapsed: Double) -> String {
-    let hours = Int(elapsed / (60 * 60))
-    let minutes = Int((elapsed - Double(hours) * 60 * 60) / 60)
-    let seconds = Int(elapsed - Double(hours) * 60 * 60 - Double(minutes) * 60)
+func formatTime(duration elapsed: Double) -> String {
+    let formatter = DateComponentsFormatter()
+    formatter.allowedUnits = [.hour, .minute, .second]
+    formatter.unitsStyle = .full
 
-    var components = [String]()
-    if hours > 0 { components.append("\(hours)h") }
-    if minutes > 0 { components.append("\(minutes)m") }
-    if seconds > 0 { components.append("\(seconds)s") }
+    let formattedString = formatter.string(from: TimeInterval(elapsed))!
 
-    return components.joined(separator: " ")
+    return formattedString
 }

@@ -165,12 +165,14 @@ class ExecuterLogger: Logger, CustomDebugStringConvertible {
                 detailsClasses.append("error")
             }
 
-            templateBody.append("""
+            templateBody.append(
+                """
                 <details class="\(detailsClasses.joined(separator: " "))">
                     <summary>\(detailCommand)</summary>
                     \(detailStatusMessage)
                 </details>
-            """)
+                """
+            )
         }
 
         let templateTitle = "<h3>\(name) [\(address)]</h3>"
@@ -195,48 +197,47 @@ extension ExecuterLogger {
     static func html(title: String, body: String) -> String {
         let titleMarker = "{{ title }}"
         let bodyMarker = "{{ body }}"
-        return
-            """
-            <html>
-            <meta charset="UTF-8">
-            <head>
-                <style>
-                    body {
-                        font-family: -apple-system, BlinkMacSystemFont, Menlo;
-                        font-weight: normal;
-                    }
-                    details {
-                        font-family: Menlo, Courier;
-                        color: rgb(30, 30, 30);
-                        font-size: 80%;
-                        margin-left: -5px;
-                        padding-left: 5px;
-                        padding-top: 5px;
-                        padding-bottom: 5px;
-                    }
-                    details.even {
-                        background-color: rgb(244,245,244);
-                    }
-                    details.error {
-                        background-color: rgb(255,186,186);
-                        border: 0.5px solid rgb(255,123,123);
-                    }
-                    details p {
-                        margin-left: 20px;
-                        font-weight: lighter;
-                    }
-                    summary::-webkit-details-marker {
-                        display: none;
-                    }
-                </style>
-            </head>
-            <body>
-            <a href="index.html">home</a>
-            \(titleMarker)
-            \(bodyMarker)
-            </body>
-            </html>
-            """.replacingOccurrences(of: titleMarker, with: title)
+        return """
+        <html>
+        <meta charset="UTF-8">
+        <head>
+            <style>
+                body {
+                    font-family: -apple-system, BlinkMacSystemFont, Menlo;
+                    font-weight: normal;
+                }
+                details {
+                    font-family: Menlo, Courier;
+                    color: rgb(30, 30, 30);
+                    font-size: 80%;
+                    margin-left: -5px;
+                    padding-left: 5px;
+                    padding-top: 5px;
+                    padding-bottom: 5px;
+                }
+                details.even {
+                    background-color: rgb(244,245,244);
+                }
+                details.error {
+                    background-color: rgb(255,186,186);
+                    border: 0.5px solid rgb(255,123,123);
+                }
+                details p {
+                    margin-left: 20px;
+                    font-weight: lighter;
+                }
+                summary::-webkit-details-marker {
+                    display: none;
+                }
+            </style>
+        </head>
+        <body>
+        <a href="index.html">home</a>
+        \(titleMarker)
+        \(bodyMarker)
+        </body>
+        </html>
+        """.replacingOccurrences(of: titleMarker, with: title)
             .replacingOccurrences(of: bodyMarker, with: body)
     }
 }

@@ -31,12 +31,14 @@ extension TestCaseResult: DefaultInitializable {
 
 extension TestCaseResult.Status: CustomReflectable {
     var customMirror: Mirror {
-        Mirror(self, children: ["hack": """
-        enum Status: Int, Codable {
-            case passed, failed
-        }
-                    
-        """])
+        let status = """
+            enum Status: Int, Codable {
+                case passed, failed
+            }
+
+        """
+
+        return Mirror(self, children: ["hack": status])
     }
 }
 

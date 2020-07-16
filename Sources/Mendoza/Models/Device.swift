@@ -9,12 +9,19 @@ import Foundation
 
 struct Device: Codable {
     let name: String
+    let osVersion: String
     let runtime: String
+
+    public init(name: String, osVersion: String) {
+        self.name = name
+        self.osVersion = osVersion
+        runtime = osVersion.components(separatedBy: ".").prefix(2).joined(separator: ".")
+    }
 }
 
 extension Device: DefaultInitializable {
     static func defaultInit() -> Device {
-        Device(name: "", runtime: "")
+        return Device(name: "", osVersion: "")
     }
 }
 

@@ -23,7 +23,12 @@ struct TestExtractionPlugin {
     func handle(_ input: TestExtractionInput, pluginData _: String?) -> [TestCase] {
         do {
             let parser = XCTestFileParser()
-            let extractionTestCases = try parser.extractTestCases(from: input.candidates)
+            let extractionTestCases = try parser.extractTestCases(
+                from: input.candidates,
+                baseXCTestCaseClass: input.baseXCTestCaseClass,
+                include: input.include,
+                exclude: input.exclude
+            )
 
             return extractionTestCases.map { TestCase(name: $0.name, suite: $0.suite) }
         } catch {
@@ -70,7 +75,7 @@ struct KittenElement: Codable, Equatable, Hashable {
     }
 
     var isOpenClass: Bool {
-        subElements?.count != 0 &&
+        subElements?.isEmpty != true &&
             accessibility != "source.lang.swift.accessibility.private" &&
             kind == "source.lang.swift.decl.class"
     }
@@ -100,7 +105,7 @@ struct KittenElement: Codable, Equatable, Hashable {
 }
 
 struct XCTestFileParser {
-    func extractTestCases(from urls: [URL]) throws -> [ExtractionTestCase] {
+    func extractTestCases(from urls: [URL], baseXCTestCaseClass: input.baseXCTestCaseClass, include: input.include, exclude: input.exclude) throws -> [ExtractionTestCase] {
         var result = [ExtractionTestCase]()
 
         for url in urls {
@@ -114,7 +119,7 @@ struct XCTestFileParser {
                 return [] // no testing classes found
             }
 
-            let testClasses = types.filter { $0.conforms(candidates: types).contains("XCTestCase") }
+            let testClasses = types.filter { $0.conforms(candidates: types).contains(baseXCTestCaseClass) }
 
             let testCases: [[ExtractionTestCase]] = testClasses.compactMap {
                 guard let suite = $0.name,
