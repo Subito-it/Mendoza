@@ -3,8 +3,8 @@ public class Parser {
 
     public var summary: TestSummary?
 
-    public func parse(line: String, colored: Bool = true) -> (line: String?, outputType: XCBOutputType, pattern: Pattern?, value: [String: String]) {
-        var pattern: Pattern?
+    public func parse(line: String, colored: Bool = true) -> (line: String?, outputType: XCBOutputType, pattern: Pattern, value: [String: String]) {
+        var pattern: Pattern
         var outputType = XCBOutputType.undefined
 
         switch line {
@@ -78,7 +78,7 @@ public class Parser {
 
         case Matcher.executedMatcher:
             outputType = XCBOutputType.task
-            pattern = nil
+            pattern = .undefined
 
             parseSummary(line: line, colored: colored)
 
@@ -324,15 +324,11 @@ public class Parser {
 
         default:
             outputType = XCBOutputType.undefined
-            pattern = nil
+            pattern = .undefined
         }
 
-        guard let patternMatch = pattern else {
-            return (nil, outputType, nil, [:])
-        }
-
-        let outputText = line.beautify(pattern: patternMatch, colored: colored)
-        let outputValues = line.values(pattern: patternMatch)
+        let outputText = line.beautify(pattern: pattern, colored: colored)
+        let outputValues = line.values(pattern: pattern)
 
         return (outputText, outputType, pattern, outputValues)
     }

@@ -419,4 +419,6 @@ public enum Pattern: String {
     case encounteredAnSimulatorError = #"\s+(?<message>.*)\(\) encountered an error \(Test runner exited"# // Should be caused by the force reset of simulator
 
     case testingFailed = #"^(Testing failed:)$"#
+
+    case undefined
 }

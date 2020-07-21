@@ -14,6 +14,7 @@ class TestTearDownOperation: BaseOperation<Void> {
     private let configuration: Configuration
     private let timestamp: String
     private let git: GitStatus?
+    private let resultsDirectory: String
     private lazy var executer: Executer? = {
         let destinationNode = configuration.resultDestination.node
 
@@ -25,6 +26,8 @@ class TestTearDownOperation: BaseOperation<Void> {
         self.configuration = configuration
         self.git = git
         self.timestamp = timestamp
+        resultsDirectory = "\(configuration.resultDestination.path)/\(timestamp)"
+        setEnvironment(variable: Environment.resultsPathKey, value: resultsDirectory, overwrite: true)
     }
 
     override func main() {
@@ -37,12 +40,13 @@ class TestTearDownOperation: BaseOperation<Void> {
                 fatalError("💣 Failed making executer")
             }
 
-            try writeHtmlRepeatedTestResultSummary(executer: executer)
-            try writeJsonRepeatedTestResultSummary(executer: executer)
-            try writeHtmlTestResultSummary(executer: executer)
-            try writeJsonTestResultSummary(executer: executer)
             try writeGitInfo(executer: executer)
             try writeGitInfoInResultBundleInfoPlist(executer: executer)
+            try writeHtmlRepeatedTestResultSummary(executer: executer)
+            try writeHtmlTestResultSummary(executer: executer)
+            try writeJsonRepeatedTestResultSummary(executer: executer)
+            try writeJsonTestResultSummary(executer: executer)
+            try writeJunitTestResultSummary(executer: executer)
 
             didEnd?(())
         } catch {
@@ -75,7 +79,7 @@ class TestTearDownOperation: BaseOperation<Void> {
 
         let repeatedTestCases = Dictionary(grouping: testCaseResults, by: { "\($0.suite)_\($0.name)" }).filter { $1.count > 1 }.keys
 
-        let destinationPath = "\(configuration.resultDestination.path)/\(timestamp)/\(Environment.htmlRepeatedTestSummaryFilename)"
+        let destinationPath = "\(resultsDirectory)/\(Environment.htmlRepeatedTestSummaryFilename)"
 
         var content = "<h2>Result - repeated tests</h2>\n"
 
@@ -98,7 +102,7 @@ class TestTearDownOperation: BaseOperation<Void> {
 
         let repeatedTestCases = Dictionary(grouping: testCaseResults, by: { "\($0.suite)_\($0.name)" }).filter { $1.count > 1 }.keys
 
-        let destinationPath = "\(configuration.resultDestination.path)/\(timestamp)/\(Environment.jsonRepeatedTestSummaryFilename)"
+        let destinationPath = "\(resultsDirectory)/\(Environment.jsonRepeatedTestSummaryFilename)"
 
         let encoder = JSONEncoder()
         encoder.outputFormatting = .prettyPrinted
@@ -115,7 +119,7 @@ class TestTearDownOperation: BaseOperation<Void> {
     private func writeHtmlTestResultSummary(executer: Executer) throws {
         guard let testCaseResults = filterRetriedTestsFromCaseResults(testCaseResults) else { return }
 
-        let destinationPath = "\(configuration.resultDestination.path)/\(timestamp)/\(Environment.htmlTestSummaryFilename)"
+        let destinationPath = "\(resultsDirectory)/\(Environment.htmlTestSummaryFilename)"
 
         var content = "<h2>Result</h2>\n"
 
@@ -141,7 +145,7 @@ class TestTearDownOperation: BaseOperation<Void> {
     private func writeJsonTestResultSummary(executer: Executer) throws {
         guard let testCaseResults = filterRetriedTestsFromCaseResults(testCaseResults) else { return }
 
-        let destinationPath = "\(configuration.resultDestination.path)/\(timestamp)/\(Environment.jsonTestSummaryFilename)"
+        let destinationPath = "\(resultsDirectory)/\(Environment.jsonTestSummaryFilename)"
 
         let encoder = JSONEncoder()
         encoder.outputFormatting = .prettyPrinted
@@ -158,7 +162,7 @@ class TestTearDownOperation: BaseOperation<Void> {
     private func writeGitInfo(executer: Executer) throws {
         guard let git = git else { return }
 
-        let destinationPath = "\(configuration.resultDestination.path)/\(timestamp)/\(Environment.jsonGitSummaryFilename)"
+        let destinationPath = "\(resultsDirectory)/\(Environment.jsonGitSummaryFilename)"
 
         let encoder = JSONEncoder()
         encoder.outputFormatting = .prettyPrinted
@@ -175,7 +179,7 @@ class TestTearDownOperation: BaseOperation<Void> {
     private func writeGitInfoInResultBundleInfoPlist(executer: Executer) throws {
         guard let git = git else { return }
 
-        let infoPlistPath = "\(configuration.resultDestination.path)/\(timestamp)/\(Environment.xcresultFilename)/Info.plist"
+        let infoPlistPath = "\(resultsDirectory)/\(Environment.xcresultFilename)/Info.plist"
 
         let uniqueUrl = Path.temp.url.appendingPathComponent("\(UUID().uuidString).plist")
         try executer.download(remotePath: infoPlistPath, localUrl: uniqueUrl)
@@ -194,6 +198,18 @@ class TestTearDownOperation: BaseOperation<Void> {
 
         try contentData.write(to: uniqueUrl)
         try executer.upload(localUrl: uniqueUrl, remotePath: infoPlistPath)
+    }
+
+    private func writeJunitTestResultSummary(executer: Executer) throws {
+        guard let testCaseResults = filterRetriedTestsFromCaseResults(testCaseResults) else { return }
+
+        let destinationPath = "\(resultsDirectory)/\(Environment.junitTestSummaryFilename)"
+        let tempUrl = Path.temp.url.appendingPathComponent("\(UUID().uuidString).junit")
+
+        let junitGenerator = JunitGenerator(testCaseResult: testCaseResults)
+        try junitGenerator.writeReport(path: tempUrl)
+
+        try executer.upload(localUrl: tempUrl, remotePath: destinationPath)
     }
 }
 

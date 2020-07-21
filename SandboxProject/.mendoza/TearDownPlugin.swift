@@ -62,6 +62,11 @@ struct TearDownPlugin {
         print("Device:  \(testSessionResult.device.name)")
         print("Runtime: \(testSessionResult.device.osVersion)")
 
+        if let value = ProcessInfo.processInfo.environment["MENDOZA_RESULTS_PATH"] {
+            print("Results Path: \(value)")
+        }
+
+
         let testResults = testSessionResult.passedTests + testSessionResult.failedTests
 
         let groupedItems = Dictionary(grouping: testResults, by: { $0.suite })
@@ -94,9 +99,9 @@ struct TearDownPlugin {
         if testSessionResult.failedTests.count > 0 {
             var failedTestsTable = [[String]]()
 
-            let testCases = testSessionResult.failedTests.map { [$0.name, $0.testCaseIDs.joined(separator: " ")] }
+            let testCases = testSessionResult.failedTests.map { [$0.name, $0.testCaseIDs.joined(separator: " "), $0.message] }
 
-            failedTestsTable.append(["Failed Tests", "TestCase IDs"])
+            failedTestsTable.append(["Failed Tests", "TestCase IDs", "Reason"])
             failedTestsTable.append(contentsOf: testCases)
         
             table.put(failedTestsTable)

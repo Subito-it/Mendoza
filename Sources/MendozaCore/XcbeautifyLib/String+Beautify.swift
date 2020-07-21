@@ -152,6 +152,8 @@ extension String {
             return nil
         case .testingFailed:
             return nil
+        case .undefined:
+            return nil
         }
     }
 

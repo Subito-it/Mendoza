@@ -7,36 +7,44 @@
 
 import Foundation
 
-struct TestCaseResult: Codable, CustomStringConvertible, Hashable {
-    enum Status: Int, Codable {
+public struct TestCaseResult: Codable, CustomStringConvertible, Hashable {
+    public enum Status: Int, Codable {
         case passed, failed
     }
 
-    let node: String
-    let xcResultPath: String
-    let suite: String
-    let name: String
-    let status: Status
-    let duration: Double
-    let testCaseIDs: [String]
-    let testTags: [String]
+    public let node: String
+    public let xcResultPath: String
+    public let suite: String
+    public let name: String
+    public let status: Status
+    public let duration: Double
+    public let testCaseIDs: [String]
+    public let testTags: [String]
+    public let message: String
 
-    var description: String { "\(testCaseIdentifier) (\(duration) seconds)" }
-    var testCaseIdentifier: String { "\(suite)/\(name)" }
+    public var description: String { "\(testCaseIdentifier) (\(duration) seconds)" }
+    public var testCaseIdentifier: String { "\(suite)/\(name)" }
 
-    static func == (lhs: TestCaseResult, rhs: TestCaseResult) -> Bool {
+    public static func == (lhs: TestCaseResult, rhs: TestCaseResult) -> Bool {
         return lhs.testCaseIdentifier == rhs.testCaseIdentifier
+    }
+
+    public var didTestPass: Bool {
+        switch status {
+        case .passed: return true
+        default: return false
+        }
     }
 }
 
 extension TestCaseResult: DefaultInitializable {
-    static func defaultInit() -> TestCaseResult {
-        return TestCaseResult(node: "", xcResultPath: "", suite: "", name: "", status: .passed, duration: 0.0, testCaseIDs: [], testTags: [])
+    public static func defaultInit() -> TestCaseResult {
+        return TestCaseResult(node: "", xcResultPath: "", suite: "", name: "", status: .passed, duration: 0.0, testCaseIDs: [], testTags: [], message: "")
     }
 }
 
 extension TestCaseResult.Status: CustomReflectable {
-    var customMirror: Mirror {
+    public var customMirror: Mirror {
         let status = """
         enum Status: Int, Codable {
             case passed, failed
@@ -49,7 +57,7 @@ extension TestCaseResult.Status: CustomReflectable {
 }
 
 extension TestCaseResult.Status: DefaultInitializable {
-    static func defaultInit() -> TestCaseResult.Status {
+    public static func defaultInit() -> TestCaseResult.Status {
         .passed
     }
 }

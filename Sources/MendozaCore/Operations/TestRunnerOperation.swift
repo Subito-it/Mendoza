@@ -44,6 +44,7 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
         case testCaseFailed(duration: Double)
         case testCaseCrashed
         case noSpaceOnDevice
+        case undefined
 
         var isTestPassed: Bool {
             switch self {
@@ -291,7 +292,7 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
 
                 case .testCaseFailed:
                     self.syncQueue.sync { [unowned self] in
-                        let addToCompleted = index > 0 ? events[index - 1].xcodeEvent?.isTestCrashed == false : true
+                        let addToCompleted = index > 0 ? events[index - 1].xcodeEvent.isTestCrashed == false : true
 
                         guard let currentRunning = currentRunningAndDuration(addToCompleted) else { return }
 
@@ -339,7 +340,7 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                     try? self.eventPlugin.run(event: Event(kind: .testCrashed, info: eventValues, values: [:]), device: self.device)
                     fatalError("💥  No space left on \(executer.address). If you're using a RAM disk in Mendoza's configuration consider increasing size")
                     
-                case .none:
+                case .undefined:
                     break
                 }
             }
@@ -395,13 +396,13 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
         return output
     }
 
-    private func parseXcodebuildOutput(lines: [String]) -> [(xcodeEvent: XcodebuildLineEvent?, values: [String: String])] {
+    private func parseXcodebuildOutput(lines: [String]) -> [(xcodeEvent: XcodebuildLineEvent, values: [String: String])] {
         let xcodeParser = Parser()
 
-        var output: [(xcodeEvent: XcodebuildLineEvent?, values: [String: String])] = []
+        var output: [(xcodeEvent: XcodebuildLineEvent, values: [String: String])] = []
 
         for line in lines {
-            var xcodebuildEvent: XcodebuildLineEvent?
+            var xcodebuildEvent: XcodebuildLineEvent
             var values: [String: String] = [:]
 
             let outputData = xcodeParser.parse(line: line, colored: false)
@@ -437,13 +438,13 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                 xcodebuildEvent = .testCaseFailed(duration: -1)
 
             default:
-                xcodebuildEvent = nil
+                xcodebuildEvent = .undefined
             }
 
             output.append((xcodebuildEvent, values))
         }
 
-        return output.filter({ $0.xcodeEvent != nil })
+        return output
     }
 
     private func parseTestResults(_ output: String, candidates: [TestCase], node: String, xcResultPath: String) throws -> [TestCaseResult] {
@@ -453,12 +454,11 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
 
         let lines = output.components(separatedBy: "\n")
         let xcodeEvents = parseXcodebuildOutput(lines: lines)
-        let events = xcodeEvents.compactMap({ $0.xcodeEvent })
 
         var currentCandidate: TestCase?
 
-        for event in events {
-            switch event {
+        for event in xcodeEvents {
+            switch event.xcodeEvent {
             case .testSuitedStarted:
                 break
 
@@ -478,10 +478,11 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                     xcResultPath: resultPath,
                     suite: currentCandidate.suite,
                     name: currentCandidate.name,
-                    status: event.isTestPassed ? .passed : .failed,
+                    status: event.xcodeEvent.isTestPassed ? .passed : .failed,
                     duration: duration,
                     testCaseIDs: currentCandidate.testCaseIDs,
-                    testTags: currentCandidate.tags
+                    testTags: currentCandidate.tags,
+                    message: event.xcodeEvent.isTestPassed ? "" : event.values["reason"] ?? ""
                 )
 
                 if let index = result.firstIndex(where: { $0 == testCaseResults }) {
@@ -500,13 +501,17 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                     status: .failed,
                     duration: -1,
                     testCaseIDs: currentCandidate.testCaseIDs,
-                    testTags: currentCandidate.tags
+                    testTags: currentCandidate.tags,
+                    message: ""
                 )
 
                 result.append(testCaseResults)
 
             case .noSpaceOnDevice:
                 throw Error("💥  No space left on device. If you're using a RAM disk in Mendoza's configuration consider increasing size".red)
+
+            case .undefined:
+                break
             }
         }
 
@@ -532,7 +537,8 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                     status: .failed,
                     duration: -1,
                     testCaseIDs: $0.testCaseIDs,
-                    testTags: $0.tags
+                    testTags: $0.tags,
+                    message: ""
                 )
             }
         }

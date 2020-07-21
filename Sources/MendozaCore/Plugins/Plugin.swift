@@ -85,10 +85,12 @@ public class Plugin<Input: DefaultInitializable, Output: DefaultInitializable> {
                 throw Error("Failed running plugin `\(filename)`, got \(output)", logger: executer.logger)
             }
 
-            print("\n👻  Plugin Log:\n\(pluginLogs)\n")
+            if !pluginLogs.isEmpty {
+                print("\n👻  Plugin Log:\n\(pluginLogs)\n")
+            }
 
             if plugin.debug {
-                print("🧪 Plugin Result:\n\(result)\n")
+                print("\n🧪 Plugin Result:\n\(result)\n")
             }
 
             return ret

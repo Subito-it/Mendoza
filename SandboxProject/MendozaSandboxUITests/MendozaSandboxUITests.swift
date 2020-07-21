@@ -47,7 +47,7 @@ class MendozaSandboxUITests: XCTestCase {
         ])
 
         report(territory: [.uk], testCases: ["APP-T486", "APP-T486"]) {
-            XCTAssertTrue(false)
+            XCTAssertTrue(false, "Failed to validate")
         }
     }
 
