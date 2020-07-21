@@ -6,6 +6,7 @@
 //
 
 import Bariloche
+import MendozaCore
 
 class RootCommand: Command {
     let usage: String? = "Parallelize Apple's UI tests over multiple physical nodes"
