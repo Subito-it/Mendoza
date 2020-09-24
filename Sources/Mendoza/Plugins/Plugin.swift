@@ -39,17 +39,20 @@ class Plugin<Input: DefaultInitializable, Output: DefaultInitializable> {
     func run(input: Input) throws -> Output {
         let pluginUrl = baseUrl.appendingPathComponent(filename)
         // We add a suffix to the pluginname that is based on so that swift-sh has a consistent name for its internal cache
-        let pluginRunUrl = baseUrl.appendingPathComponent("_\(filename)_\(baseUrl.absoluteString.sha256())")
 
-        try? fileManager.removeItem(at: pluginRunUrl)
-        defer { if !plugin.debug { try? fileManager.removeItem(at: pluginRunUrl) } }
+        let pluginContent = try String(contentsOf: pluginUrl)
+        let pluginRunUrl = baseUrl.appendingPathComponent("_\(filename)_\(pluginContent.sha256())")
 
-        try fileManager.copyItem(at: pluginUrl, to: pluginRunUrl)
+        if !fileManager.fileExists(atPath: pluginRunUrl.path) {
+            // We should delete all plugins with different pluginContent suffixes
+            // try? fileManager.removeItem(at: pluginRunUrl)
+            try fileManager.copyItem(at: pluginUrl, to: pluginRunUrl)
 
-        var runContent = try String(contentsOf: pluginRunUrl)
-        runContent += runnerCode()
+            var runContent = try String(contentsOf: pluginRunUrl)
+            runContent += runnerCode()
 
-        try runContent.data(using: .utf8)?.write(to: pluginRunUrl)
+            try runContent.data(using: .utf8)?.write(to: pluginRunUrl)
+        }
 
         let inputString: String
         if input is PluginVoid {
