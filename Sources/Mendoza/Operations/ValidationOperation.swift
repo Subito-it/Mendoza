@@ -31,9 +31,13 @@ class ValidationOperation: BaseOperation<Void> {
             defer { loggers = loggers.union(validator.loggers) }
             try validator.validate()
 
+            guard (try? executer.execute("swiftc --version > /dev/null")) != nil else { throw Error("You have not agreed to the Xcode license agreements, please run 'sudo xcodebuild -license accept' from within a Terminal window on \(executer.address) to accept the Xcode license agreements.", logger: executer.logger) }
+
             guard let compilingSwiftVersion = try executer.execute("swiftc --version").capturedGroups(withRegexString: #"swiftlang(.*)\)"#).first else { throw Error("Failed fetching swift version, expecting 'swiftlang(.*)' when running `swiftc --version`", logger: executer.logger) }
 
             try pool.execute { executer, _ in
+                guard (try? executer.execute("swiftc --version > /dev/null")) != nil else { throw Error("You have not agreed to the Xcode license agreements, please run 'sudo xcodebuild -license accept' from within a Terminal window on \(executer.address) to accpet the Xcode license agreements.", logger: executer.logger) }
+
                 guard let remoteSwiftVersion = try executer.execute("swiftc --version").capturedGroups(withRegexString: #"swiftlang(.*)\)"#).first else { throw Error("Failed fetching swift version, expecting 'swiftlang(.*)' when running `swiftc --version`", logger: executer.logger) }
 
                 guard remoteSwiftVersion == compilingSwiftVersion else {
