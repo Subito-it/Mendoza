@@ -66,18 +66,23 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
                 try proxy.enableLowQualityGraphicOverrides()
                 try proxy.disableSimulatorBezel()
 
-                var simulatorsProperlyArranged = true
-                if self.runHeadless == false {
-                    simulatorsProperlyArranged = try self.simulatorsProperlyArranged(executer: executer, simulators: nodeSimulators)
                 let shouldArrangeSimulators = self.runHeadless == false
                 try self.updateSimulatorsSettings(executer: executer, simulators: nodeSimulators, arrangeSimulators: shouldArrangeSimulators)
+
                 var shouldRebootSimulators = false
+                if shouldArrangeSimulators {
+                    shouldRebootSimulators = !(try self.simulatorsProperlyArranged(executer: executer, simulators: nodeSimulators))
+                }
+
                 for nodeSimulator in nodeSimulators {
                     let languageUpdated = try proxy.updateLanguage(on: nodeSimulator, language: self.device.language)
                     shouldRebootSimulators = shouldRebootSimulators || languageUpdated
                 }
 
-                    if !simulatorsProperlyArranged {
+                if shouldRebootSimulators {
+                    try nodeSimulators.forEach { try proxy.shutdown(simulator: $0) }
+
+                    if self.runHeadless == false {
                         try proxy.gracefullyQuit()
                     }
                 }
@@ -101,6 +106,9 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
                 }
 
                 if self.runHeadless == false {
+                    if shouldRebootSimulators {
+                        try proxy.gracefullyQuit()
+                    }
                     try proxy.launch()
                 } else {
                     try proxy.gracefullyQuit()
@@ -289,18 +297,18 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
             }
 
             if arrangeSimulators {
-            let windowGeometry = settings.DevicePreferences?[simulator.id]?.SimulatorWindowGeometry?[screenIdentifier] ?? .init()
-            windowGeometry.WindowScale = Double(scaleFactor)
-            windowGeometry.WindowCenter = windowCenter
-            settings.DevicePreferences?[simulator.id]?.SimulatorWindowGeometry?[screenIdentifier] = windowGeometry
+                let windowGeometry = settings.DevicePreferences?[simulator.id]?.SimulatorWindowGeometry?[screenIdentifier] ?? .init()
+                windowGeometry.WindowScale = Double(scaleFactor)
+                windowGeometry.WindowCenter = windowCenter
+                settings.DevicePreferences?[simulator.id]?.SimulatorWindowGeometry?[screenIdentifier] = windowGeometry
 
-            executer.logger?.log(command: "Arranging simulator \(simulator.id) on \(executer.address) at location (\(center))")
-            executer.logger?.log(output: "", statusCode: 0)
+                executer.logger?.log(command: "Arranging simulator \(simulator.id) on \(executer.address) at location (\(center))")
+                executer.logger?.log(output: "", statusCode: 0)
 
-            #if DEBUG
-                print("⚠️ Arranging simulator \(simulator.id) on \(executer.address) at location (\(center))".bold)
-            #endif
-        }
+                #if DEBUG
+                    print("⚠️ Arranging simulator \(simulator.id) on \(executer.address) at location (\(center))".bold)
+                #endif
+            }
         }
 
         try simulatorProxy.storeSimulatorSettings(settings)
