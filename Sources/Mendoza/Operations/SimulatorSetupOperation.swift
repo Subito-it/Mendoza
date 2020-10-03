@@ -69,6 +69,8 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
                 var simulatorsProperlyArranged = true
                 if self.runHeadless == false {
                     simulatorsProperlyArranged = try self.simulatorsProperlyArranged(executer: executer, simulators: nodeSimulators)
+                let shouldArrangeSimulators = self.runHeadless == false
+                try self.updateSimulatorsSettings(executer: executer, simulators: nodeSimulators, arrangeSimulators: shouldArrangeSimulators)
                 var shouldRebootSimulators = false
                 for nodeSimulator in nodeSimulators {
                     let languageUpdated = try proxy.updateLanguage(on: nodeSimulator, language: self.device.language)
@@ -77,7 +79,6 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
 
                     if !simulatorsProperlyArranged {
                         try proxy.gracefullyQuit()
-                        try self.updateSimulatorsArrangement(executer: executer, simulators: nodeSimulators)
                     }
                 }
 
@@ -226,7 +227,7 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
     ///
     /// - Parameters:
     ///   - param1: simulators to arrange
-    private func updateSimulatorsArrangement(executer: Executer, simulators: [Simulator]) throws {
+    private func updateSimulatorsSettings(executer: Executer, simulators: [Simulator], arrangeSimulators: Bool) throws {
         let simulatorProxy = CommandLineProxy.Simulators(executer: executer, verbose: verbose)
 
         // Configuration file might not be ready yet
@@ -287,6 +288,7 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
                 settings.DevicePreferences?[simulator.id]?.SimulatorWindowGeometry = .init()
             }
 
+            if arrangeSimulators {
             let windowGeometry = settings.DevicePreferences?[simulator.id]?.SimulatorWindowGeometry?[screenIdentifier] ?? .init()
             windowGeometry.WindowScale = Double(scaleFactor)
             windowGeometry.WindowCenter = windowCenter
@@ -298,6 +300,7 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
             #if DEBUG
                 print("⚠️ Arranging simulator \(simulator.id) on \(executer.address) at location (\(center))".bold)
             #endif
+        }
         }
 
         try simulatorProxy.storeSimulatorSettings(settings)
