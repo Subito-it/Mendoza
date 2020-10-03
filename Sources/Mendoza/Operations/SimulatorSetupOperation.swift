@@ -69,6 +69,11 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
                 var simulatorsProperlyArranged = true
                 if self.runHeadless == false {
                     simulatorsProperlyArranged = try self.simulatorsProperlyArranged(executer: executer, simulators: nodeSimulators)
+                var shouldRebootSimulators = false
+                for nodeSimulator in nodeSimulators {
+                    let languageUpdated = try proxy.updateLanguage(on: nodeSimulator, language: self.device.language)
+                    shouldRebootSimulators = shouldRebootSimulators || languageUpdated
+                }
 
                     if !simulatorsProperlyArranged {
                         try proxy.gracefullyQuit()
