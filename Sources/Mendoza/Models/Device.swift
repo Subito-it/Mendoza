@@ -10,11 +10,12 @@ import Foundation
 struct Device: Codable {
     let name: String
     let runtime: String
+    let language: String?
 }
 
 extension Device: DefaultInitializable {
     static func defaultInit() -> Device {
-        Device(name: "", runtime: "")
+        Device(name: "", runtime: "", language: nil)
     }
 }
 

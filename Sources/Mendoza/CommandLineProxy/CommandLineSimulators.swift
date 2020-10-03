@@ -207,7 +207,7 @@ extension CommandLineProxy {
 
                 guard capture.count == 3 else { continue }
 
-                simulators.append(Simulator(id: capture[2], name: capture[0], device: Device(name: capture[0], runtime: capture[1])))
+                simulators.append(Simulator(id: capture[2], name: capture[0], device: Device(name: capture[0], runtime: capture[1], language: nil)))
             }
 
             return simulators
