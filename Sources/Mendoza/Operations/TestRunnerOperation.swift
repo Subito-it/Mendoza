@@ -38,8 +38,8 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
         case testCrashed
         case noSpaceOnDevice
 
-        var isTestPassed: Bool { switch self { case .testPassed: return true; default: return false } }
-        var isTestCrashed: Bool { switch self { case .testCrashed: return true; default: return false } }
+        var isTestPassed: Bool { switch self { case .testPassed: return true; default: return false } } // swiftlint:disable:this switch_case_alignment
+        var isTestCrashed: Bool { switch self { case .testCrashed: return true; default: return false } } // swiftlint:disable:this switch_case_alignment
     }
 
     private lazy var pool: ConnectionPool<TestRunner> = {

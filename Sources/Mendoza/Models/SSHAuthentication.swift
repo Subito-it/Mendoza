@@ -60,9 +60,7 @@ extension SSHAuthentication {
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
 
-        if let username = try container.decodeIfPresent(String.self, forKey: .credentialUsername),
-           let password = try container.decodeIfPresent(String.self, forKey: .credentialPassword)
-        {
+        if let username = try container.decodeIfPresent(String.self, forKey: .credentialUsername), let password = try container.decodeIfPresent(String.self, forKey: .credentialPassword) {
             self = .credentials(username: username, password: password)
         } else if let username = try container.decodeIfPresent(String.self, forKey: .keyUsername) {
             self = .key(username: username,

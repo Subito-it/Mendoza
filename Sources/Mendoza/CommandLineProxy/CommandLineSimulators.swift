@@ -83,7 +83,8 @@ extension CommandLineProxy {
             guard try !isRuntimeInstalled() else { return }
 
             guard let appleIdCredentials = appleIdCredentials,
-                let password = administratorPassword else {
+                  let password = administratorPassword
+            else {
                 throw Error("Could not install simulator runtime on node `\(nodeAddress)` because administrator credentials were not provided. Please install `\(runtime)` runtime manually")
             }
 

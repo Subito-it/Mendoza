@@ -29,11 +29,7 @@ extension Configuration {
         let architectures: String
         let useNewBuildSystem: String
 
-        init(buildSettings: String = "GCC_OPTIMIZATION_LEVEL='s' SWIFT_OPTIMIZATION_LEVEL='-Osize'",
-             onlyActiveArchitecture: String = "YES",
-             architectures: String = "x86_64",
-             useNewBuildSystem: String = "YES")
-        {
+        init(buildSettings: String = "GCC_OPTIMIZATION_LEVEL='s' SWIFT_OPTIMIZATION_LEVEL='-Osize'", onlyActiveArchitecture: String = "YES", architectures: String = "x86_64", useNewBuildSystem: String = "YES") {
             self.buildSettings = buildSettings
             self.onlyActiveArchitecture = onlyActiveArchitecture
             self.architectures = architectures

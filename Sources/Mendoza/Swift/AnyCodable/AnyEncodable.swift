@@ -58,7 +58,7 @@ extension _AnyEncodable {
 
         switch value {
         #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
-            case let number as NSNumber:
+            case let number as NSNumber: // swiftlint:disable:this switch_case_alignment
                 try encode(nsnumber: number, into: &container)
         #endif
         case is NSNull, is Void:
@@ -131,7 +131,7 @@ extension _AnyEncodable {
             case .doubleType, .float64Type, .cgFloatType:
                 try container.encode(nsnumber.doubleValue)
             #if swift(>=5.0)
-                @unknown default:
+                @unknown default: // swiftlint:disable:this switch_case_alignment
                     fatalError("Unhandled case")
             #endif
             }
