@@ -238,6 +238,9 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                 self.timeoutBlocks[runnerIndex] = self.makeTimeoutBlock(executer: executer, currentRunning: self.currentRunningTest[runnerIndex], testRunner: testRunner, runnerIndex: runnerIndex)
             }
 
+            let testResults = try findTestResultsUrl(executer: executer, testRunner: testRunner)
+            try testResults.forEach { _ = try executer.execute("rm -rf '\($0.path)' || true") }
+
             output = try executer.execute(testWithoutBuilding, progress: progressHandler) { result, originalError in
                 try self.assertAccessibilityPermissions(in: result.output)
                 throw originalError
