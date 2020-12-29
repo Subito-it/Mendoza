@@ -29,7 +29,7 @@ extension Executer {
                     guard passphrase == nil else { fatalError("passphare in key not supported yet") }
                     rsyncCommand += "'\(username)@\(remoteNode.address):\(sourcePath)'"
                 case let .credentials(username, password):
-                    logger?.addBlackList(password)
+                    logger?.addIgnoreList(password)
                     rsyncCommand = "sshpass -p '\(password)' " + rsyncCommand
                     rsyncCommand += "'\(username)@\(remoteNode.address):\(sourcePath)'"
                 case .none:
@@ -59,7 +59,7 @@ extension Executer {
                 guard passphrase == nil else { fatalError("passphare in key not supported yet") }
                 username = user
             case let .credentials(user, password):
-                logger?.addBlackList(password)
+                logger?.addIgnoreList(password)
                 rsyncCommand = "sshpass -p '\(password)' " + rsyncCommand
                 username = user
             case .none:

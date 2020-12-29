@@ -65,7 +65,7 @@ class ExecuterLogger: Logger, CustomDebugStringConvertible {
     var dumpToStandardOutput: Bool = false
 
     private var logs = [LoggerEvent]()
-    private var blackList = [String]()
+    private var ignoreList = [String]()
 
     init(name: String, address: String) {
         self.name = name
@@ -85,8 +85,8 @@ class ExecuterLogger: Logger, CustomDebugStringConvertible {
         logs.append(.exception(error: redact(exception)))
     }
 
-    func addBlackList(_ word: String) {
-        blackList.append(word)
+    func addIgnoreList(_ word: String) {
+        ignoreList.append(word)
     }
 
     func dump() throws {
@@ -96,7 +96,7 @@ class ExecuterLogger: Logger, CustomDebugStringConvertible {
 
     func redact(_ input: String) -> String {
         var result = input
-        for redact in blackList {
+        for redact in ignoreList {
             result = result.replacingOccurrences(of: redact, with: "~redacted~")
         }
 

@@ -92,9 +92,9 @@ extension CommandLineProxy {
             let keychain = Keychain(executer: executer)
             try keychain.unlock(password: password)
 
-            executer.logger?.addBlackList(password)
-            executer.logger?.addBlackList(appleIdCredentials.username)
-            executer.logger?.addBlackList(appleIdCredentials.password)
+            executer.logger?.addIgnoreList(password)
+            executer.logger?.addIgnoreList(appleIdCredentials.username)
+            executer.logger?.addIgnoreList(appleIdCredentials.password)
 
             try reset()
 

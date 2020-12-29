@@ -50,7 +50,7 @@ class ConfigurationValidator {
             let executer = try node.makeExecuter(logger: logger)
             loggers.insert(logger)
 
-            executer.logger?.addBlackList(password)
+            executer.logger?.addIgnoreList(password)
             _ = try executer.execute("echo '\(password)' | sudo -S -v")
         } catch {
             return false

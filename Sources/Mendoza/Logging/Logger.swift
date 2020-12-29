@@ -17,7 +17,7 @@ protocol Logger: AnyObject, Hashable, CustomStringConvertible {
     func log(output: String, statusCode: Int32)
     func log(exception: String)
 
-    func addBlackList(_ word: String)
+    func addIgnoreList(_ word: String)
 
     func redact(_ input: String) -> String
 

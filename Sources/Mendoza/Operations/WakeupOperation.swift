@@ -38,7 +38,7 @@ class WakeupOperation: BaseOperation<Void> {
                     return
                 }
 
-                executer.logger?.addBlackList(password)
+                executer.logger?.addIgnoreList(password)
                 _ = try executer.execute("echo '\(password)' | sudo -S pmset schedule wake '\(date)'")
             }
 
