@@ -99,7 +99,7 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                     print("ℹ️  \(self.verbose ? "[\(Date().description)] " : "")Node \(source.node.address) will execute \(testCases.count) tests on \(testRunner.name) {\(runnerIndex)}".magenta)
 
                     executer.logger?.log(command: "Will launch \(testCases.count) test cases")
-                    executer.logger?.log(output: testCases.map { $0.testIdentifier }.joined(separator: "\n"), statusCode: 0)
+                    executer.logger?.log(output: testCases.map(\.testIdentifier).joined(separator: "\n"), statusCode: 0)
 
                     let output = try autoreleasepool {
                         try self.testWithoutBuilding(executer: executer, testTarget: self.testTarget, testCases: testCases, testRunner: testRunner, runnerIndex: runnerIndex)

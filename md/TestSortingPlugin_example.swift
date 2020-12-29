@@ -47,6 +47,6 @@ struct TestSortingPlugin {
             }
         }
 
-        return estimatedTests.sorted(by: { $0.estimatedDuration > $1.estimatedDuration }).map { $0.testCase }
+        return estimatedTests.sorted(by: { $0.estimatedDuration > $1.estimatedDuration }).map(\.testCase)
     }
 }

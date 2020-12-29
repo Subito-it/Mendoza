@@ -79,8 +79,9 @@ class Plugin<Input: DefaultInitializable, Output: DefaultInitializable> {
         do {
             let output = try executer.capture(command).output
             guard let result = output.components(separatedBy: pluginOutputMarker).last,
-                let resultData = result.data(using: .utf8), !resultData.isEmpty,
-                let ret = try? JSONDecoder().decode(Output.self, from: resultData) else {
+                  let resultData = result.data(using: .utf8), !resultData.isEmpty,
+                  let ret = try? JSONDecoder().decode(Output.self, from: resultData)
+            else {
                 throw Error("Failed running plugin `\(filename)`, got \(output)", logger: executer.logger)
             }
             if plugin.debug {
@@ -103,8 +104,8 @@ class Plugin<Input: DefaultInitializable, Output: DefaultInitializable> {
 
         let dependencies: [DefaultInitializable.Type] = [Input.self, Output.self]
         let reflections = dependencies.flatMap { $0.reflections() }
-        let uniqueSubject = Set(reflections.map { $0.subject })
-        let uniqueReflections = uniqueSubject.compactMap { uniqueSubject in reflections.first(where: { reflection in reflection.subject == uniqueSubject }) }.map { $0.reflection }
+        let uniqueSubject = Set(reflections.map(\.subject))
+        let uniqueReflections = uniqueSubject.compactMap { uniqueSubject in reflections.first(where: { reflection in reflection.subject == uniqueSubject }) }.map(\.reflection)
 
         let dependenciesReflection = uniqueReflections.flatMap { $0.components(separatedBy: "\n") }
         let dependenciesReflectionComment = dependenciesReflection.map { "// \($0)" }
@@ -144,8 +145,8 @@ class Plugin<Input: DefaultInitializable, Output: DefaultInitializable> {
 
         let dependencies: [DefaultInitializable.Type] = [Input.self, Output.self]
         let reflections = dependencies.flatMap { $0.reflections() }
-        let uniqueSubject = Set(reflections.map { $0.subject })
-        let uniqueReflections = uniqueSubject.compactMap { uniqueSubject in reflections.first(where: { reflection in reflection.subject == uniqueSubject }) }.map { $0.reflection }
+        let uniqueSubject = Set(reflections.map(\.subject))
+        let uniqueReflections = uniqueSubject.compactMap { uniqueSubject in reflections.first(where: { reflection in reflection.subject == uniqueSubject }) }.map(\.reflection)
 
         let dependenciesReflection = uniqueReflections.flatMap { $0.components(separatedBy: "\n") }
         result += dependenciesReflection

@@ -49,7 +49,7 @@ disabled_rules:
   # - return_arrow_whitespace
   # - shorthand_operator
   # - statement_position
-  - switch_case_alignment
+  # - switch_case_alignment
   # - syntactic_sugar
   # - todo
   - trailing_comma
@@ -160,6 +160,7 @@ opt_in_rules:
   - yoda_condition
 excluded:
   - .build\/
+  - Dependencies\/
 analyzer_rules: # Rules run by `swiftlint analyze` (experimental)
   # - explicit_self
   - unused_declaration

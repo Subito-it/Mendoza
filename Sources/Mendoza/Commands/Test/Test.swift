@@ -58,7 +58,7 @@ class Test {
         }
 
         print("ℹ️  Dispatching on".magenta.bold)
-        let nodes = Array(Set(userOptions.configuration.nodes.map { $0.address } + (userOptions.dispatchOnLocalHost ? ["localhost"] : []))).sorted()
+        let nodes = Array(Set(userOptions.configuration.nodes.map(\.address) + (userOptions.dispatchOnLocalHost ? ["localhost"] : []))).sorted()
         print(nodes.joined(separator: "\n").magenta)
 
         let git = Git(executer: LocalExecuter())
@@ -246,10 +246,10 @@ class Test {
                     uniqueFailedSessions.update(with: $0.testCaseIdentifier) == nil
                 }
 
-                let nodes = Set(testCaseResults.map { $0.node })
+                let nodes = Set(testCaseResults.map(\.node))
                 for node in nodes {
                     let testCases = testCaseResults.filter { $0.node == node }
-                    for xcResultPath in Set(testCases.map { $0.xcResultPath }) {
+                    for xcResultPath in Set(testCases.map(\.xcResultPath)) {
                         testSessionResult.xcResultPath[xcResultPath] = node
                     }
                     guard !testCases.isEmpty else { continue }

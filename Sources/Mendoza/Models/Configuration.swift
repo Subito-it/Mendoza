@@ -32,7 +32,8 @@ extension Configuration {
         init(buildSettings: String = "GCC_OPTIMIZATION_LEVEL='s' SWIFT_OPTIMIZATION_LEVEL='-Osize'",
              onlyActiveArchitecture: String = "YES",
              architectures: String = "x86_64",
-             useNewBuildSystem: String = "YES") {
+             useNewBuildSystem: String = "YES")
+        {
             self.buildSettings = buildSettings
             self.onlyActiveArchitecture = onlyActiveArchitecture
             self.architectures = architectures
@@ -51,7 +52,8 @@ extension Configuration {
         let keychain = KeychainAccess.Keychain(service: Environment.bundle)
 
         guard let data = try? keychain.getData("appleID"),
-            let credentials = try? JSONDecoder().decode(Credentials.self, from: data) else {
+              let credentials = try? JSONDecoder().decode(Credentials.self, from: data)
+        else {
             return nil
         }
 

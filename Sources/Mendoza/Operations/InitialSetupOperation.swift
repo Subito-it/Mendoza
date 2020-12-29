@@ -25,7 +25,8 @@ class InitialSetupOperation: BaseOperation<Void> {
 
             try pool.execute { executer, _ in
                 guard let maxUidProcessCountRaw = try executer.execute("sysctl kern.maxprocperuid").components(separatedBy: " ").last,
-                    let maxUidProcessCount = Double(maxUidProcessCountRaw) else {
+                      let maxUidProcessCount = Double(maxUidProcessCountRaw)
+                else {
                     throw Error("Invalid maxprocperuid!")
                 }
 

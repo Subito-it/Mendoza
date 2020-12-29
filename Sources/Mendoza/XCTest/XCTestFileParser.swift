@@ -27,7 +27,8 @@ struct XCTestFileParser {
 
             let testCases: [[TestCase]] = testClasses.compactMap {
                 guard let suite = $0.name,
-                    let methods = $0.subElements?.filter({ $0.isTestMethod }) else {
+                      let methods = $0.subElements?.filter({ $0.isTestMethod })
+                else {
                     return nil
                 }
 

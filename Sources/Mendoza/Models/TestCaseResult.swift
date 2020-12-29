@@ -35,7 +35,7 @@ extension TestCaseResult.Status: CustomReflectable {
         enum Status: Int, Codable {
             case passed, failed
         }
-                    
+
         """])
     }
 }

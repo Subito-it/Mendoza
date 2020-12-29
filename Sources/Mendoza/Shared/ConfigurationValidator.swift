@@ -88,7 +88,7 @@ class ConfigurationValidator {
             let poolSources = remoteNodes.map { ConnectionPool<Void>.Source(node: $0, logger: logger($0)) }
             let pool = ConnectionPool(sources: poolSources)
 
-            let poolLoggers = Set(poolSources.compactMap { $0.logger })
+            let poolLoggers = Set(poolSources.compactMap(\.logger))
             loggers = loggers.union(poolLoggers)
 
             try pool.execute { executer, _ in

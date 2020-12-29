@@ -83,7 +83,7 @@ struct KittenElement: Codable, Equatable, Hashable {
 
         loop: repeat {
             for item in items {
-                if currentInherits.map({ $0.name }).contains(item.name) {
+                if currentInherits.map(\.name).contains(item.name) {
                     currentInherits = item.types ?? []
                     result = result.union(currentInherits)
                     items.removeAll { $0 == item }
@@ -95,7 +95,7 @@ struct KittenElement: Codable, Equatable, Hashable {
 
         result = result.union(currentInherits)
 
-        return Set(result.compactMap { $0.name })
+        return Set(result.compactMap(\.name))
     }
 }
 
@@ -118,7 +118,8 @@ struct XCTestFileParser {
 
             let testCases: [[ExtractionTestCase]] = testClasses.compactMap {
                 guard let suite = $0.name,
-                    let methods = $0.subElements?.filter({ $0.isTestMethod }) else {
+                      let methods = $0.subElements?.filter({ $0.isTestMethod })
+                else {
                     return nil
                 }
 

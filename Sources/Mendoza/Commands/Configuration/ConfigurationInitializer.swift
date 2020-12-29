@@ -78,7 +78,7 @@ struct ConfigurationInitializer {
         let nodes = try askNodes(sdk: sdk)
 
         let destinationNode: Node
-        let resultDestinationNodeName = Bariloche.ask(title: "Please select which node should collect test results:", array: nodes.map { $0.name } + ["Other"])
+        let resultDestinationNodeName = Bariloche.ask(title: "Please select which node should collect test results:", array: nodes.map(\.name) + ["Other"])
         if resultDestinationNodeName.value == "Other" {
             destinationNode = try askNode(sdk: sdk)
         } else {

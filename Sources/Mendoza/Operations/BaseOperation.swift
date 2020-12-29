@@ -75,7 +75,7 @@ class BaseOperation<Output: Any>: Operation, Starting, Ending, Throwing, LoggedO
         let poolSources = sources.map { ConnectionPool<T>.Source(node: $0.node, value: $0.value, logger: logger($0.node)) }
         let pool = ConnectionPool(sources: poolSources)
 
-        let poolLoggers = Set(poolSources.compactMap { $0.logger })
+        let poolLoggers = Set(poolSources.compactMap(\.logger))
         loggers = loggers.union(poolLoggers)
 
         return pool
@@ -125,6 +125,6 @@ enum Path: String, CaseIterable {
     }
 
     var url: URL {
-        URL(fileURLWithPath: self.rawValue)
+        URL(fileURLWithPath: rawValue)
     }
 }

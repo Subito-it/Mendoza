@@ -149,11 +149,11 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
 
         let screenIdentifier = settings.ScreenConfigurations!.keys.first! // swiftlint:disable:this force_unwrapping
 
-        guard let geometries = settings.DevicePreferences?.values.map({ $0.SimulatorWindowGeometry }) else { return false }
+        guard let geometries = settings.DevicePreferences?.values.map(\.SimulatorWindowGeometry) else { return false }
 
         var screenGeometries = [CommandLineProxy.Simulators.Settings.DevicePreferences.WindowGeometry]()
         for geometry in geometries {
-            screenGeometries += geometry?.filter { $0.key == screenIdentifier }.map { $0.value } ?? []
+            screenGeometries += geometry?.filter { $0.key == screenIdentifier }.map(\.value) ?? []
         }
 
         let expectSimulatorLocations = (0 ..< simulators.count).compactMap {
@@ -179,7 +179,8 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
                     .components(separatedBy: ",")
                     .compactMap({ Double($0.trimmingCharacters(in: .whitespaces)) })
                     .map({ CGFloat($0) }),
-                    center.count == 2 else {
+                    center.count == 2
+                else {
                     return false
                 }
 

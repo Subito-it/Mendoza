@@ -61,7 +61,7 @@ class XcodeProject: NSObject {
 
     func testTargetSourceFilePaths(scheme: String) throws -> [String] {
         let targets = try getTargetsInScheme(scheme)
-        return try targets.test.sourceFiles().compactMap { $0.path }
+        return try targets.test.sourceFiles().compactMap(\.path)
     }
 
     func buildSystem() -> XcodeProject.BuildSystem {
@@ -87,7 +87,7 @@ class XcodeProject: NSObject {
     }
 
     func buildConfigurations() -> [String] {
-        Array(Set(project.pbxproj.buildConfigurations.map { $0.name })).sorted()
+        Array(Set(project.pbxproj.buildConfigurations.map(\.name))).sorted()
     }
 
     func backupScheme(name: String, baseUrl _: URL) throws -> URL {
@@ -120,7 +120,7 @@ class XcodeProject: NSObject {
             throw Error("Expecting 1 run target in scheme \(name). Check that you have an executable selected in the info section of the run settings in the selected scheme.")
         }
 
-        let testableTargetNames = scheme.testAction?.testables.map { $0.buildableReference.blueprintName } ?? []
+        let testableTargetNames = scheme.testAction?.testables.map(\.buildableReference.blueprintName) ?? []
         guard testableTargetNames.count == 1 else {
             throw Error("Expecting 1 testing target in scheme \(name). Check that you have an executable selected in the info section of the run settings in the selected scheme.")
         }
@@ -164,7 +164,7 @@ class XcodeProject: NSObject {
     func getBuildSDK(for schemeName: String) throws -> SDK {
         let (buildTarget, _) = try getTargetsInScheme(schemeName)
 
-        guard let buildProject = project.pbxproj.projects.first(where: { project in project.targets.map { $0.name }.contains(buildTarget.name) }) else {
+        guard let buildProject = project.pbxproj.projects.first(where: { project in project.targets.map(\.name).contains(buildTarget.name) }) else {
             throw Error("Failed to extract build project")
         }
 

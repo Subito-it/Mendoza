@@ -38,7 +38,7 @@ class TestCollectorOperation: BaseOperation<Void> {
 
             guard let testCaseResults = testCaseResults else { fatalError("💣 Required field `testCaseResults` not set") }
 
-            let testNodes = Set(testCaseResults.map { $0.node })
+            let testNodes = Set(testCaseResults.map(\.node))
             try pool.execute { [unowned self] executer, source in
                 guard testNodes.contains(source.node.address) else {
                     return

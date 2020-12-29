@@ -214,6 +214,7 @@ extension AnyEncodable: ExpressibleByStringLiteral {}
 extension AnyEncodable: ExpressibleByArrayLiteral {}
 extension AnyEncodable: ExpressibleByDictionaryLiteral {}
 
+// swiftformat:disable extensionAccessControl
 // swiftlint:disable:next extension_access_modifier
 extension _AnyEncodable {
     public init(nilLiteral _: ()) {
