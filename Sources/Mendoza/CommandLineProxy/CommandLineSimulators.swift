@@ -143,8 +143,7 @@ extension CommandLineProxy {
             _ = try executer.execute("xcrun simctl spawn '\(simulator.id)' defaults write com.apple.Preferences DidShowContinuousPathIntroduction -bool true")
         }
 
-        func updateLanguage(on simulator: Simulator, language: String?) throws -> Bool {
-            guard let language = language else { return false }
+        func updateLanguage(on simulator: Simulator, language: String?, locale: String?) throws -> Bool {
 
             let currentLanguage = try executer.execute("plutil -extract AppleLanguages json -o - \(simulatorSettingsPath(for: simulator))/.GlobalPreferences.plist | cut -d'\"' -f2")
             _ = try executer.execute("plutil -replace AppleLanguages -json '[ \"\(language)\" ]' \(simulatorSettingsPath(for: simulator))/.GlobalPreferences.plist")
@@ -217,7 +216,7 @@ extension CommandLineProxy {
 
                 guard capture.count == 3 else { continue }
 
-                simulators.append(Simulator(id: capture[2], name: capture[0], device: Device(name: capture[0], runtime: capture[1], language: nil)))
+                simulators.append(Simulator(id: capture[2], name: capture[0], device: Device(name: capture[0], runtime: capture[1], language: nil, locale: nil)))
             }
 
             return simulators

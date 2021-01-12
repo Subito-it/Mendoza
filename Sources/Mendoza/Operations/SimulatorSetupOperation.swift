@@ -75,7 +75,7 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
                 }
 
                 for nodeSimulator in nodeSimulators {
-                    let languageUpdated = try proxy.updateLanguage(on: nodeSimulator, language: self.device.language)
+                    let languageUpdated = try proxy.updateLanguage(on: nodeSimulator, language: self.device.language, locale: self.device.locale)
                     shouldRebootSimulators = shouldRebootSimulators || languageUpdated
                 }
 
