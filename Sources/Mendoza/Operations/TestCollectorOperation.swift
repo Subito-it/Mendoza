@@ -79,14 +79,38 @@ class TestCollectorOperation: BaseOperation<Void> {
         let logger = ExecuterLogger(name: "TestCollectorOperation-Merge", address: destinationNode.address)
         loggers.insert(logger)
 
+        let mergedDestinationPath = "\(destinationPath)/\(Environment.xcresultFilename)"
+
         let executer = try destinationNode.makeExecuter(logger: logger)
         let sourcePaths = try executer.execute("find \(destinationPath) -type d -name '*.xcresult'").components(separatedBy: "\n")
 
-        let mergedDestinationPath = "\(destinationPath)/\(Environment.xcresultFilename)"
-        let mergeCmd = "xcrun xcresulttool merge " + sourcePaths.map { "\"\($0)\"" }.joined(separator: " ") + " --output-path \(mergedDestinationPath)"
-        _ = try executer.execute(mergeCmd)
+        let mergeCmd: (_ sourcePaths: [String], _ destinationPath: String) -> String = { "xcrun xcresulttool merge " + $0.map { "'\($0)'" }.joined(separator: " ") + " --output-path '\($1)'" }
 
-        let cleanupCmd = "rm -rf " + sourcePaths.map { "\"\($0)\"" }.joined(separator: " ")
+        // Merge in batch of 100 results
+
+        let partsCount = sourcePaths.count / 100
+        let sourcePathsParts = sourcePaths.split(in: partsCount)
+        var partialMerges = [String]()
+        for (index, part) in sourcePathsParts.enumerated() {
+            if part.count > 1 {
+                let partialMergeDestination = mergedDestinationPath + index.description
+                _ = try executer.execute(mergeCmd(part, partialMergeDestination))
+                partialMerges.append(partialMergeDestination)
+            } else {
+                partialMerges = part
+            }
+        }
+
+        guard partialMerges.isEmpty == false else { return }
+
+        if partialMerges.count > 1 {
+            _ = try executer.execute(mergeCmd(partialMerges, mergedDestinationPath))
+        } else {
+            let moveCommand = "mv '\(partialMerges[0])' '\(mergedDestinationPath)'"
+            _ = try executer.execute(moveCommand)
+        }
+
+        let cleanupCmd = "rm -rf " + (sourcePaths + partialMerges).map { "'\($0)'" }.joined(separator: " ")
         _ = try executer.execute(cleanupCmd)
     }
 }

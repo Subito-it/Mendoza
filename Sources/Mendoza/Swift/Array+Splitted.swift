@@ -9,12 +9,13 @@ import Foundation
 
 extension Array {
     func split(in parts: Int) -> [[Element]] {
-        var processedSize = 0
+        let parts = Swift.max(1, parts)
 
+        var processedSize = 0
         return (0 ..< parts).map {
             let size = Int((Float(count - processedSize) / Float(parts - $0)).rounded())
             defer { processedSize += size }
             return Array(self[processedSize ..< processedSize + size])
         }
-    }
+    }    
 }
