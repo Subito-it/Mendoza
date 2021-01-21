@@ -144,11 +144,8 @@ extension CommandLineProxy {
         }
 
         func updateLanguage(on simulator: Simulator, language: String?, locale: String?) throws -> Bool {
-
-            let currentLanguage = try executer.execute("plutil -extract AppleLanguages json -o - \(simulatorSettingsPath(for: simulator))/.GlobalPreferences.plist | cut -d'\"' -f2")
-            _ = try executer.execute("plutil -replace AppleLanguages -json '[ \"\(language)\" ]' \(simulatorSettingsPath(for: simulator))/.GlobalPreferences.plist")
-
-            return language != currentLanguage
+            // Still TODO
+            return false
         }
 
         func rawSimulatorStatus() throws -> String {
