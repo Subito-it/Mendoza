@@ -80,7 +80,7 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
                 }
 
                 if shouldRebootSimulators {
-                    try nodeSimulators.forEach { try proxy.shutdown(simulator: $0) }
+                    nodeSimulators.forEach { try? proxy.shutdown(simulator: $0) }
 
                     if self.runHeadless == false {
                         try proxy.gracefullyQuit()
