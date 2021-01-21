@@ -471,7 +471,7 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
 
     private func findTestResultsUrl(executer: Executer, testRunner: TestRunner) throws -> [URL] {
         let resultPath = Path.logs.url.appendingPathComponent(testRunner.id).path
-        let testResults = try executer.execute("find '\(resultPath)' -type d -name '*.xcresult'").components(separatedBy: "\n")
+        let testResults = (try? executer.execute("find '\(resultPath)' -type d -name '*.xcresult'"))?.components(separatedBy: "\n") ?? []
 
         return testResults.filter { $0.isEmpty == false }.map { URL(fileURLWithPath: $0) }
     }
