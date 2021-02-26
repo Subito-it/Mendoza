@@ -211,17 +211,27 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                     self.syncQueue.sync { [unowned self] in
                         let addToCompleted = index > 0 ? events[index - 1].isTestCrashed == false : true
 
-                        guard let currentRunning = currentRunningAndDuration(addToCompleted) else { return }
+                        if let currentRunning = currentRunningAndDuration(addToCompleted) {
                         self.currentRunningTest[runnerIndex] = nil
 
                         print("𝘅 \(self.verbose ? "[\(Date().description)] " : "")\(currentRunning.test.description) failed [\(self.testCasesCompleted.count)/\(self.testCasesCount)]\(self.retryCount > 0 ? " (\(self.retryCount) retries)" : "") in \(currentRunning.duration) {\(runnerIndex)}".red)
+                        } else {
+                            let failedTests = testCases.map(\.testIdentifier).joined(separator: " ")
+                            
+                            print("𝘅 \(self.verbose ? "[\(Date().description)] " : "")\(failedTests) failed [\(self.testCasesCompleted.count)/\(self.testCasesCount)]\(self.retryCount > 0 ? " (\(self.retryCount) retries)" : "") {\(runnerIndex)}".red)
+                        }
                     }
                 case .testCrashed:
                     self.syncQueue.sync { [unowned self] in
-                        guard let currentRunning = currentRunningAndDuration(true) else { return }
+                        if let currentRunning = currentRunningAndDuration(true) {
                         self.currentRunningTest[runnerIndex] = nil
 
-                        print("💥 \(self.verbose ? "[\(Date().description)] " : "")\(currentRunning.test.description) crash [\(self.testCasesCompleted.count)/\(self.testCasesCount)]\(self.retryCount > 0 ? " (\(self.retryCount) retries)" : "") in \(currentRunning.duration) {\(runnerIndex)}".red)
+                            print("💥 \(self.verbose ? "[\(Date().description)] " : "")\(currentRunning.test.description) crashed [\(self.testCasesCompleted.count)/\(self.testCasesCount)]\(self.retryCount > 0 ? " (\(self.retryCount) retries)" : "") in \(currentRunning.duration) {\(runnerIndex)}".red)
+                        } else {
+                            let crashedTests = testCases.map(\.testIdentifier).joined(separator: " ")
+                            
+                            print("💥 \(self.verbose ? "[\(Date().description)] " : "")\(crashedTests) crashed [\(self.testCasesCompleted.count)/\(self.testCasesCount)]\(self.retryCount > 0 ? " (\(self.retryCount) retries)" : "") {\(runnerIndex)}".red)
+                        }
                     }
                 case .noSpaceOnDevice:
                     fatalError("💥  No space left on \(executer.address). If you're using a RAM disk in Mendoza's configuration consider increasing size")
