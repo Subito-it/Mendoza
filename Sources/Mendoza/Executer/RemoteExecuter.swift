@@ -83,7 +83,7 @@ final class RemoteExecuter: Executer {
 
         var result = (status: Int32(-999), output: "")
         do {
-            result = try connection.capture("\(RemoteExecuter.executablePathExport()) \(cmd) 2>&1") { localProgress in
+            result = try connection.capture("bash -c \"\(RemoteExecuter.executablePathExport()) \(cmd.replacingOccurrences(of: "\"", with: "\\\"")) 2>&1\"") { localProgress in
                 progress?(localProgress)
             }
 
@@ -161,9 +161,9 @@ final class RemoteExecuter: Executer {
     func terminate() {
         try? connection?.terminate()
     }
-
+    
     private func terminateProcessOnDisconnect() throws {
-        try connection?.execute("shopt -s huponexit")
+        try connection?.execute("/bin/bash -c \"shopt -s huponexit\"")
     }
 
     private func updateCurrentDirectoryPath() throws {
