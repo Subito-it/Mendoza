@@ -149,7 +149,7 @@ extension CommandLineProxy {
         }
 
         func rawSimulatorStatus() throws -> String {
-            try executer.execute("$(xcode-select -p)/usr/bin/instruments -s devices")
+            try executer.execute("xcrun xctrace list devices")
         }
 
         /// This method instantiates a Simulator given a name.
@@ -164,18 +164,32 @@ extension CommandLineProxy {
             // We use 'instruments -s devices' instead of 'xcrun simctl list devices' because it gives more complete infos including simulator version
             let simulatorsStatus = try cachedSimulatorStatus ?? (try rawSimulatorStatus())
 
-            let statusRegex = try NSRegularExpression(pattern: #"(.*)\s\((\d+\.\d+(\.\d+)?)\)\s\[(.*)\]\s\(Simulator\)$"#)
-            for simulatorStatus in simulatorsStatus.components(separatedBy: "\n") {
-                let captureGroups = simulatorStatus.capturedGroups(regex: statusRegex)
+            let statusRegex = try NSRegularExpression(pattern: #"(.*)\s\((.*)\)\s\((.*)\)$"#)
+            
+            let simulatorStatus: (String) -> (String, String, String)? = { rawStatus in
+                let captureGroups = rawStatus.capturedGroups(regex: statusRegex)
 
-                guard captureGroups.count == 4 else { continue }
+                guard captureGroups.count == 3 else { return nil }
 
-                let simulatorName = captureGroups[0]
-                let simulatorRuntime = captureGroups[1]
-                let simulatorId = captureGroups[3]
-
-                if simulatorName == name, simulatorRuntime == device.runtime {
-                    return Simulator(id: simulatorId, name: name, device: device)
+                return (captureGroups[0], captureGroups[1], captureGroups[2])
+            }
+            
+            for rawStatus in simulatorsStatus.components(separatedBy: "\n") {
+                if let (simulatorName, simulatorRuntime, simulatorId) = simulatorStatus(rawStatus) {
+                    if simulatorName == name, simulatorRuntime == device.runtime {
+                        return Simulator(id: simulatorId, name: name, device: device)
+                    }
+                }
+            }
+            
+            // Some versions of Xcode add a minor to simulator version (e.g 14.0.1 instead of 14.0)
+            for rawStatus in simulatorsStatus.components(separatedBy: "\n") {
+                if let (simulatorName, simulatorRuntime, simulatorId) = simulatorStatus(rawStatus) {
+                    if simulatorName == name, simulatorRuntime.hasPrefix(device.runtime) {
+                        print("📱  Simulator \(name) using version \(simulatorRuntime) instead of \(device.runtime)")
+                        
+                        return Simulator(id: simulatorId, name: name, device: device)
+                    }
                 }
             }
 
