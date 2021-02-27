@@ -144,8 +144,27 @@ extension CommandLineProxy {
         }
 
         func updateLanguage(on simulator: Simulator, language: String?, locale: String?) throws -> Bool {
-            // Still TODO
-            return false
+            let path = "\(simulatorSettingsPath(for: simulator))/.GlobalPreferences.plist"
+
+            if try executer.execute("ls \(path) | wc -l") == "0" {
+                let tmpPath = Path.temp.url.appendingPathComponent("\(UUID().uuidString).plist")
+                // TODO verify this is working _ = try executer.execute("echo '{\"AppleLanguages\":[\"\(language)\"], \"AppleLocale\": \"\(locale)\" }' > \(tmpPath); plutil -convert binary1 \(tmpPath) -o \(path)")
+                print(tmpPath)
+
+                return true
+            } else {
+                let currentLanguage = try executer.execute(#"plutil -extract AppleLanguages xml1 -o - '\#(path)' | sed -n "s/.*<string>\(.*\)<\/string>.*/\1/p" | head -n 1"#)
+                let currentLocale = try executer.execute(#"plutil -extract AppleLocale xml1 -o - '\#(path)' | sed -n "s/.*<string>\(.*\)<\/string>.*/\1/p" | head -n 1"#)
+
+                if let language = language {
+                    _ = try executer.execute(#"plutil -replace AppleLanguages -json '[ "\#(language)" ]' \#(path)"#)
+                }
+                if let locale = locale {
+                    _ = try executer.execute(#"plutil -replace AppleLocale -json '"\#(locale)"' \#(path)"#)
+                }
+
+                return currentLocale == (locale ?? currentLocale) || currentLanguage == (language ?? currentLanguage)
+            }
         }
 
         func rawSimulatorStatus() throws -> String {
