@@ -145,25 +145,47 @@ extension CommandLineProxy {
 
         func updateLanguage(on simulator: Simulator, language: String?, locale: String?) throws -> Bool {
             let path = "\(simulatorSettingsPath(for: simulator))/.GlobalPreferences.plist"
-
-            if try executer.execute("ls \(path) | wc -l") == "0" {
-                let tmpPath = Path.temp.url.appendingPathComponent("\(UUID().uuidString).plist")
-                // TODO verify this is working _ = try executer.execute("echo '{\"AppleLanguages\":[\"\(language)\"], \"AppleLocale\": \"\(locale)\" }' > \(tmpPath); plutil -convert binary1 \(tmpPath) -o \(path)")
-                print(tmpPath)
-
-                return true
+            
+            if try executer.execute("ls '\(path)' 2>/dev/null | wc -l") == "0" {
+                let tmpPath = Path.temp.url.appendingPathComponent("\(UUID().uuidString).plist").path
+                
+                var json = [String]()
+                if let language = language {
+                    guard language.components(separatedBy: "-").count == 2 else {
+                        throw Error("Invalid language provided \(language), expecting", logger: executer.logger)
+                    }
+                    json.append("\"AppleLanguages\":[\"\(language)\"]")
+                }
+                if let locale = locale {
+                    guard locale.components(separatedBy: "_").count == 2 else {
+                        throw Error("Invalid locale provided \(locale), expecting _", logger: executer.logger)
+                    }
+                    json.append("\"AppleLocale\": \"\(locale)\"")
+                }
+                
+                if json.count > 0 {
+                    _ = try executer.execute("echo '{ \(json.joined(separator: ", ")) }' > \(tmpPath); plutil -convert binary1 \(tmpPath) -o \(path)")
+                }
+                
+                return json.count > 0
             } else {
                 let currentLanguage = try executer.execute(#"plutil -extract AppleLanguages xml1 -o - '\#(path)' | sed -n "s/.*<string>\(.*\)<\/string>.*/\1/p" | head -n 1"#)
                 let currentLocale = try executer.execute(#"plutil -extract AppleLocale xml1 -o - '\#(path)' | sed -n "s/.*<string>\(.*\)<\/string>.*/\1/p" | head -n 1"#)
 
                 if let language = language {
+                    guard language.components(separatedBy: "-").count == 2 else {
+                        throw Error("Invalid language provided \(language), expecting", logger: executer.logger)
+                    }
                     _ = try executer.execute(#"plutil -replace AppleLanguages -json '[ "\#(language)" ]' \#(path)"#)
                 }
                 if let locale = locale {
+                    guard locale.components(separatedBy: "_").count == 2 else {
+                        throw Error("Invalid locale provided \(locale), expecting _", logger: executer.logger)
+                    }
                     _ = try executer.execute(#"plutil -replace AppleLocale -json '"\#(locale)"' \#(path)"#)
                 }
 
-                return currentLocale == (locale ?? currentLocale) || currentLanguage == (language ?? currentLanguage)
+                return currentLocale != (locale ?? currentLocale) || currentLanguage != (language ?? currentLanguage)
             }
         }
 
