@@ -25,7 +25,7 @@ class TestCommand: Command {
     let deviceRuntimeField = Argument<String>(name: "version", kind: .named(short: "v", long: "device_runtime"), optional: true, help: "Device runtime to use to run tests. e.g. '13.0'")
     let deviceLanguage = Argument<String>(name: "language", kind: .named(short: nil, long: "device_language"), optional: true, help: "Device language. e.g. 'en-EN'")
     let deviceLocale = Argument<String>(name: "locale", kind: .named(short: nil, long: "device_locale"), optional: true, help: "Device locale. e.g. 'en_US'")
-    let timeoutField = Argument<Int>(name: "seconds", kind: .named(short: nil, long: "timeout"), optional: true, help: "Maximum allowed idle time (in seconds) in test standard output before dispatch process is automatically terminated. Default 120 seconds")
+    let timeoutField = Argument<Int>(name: "seconds", kind: .named(short: nil, long: "timeout"), optional: true, help: "Maximum allowed idle time (in seconds) in test standard output before dispatch process is automatically terminated. Default 600 seconds")
     let pluginCustomField = Argument<String>(name: "data", kind: .named(short: nil, long: "plugin_data"), optional: true, help: "A custom string that can be used to inject data to plugins")
     let failingTestsRetryCountField = Argument<Int>(name: "count", kind: .named(short: "r", long: "failure_retry"), optional: true, help: "Number of times a failing tests should be repeated")
 
@@ -37,7 +37,7 @@ class TestCommand: Command {
             } else {
                 device = Device.defaultInit()
             }
-            let timeout = timeoutField.value ?? 120
+            let timeout = timeoutField.value ?? 600
             let filePatterns = FilePatterns(commaSeparatedIncludePattern: includePatternField.value, commaSeparatedExcludePattern: excludePatternField.value)
             let failingTestsRetryCount = failingTestsRetryCountField.value ?? 0
 
