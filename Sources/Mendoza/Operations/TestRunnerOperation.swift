@@ -25,7 +25,6 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
     private let testTimeoutSeconds: Int
     private let syncQueue = DispatchQueue(label: String(describing: TestRunnerOperation.self))
     private let verbose: Bool
-    private var timeoutBlocks = [Int: CancellableDelayedTask]()
     private var retryCountMap = NSCountedSet()
     private var retryCount: Int { // access only from syncQueue
         retryCountMap.reduce(0) { $0 + retryCountMap.count(for: $1) }
@@ -166,16 +165,6 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
 
         var partialProgress = ""
         let progressHandler: ((String) -> Void) = { [unowned self] progress in
-            let timeoutBlockRunning = self.syncQueue.sync { self.timeoutBlocks[runnerIndex]?.isRunning == true }
-            guard !timeoutBlockRunning else {
-                return
-            }
-
-            self.syncQueue.sync {
-                self.timeoutBlocks[runnerIndex]?.cancel()
-                self.timeoutBlocks[runnerIndex] = self.makeTimeoutBlock(executer: executer, currentRunning: self.currentRunningTest[runnerIndex], testRunner: testRunner, runnerIndex: runnerIndex)
-            }
-
             partialProgress += progress
             let lines = partialProgress.components(separatedBy: "\n")
             let events = lines.compactMap(self.parseXcodebuildOutput)
@@ -243,11 +232,6 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
 
         var output = ""
         for shouldRetry in [true, false] {
-            syncQueue.sync {
-                self.timeoutBlocks[runnerIndex]?.cancel()
-                self.timeoutBlocks[runnerIndex] = self.makeTimeoutBlock(executer: executer, currentRunning: self.currentRunningTest[runnerIndex], testRunner: testRunner, runnerIndex: runnerIndex)
-            }
-
             let testResults = try findTestResultsUrl(executer: executer, testRunner: testRunner)
             try testResults.forEach { _ = try executer.execute("rm -rf '\($0.path)' || true") }
 
@@ -255,8 +239,6 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                 try self.assertAccessibilityPermissions(in: result.output)
                 throw originalError
             }
-
-            syncQueue.sync { timeoutBlocks[runnerIndex]?.cancel() }
 
             // xcodebuild returns 0 even on ** TEST EXECUTE FAILED ** when missing
             // accessibility permissions or other errors like the bootstrapping onese we check in testsDidFailToStart
@@ -406,28 +388,6 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
         }
 
         return nil
-    }
-
-    private func makeTimeoutBlock(executer: Executer, currentRunning: @autoclosure @escaping () -> (test: TestCase, start: TimeInterval)?, testRunner: TestRunner, runnerIndex: Int) -> CancellableDelayedTask {
-        let task = CancellableDelayedTask(delay: TimeInterval(testTimeoutSeconds), queue: syncQueue)
-
-        task.run { [unowned self] in
-            if let currentRunning = currentRunning() {
-                print("⏰ \(currentRunning.test.description) timed out {\(runnerIndex)} in \(Int(CFAbsoluteTimeGetCurrent() - currentRunning.start))s".red)
-            } else {
-                print("⏰ Unknown test timed out {\(runnerIndex)}".red)
-            }
-
-            // - NOTE:
-            // To stop tests that time out we're force resetting simulators.
-            // This abrupt way of stopping tests will have as a consequence that
-            // no data related to the test will be written to the output xcresult
-            DispatchQueue.global(qos: .userInitiated).async {
-                self.forceResetSimulator(executer: executer, testRunner: testRunner)
-            }
-        }
-
-        return task
     }
 
     private func forceResetSimulator(executer: Executer, testRunner: TestRunner) {
