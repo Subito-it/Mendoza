@@ -26,21 +26,7 @@ class RemoteSetupOperation: BaseOperation<Void> {
             try pool.execute { executer, source in
                 let ramDisks = CommandLineProxy.RamDisk(executer: executer)
                 try ramDisks.eject(name: Environment.ramDiskName, throwOnError: false)
-
-                switch AddressType(node: source.node) {
-                case .remote:
-                    for path in Path.allCases {
-                        if path != .base {
-                            _ = try executer.execute("rm -rf '\(path.rawValue)' || true")
-                        }
-                        _ = try executer.execute("mkdir -p '\(path.rawValue)' || true")
-                    }
-                case .local:
-                    break // Folders setup in LocalSetupOperation
-                }
-
-                _ = try executer.execute("touch '\(Path.base.url.appendingPathComponent(".metadata_never_index").path)'")
-
+                
                 switch AddressType(node: source.node) {
                 case .remote:
                     if let ramDiskSize = source.node.ramDiskSizeMB {
@@ -50,8 +36,22 @@ class RemoteSetupOperation: BaseOperation<Void> {
                 case .local:
                     break // never create ram disk on local address because we already wrote critical files to Path.base
                 }
-            }
 
+                switch AddressType(node: source.node) {
+                case .remote:
+                    for path in Path.allCases.filter({ $0 != .base }) {
+                        _ = try executer.execute("rm -rf '\(path.rawValue)' || true")
+                    }
+                    for path in Path.allCases {
+                        _ = try executer.execute("mkdir -p '\(path.rawValue)' || true")
+                    }
+                case .local:
+                    break // Folders setup in LocalSetupOperation
+                }
+
+                _ = try executer.execute("touch '\(Path.base.url.appendingPathComponent(".metadata_never_index").path)'")
+            }
+            
             didEnd?(())
         } catch {
             didThrow?(error)
