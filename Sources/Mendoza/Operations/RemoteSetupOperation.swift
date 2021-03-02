@@ -24,6 +24,8 @@ class RemoteSetupOperation: BaseOperation<Void> {
             didStart?()
 
             try pool.execute { executer, source in
+                _ = try executer.execute("mkdir -p '\(Path.base.rawValue)' || true")
+                
                 let ramDisks = CommandLineProxy.RamDisk(executer: executer)
                 try ramDisks.eject(name: Environment.ramDiskName, throwOnError: false)
                 
@@ -41,8 +43,6 @@ class RemoteSetupOperation: BaseOperation<Void> {
                 case .remote:
                     for path in Path.allCases.filter({ $0 != .base }) {
                         _ = try executer.execute("rm -rf '\(path.rawValue)' || true")
-                    }
-                    for path in Path.allCases {
                         _ = try executer.execute("mkdir -p '\(path.rawValue)' || true")
                     }
                 case .local:
