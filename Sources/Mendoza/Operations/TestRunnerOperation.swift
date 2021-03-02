@@ -256,6 +256,9 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                 break
             }
         }
+        
+        if testDidFailLoadingAccessibility(in: output) {
+            self.forceResetSimulator(executer: executer, testRunner: testRunner)
         }
 
         return output
@@ -482,6 +485,10 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
 
     private func testsDidFailBootstrapping(in output: String) -> Bool {
         output.contains("Test runner exited before starting test execution")
+    }
+    
+    private func testDidFailLoadingAccessibility(in output: String) -> Bool {
+        output.contains("has not loaded accessibility")
     }
 
     private func testDidFailBecauseOfDamagedBuild(in output: String) -> Bool {
