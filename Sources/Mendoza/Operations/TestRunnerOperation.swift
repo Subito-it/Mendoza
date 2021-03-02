@@ -386,7 +386,6 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
         // There's no better option than shutting down simulator at this point
         // xcodebuild will take care to boot simulator again and continue testing
         try? proxy.shutdown(simulator: simulator)
-        try? proxy.boot(simulator: simulator)
     }
 
     private func enqueueFailedTests(testResults: [TestCaseResult], failingTestsRetryCount: Int) -> [TestCase] {
