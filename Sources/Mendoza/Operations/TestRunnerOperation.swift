@@ -229,46 +229,33 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
 
             partialProgress = lines.last ?? ""
         }
-
-        var output = ""
-        for shouldRetry in [true, false] {
-            let testResults = try findTestResultsUrl(executer: executer, testRunner: testRunner)
-            try testResults.forEach { _ = try executer.execute("rm -rf '\($0.path)' || true") }
-
-            output = try executer.execute(testWithoutBuilding, progress: progressHandler) { result, originalError in
-                try self.assertAccessibilityPermissions(in: result.output)
-                throw originalError
-            }
-
-            // xcodebuild returns 0 even on ** TEST EXECUTE FAILED ** when missing
-            // accessibility permissions or other errors like the bootstrapping onese we check in testsDidFailToStart
-            try assertAccessibilityPermissions(in: output)
-
-            guard !testsDidFailBootstrapping(in: output) else {
-                Thread.sleep(forTimeInterval: 5.0)
-                partialProgress = ""
-
-                guard shouldRetry else {
-                    throw Error("Tests failed boostrapping on node \(testRunner.name)-\(testRunner.id)")
-                }
-
-                continue
-            }
-
-            guard !testDidFailBecauseOfDamagedBuild(in: output) else {
-                switch AddressType(address: executer.address) {
-                case .local:
-                    _ = try executer.execute("rm -rf '\(Path.build.rawValue)' || true")
-                    // To be improved
-                    throw Error("Tests failed because of damaged build folder, please try rerunning the build again")
-                case .remote:
-                    break
-                }
-
+        
+        let testResults = try findTestResultsUrl(executer: executer, testRunner: testRunner)
+        try testResults.forEach { _ = try executer.execute("rm -rf '\($0.path)' || true") }
+        
+        let output = try executer.execute(testWithoutBuilding, progress: progressHandler) { result, originalError in
+            try self.assertAccessibilityPermissions(in: result.output)
+            throw originalError
+        }
+        
+        // xcodebuild returns 0 even on ** TEST EXECUTE FAILED ** when missing
+        // accessibility permissions or other errors like the bootstrapping onese we check in testsDidFailToStart
+        try assertAccessibilityPermissions(in: output)
+        
+        if testsDidFailBootstrapping(in: output) {
+            Thread.sleep(forTimeInterval: 10.0)
+        }
+        
+        if testDidFailBecauseOfDamagedBuild(in: output) {
+            switch AddressType(address: executer.address) {
+            case .local:
+                _ = try executer.execute("rm -rf '\(Path.build.rawValue)' || true")
+                // To be improved
+                throw Error("Tests failed because of damaged build folder, please try rerunning the build again")
+            case .remote:
                 break
             }
-
-            break
+        }
         }
 
         return output
