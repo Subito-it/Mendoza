@@ -10,10 +10,11 @@ import Foundation
 struct PostCompilationInput: Codable {
     let compilationSucceeded: Bool
     let outputPath: String
+    let git: GitStatus?
 }
 
 extension PostCompilationInput: DefaultInitializable {
     static func defaultInit() -> PostCompilationInput {
-        PostCompilationInput(compilationSucceeded: false, outputPath: "")
+        PostCompilationInput(compilationSucceeded: false, outputPath: "", git: nil)
     }
 }

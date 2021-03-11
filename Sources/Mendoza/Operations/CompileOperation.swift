@@ -9,6 +9,7 @@ import Foundation
 
 class CompileOperation: BaseOperation<Void> {
     private let configuration: Configuration
+    private let git: GitStatus?
     private let baseUrl: URL
     private let project: XcodeProject
     private let scheme: String
@@ -19,8 +20,9 @@ class CompileOperation: BaseOperation<Void> {
         self.makeLocalExecuter()
     }()
 
-    init(configuration: Configuration, baseUrl: URL, project: XcodeProject, scheme: String, preCompilationPlugin: PreCompilationPlugin, postCompilationPlugin: PostCompilationPlugin, sdk: XcodeProject.SDK) {
+    init(configuration: Configuration, git: GitStatus?, baseUrl: URL, project: XcodeProject, scheme: String, preCompilationPlugin: PreCompilationPlugin, postCompilationPlugin: PostCompilationPlugin, sdk: XcodeProject.SDK) {
         self.configuration = configuration
+        self.git = git
         self.baseUrl = baseUrl
         self.project = project
         self.scheme = scheme
@@ -56,7 +58,8 @@ class CompileOperation: BaseOperation<Void> {
                 if postCompilationPlugin.isInstalled {
                     _ = try? postCompilationPlugin.run(input:
                                                         PostCompilationInput(compilationSucceeded: compilationSucceeded,
-                                                                                   outputPath: "\(Path.build.rawValue)/Build/Products"))
+                                                                             outputPath: "\(Path.build.rawValue)/Build/Products",
+                                                                             git: self.git))
                 }
 
                 didEnd?(())
