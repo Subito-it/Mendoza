@@ -54,7 +54,9 @@ class CompileOperation: BaseOperation<Void> {
             var compilationSucceeded = false
             defer {
                 if postCompilationPlugin.isInstalled {
-                    _ = try? postCompilationPlugin.run(input: PostCompilationInput(compilationSucceeded: compilationSucceeded))
+                    _ = try? postCompilationPlugin.run(input:
+                                                        PostCompilationInput(compilationSucceeded: compilationSucceeded,
+                                                                                   outputPath: "\(Path.build.rawValue)/Build/Products"))
                 }
 
                 didEnd?(())

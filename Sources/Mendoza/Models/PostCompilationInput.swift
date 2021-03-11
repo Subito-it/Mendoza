@@ -9,10 +9,11 @@ import Foundation
 
 struct PostCompilationInput: Codable {
     let compilationSucceeded: Bool
+    let outputPath: String
 }
 
 extension PostCompilationInput: DefaultInitializable {
     static func defaultInit() -> PostCompilationInput {
-        PostCompilationInput(compilationSucceeded: false)
+        PostCompilationInput(compilationSucceeded: false, outputPath: "")
     }
 }
