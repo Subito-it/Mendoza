@@ -8,6 +8,9 @@
 import Foundation
 
 extension String {
+    private static var regexCacheQueue: DispatchQueue = DispatchQueue(label: "com.subito.mendoza.regex.queue")
+    private static var regexCache = [String: NSRegularExpression]()
+    
     func capturedGroups(regex: NSRegularExpression) -> [String] {
         var results = [String]()
 
@@ -35,9 +38,13 @@ extension String {
     }
 
     func capturedGroups(withRegexString pattern: String) throws -> [String] {
-        let regex = try NSRegularExpression(pattern: pattern, options: [])
-
-        return capturedGroups(regex: regex)
+        if let regex = Self.regexCacheQueue.sync(execute: { Self.regexCache[pattern] }) {
+            return capturedGroups(regex: regex)
+        } else {
+            let regex = try NSRegularExpression(pattern: pattern, options: [])
+            Self.regexCacheQueue.sync { Self.regexCache[pattern] = regex }
+            return capturedGroups(regex: regex)
+        }
     }
 
     func expandingTilde() -> String {
