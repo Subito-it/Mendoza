@@ -85,20 +85,38 @@ class TestCollectorOperation: BaseOperation<Void> {
         let sourcePaths = try executer.execute("find \(destinationPath) -type d -name '*.xcresult'").components(separatedBy: "\n")
 
         let mergeCmd: (_ sourcePaths: [String], _ destinationPath: String) -> String = { "xcrun xcresulttool merge " + $0.map { "'\($0)'" }.joined(separator: " ") + " --output-path '\($1)'" }
-
-        // Merge in batch of 100 results
-
-        let partsCount = sourcePaths.count / 100
+        
+        // Merge in batch of ~ 50 results
+            
+        let partsCount = sourcePaths.count / 50
         let sourcePathsParts = sourcePaths.split(in: partsCount)
         var partialMerges = [String]()
-        for (index, part) in sourcePathsParts.enumerated() {
-            if part.count > 1 {
-                let partialMergeDestination = mergedDestinationPath + index.description
-                _ = try executer.execute(mergeCmd(part, partialMergeDestination))
-                partialMerges.append(partialMergeDestination)
-            } else {
-                partialMerges = part
+            
+        if partsCount > 1 {
+            let queue = OperationQueue()
+            let syncQueue = DispatchQueue(label: "com.subito.mendoza.collector.queue")
+            var mergeFailed = false
+
+            for (index, part) in sourcePathsParts.enumerated() {
+                queue.addOperation {
+                    let partialMergeDestination = mergedDestinationPath + index.description
+                    do {
+                        _ = try executer.execute(mergeCmd(part, partialMergeDestination))
+                    } catch {
+                        syncQueue.sync { mergeFailed = true }
+                    }
+                    
+                    syncQueue.sync { partialMerges.append(partialMergeDestination) }
+                }
             }
+            
+            queue.waitUntilAllOperationsAreFinished()
+            
+            guard !mergeFailed else {
+                throw Error("Result merge failed")
+            }
+        } else {
+            partialMerges = sourcePaths
         }
 
         guard partialMerges.isEmpty == false else { return }
