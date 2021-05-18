@@ -264,7 +264,7 @@ extension CommandLineProxy {
 
             var simulators = [Simulator]()
             for status in simulatorsStatus.components(separatedBy: "\n") {
-                let capture = try status.capturedGroups(withRegexString: #"(.*) \((.*)\) \[(.*)\] \(Simulator\)"#)
+                let capture = try status.capturedGroups(withRegexString: #"(.*) \((.*)\) \((.*)\)"#)
 
                 guard capture.count == 3 else { continue }
 
