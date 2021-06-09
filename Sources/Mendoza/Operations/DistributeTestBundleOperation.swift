@@ -51,7 +51,7 @@ class DistributeTestBundleOperation: BaseOperation<Void> {
                 }
 
                 guard !distributionCompleted else { break }
-
+                
                 for source in readyNodes {
                     guard let destination = missingNodes.randomElement() else {
                         continue
@@ -89,6 +89,10 @@ class DistributeTestBundleOperation: BaseOperation<Void> {
                             sendingNodes.remove(source)
                         }
                     }
+                }
+                
+                if readyNodes.isEmpty {
+                    Thread.sleep(forTimeInterval: 1.0)
                 }
             }
 
