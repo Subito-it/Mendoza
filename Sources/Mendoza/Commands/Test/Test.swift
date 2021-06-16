@@ -67,7 +67,14 @@ class Test {
         let queue = OperationQueue()
 
         let testSessionResult = TestSessionResult()
-
+        let arguments: [String?] = [userOptions.device.name,
+                                    userOptions.device.runtime,
+                                    userOptions.filePatterns.include.sorted().joined(separator: ","),
+                                    userOptions.filePatterns.exclude.sorted().joined(separator: ","),
+                                    plugin.data]
+        
+        testSessionResult.launchArguments = arguments.compactMap { $0 }.joined(separator: " ")
+        
         let operations = try makeOperations(gitStatus: gitStatus, testSessionResult: testSessionResult, sdk: sdk)
 
         queue.addOperations(operations, waitUntilFinished: true)
@@ -231,20 +238,30 @@ class Test {
         testRunnerOperation.didEnd = { [unowned self] testCaseResults in
             self.syncQueue.sync {
                 testSessionResult.passedTests = testCaseResults.filter { $0.status == .passed }
+                testSessionResult.failedTests = testCaseResults.filter { $0.status != .passed }
+                
+                let retriedTests = testSessionResult.failedTests.filter { failedTest in testSessionResult.passedTests.contains(where: { passedTest in failedTest.testCaseIdentifier == passedTest.testCaseIdentifier } )}
+                testSessionResult.retriedTests = retriedTests
 
                 // Failed test results are those that failed even after retrying
-                testSessionResult.failedTests = testCaseResults.filter { result in
-                    let passedOnRepeat = testSessionResult.passedTests.contains { successResult in
-                        result.testCaseIdentifier == successResult.testCaseIdentifier
-                    }
-
-                    return result.status == .failed && passedOnRepeat == false
+                testSessionResult.failedTests = testCaseResults.filter { testCase in
+                    let isRetriedTestCase = testSessionResult.retriedTests.contains { $0.testCaseIdentifier == testCase.testCaseIdentifier }
+                    return testCase.status == .failed && !isRetriedTestCase
                 }
-                // We should keep only one failure per test.suite + test.name
+                
+                // Keep only one failure per testCaseIdentifier
                 var uniqueFailedSessions = Set<String>()
                 testSessionResult.failedTests = testSessionResult.failedTests.filter {
                     uniqueFailedSessions.update(with: $0.testCaseIdentifier) == nil
                 }
+                
+                let testCount = Double(testCaseResults.count)
+                let failureRate = Double(100 * testSessionResult.failedTests.count) / testCount
+                let retryRate = Double(100 * testSessionResult.retriedTests.count) / testCount
+                
+                testSessionResult.failureRate = failureRate
+                testSessionResult.retryRate = retryRate
+                testSessionResult.totalTestCount = Int(testCount)
 
                 let nodes = Set(testCaseResults.map(\.node))
                 for node in nodes {

@@ -24,16 +24,23 @@ final class TestSessionResult: Codable {
         }
     }
 
+    var launchArguments = ""
     var operationExecutionTime = [String: TimeInterval]()
     var nodes = [String: NodeStatistics]()
     var git: GitStatus?
     var passedTests = [TestCaseResult]()
     var failedTests = [TestCaseResult]()
+    var retriedTests = [TestCaseResult]()
+    var totalTestCount = 0
+    var failureRate: Double = 0.0
+    var retryRate: Double = 0.0
     var destination = Destination()
     var device = Device.defaultInit()
     var xcResultPath = [String: String]()
     var date = ""
     var startTime: TimeInterval = 0.0
+    var lineCoveragePercentage: Double = 0.0
+    var appInfo = AppInfo.defaultInit()
 }
 
 extension TestSessionResult: DefaultInitializable {
