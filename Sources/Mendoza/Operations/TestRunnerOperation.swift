@@ -81,6 +81,9 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                 let testRunner = source.value
 
                 let runnerIndex = self.syncQueue.sync { [unowned self] in self.testRunners?.firstIndex { $0.0.id == testRunner.id && $0.0.name == testRunner.name } ?? 0 }
+                
+                let group = DispatchGroup()
+                let codeCoverageMergeQueue = DispatchQueue(label: "com.subito.mendoza.coverage.merge")
 
                 while true {
                     let testCases: [TestCase] = self.syncQueue.sync { [unowned self] in
@@ -124,6 +127,19 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
 
                         result += testResults
                     }
+                    
+                    // We need to progressively merge coverage results since everytime we launch a test a brand new coverage file is created
+                    
+                    let logger = ExecuterLogger(name: "Coverage merge", address: source.node.address)
+                    let executer = try source.node.makeExecuter(logger: logger)
+                    let searchPath = Path.logs.url.appendingPathComponent(testRunner.id).path
+                    let coverageMerger = CodeCoverageMerger(executer: executer, searchPath: searchPath)
+                    
+                    group.enter()
+                    codeCoverageMergeQueue.async {
+                        _ = try? coverageMerger.merge()
+                        group.leave()
+                    }
                 }
 
                 try self.copyDiagnosticReports(executer: executer, testRunner: testRunner)
@@ -131,6 +147,10 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                 try self.copySessionLogs(executer: executer, testRunner: testRunner)
 
                 try self.reclaimDiskSpace(executer: executer, testRunner: testRunner)
+                
+                if group.wait(timeout: .now() + 30.0) == .timedOut {
+                    print("\nℹ️  Node {\(runnerIndex)} code coverage merge failed")
+                }
 
                 print("\nℹ️  Node {\(runnerIndex)} did execute tests in \(hoursMinutesSeconds(in: CFAbsoluteTimeGetCurrent() - self.startTimeInterval))\n".magenta)
             }
