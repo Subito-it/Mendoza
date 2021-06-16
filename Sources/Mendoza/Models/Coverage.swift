@@ -17,7 +17,7 @@ struct Coverage: Codable {
 extension Coverage {
     struct Data: Codable {
         let files: [File]
-        let functions: [Function]
+        let functions: [Function]?
         let totals: Stats
     }
 }
@@ -42,7 +42,7 @@ extension Coverage.Data {
             let count: Int?
             let covered: Int?
             let notcovered: Int?
-            let percent: Int?
+            let percent: Double?
         }
 
         let lines: Item?
