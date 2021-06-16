@@ -11,7 +11,7 @@ class Test {
     var didFail: ((Swift.Error) -> Void)?
 
     // swiftlint:disable:next large_tuple
-    private let userOptions: (configuration: Configuration, device: Device, runHeadless: Bool, filePatterns: FilePatterns, testTimeoutSeconds: Int, failingTestsRetryCount: Int, dispatchOnLocalHost: Bool, verbose: Bool)
+    private let userOptions: (configuration: Configuration, device: Device, runHeadless: Bool, filePatterns: FilePatterns, testTimeoutSeconds: Int, failingTestsRetryCount: Int, codeCoveragePathEquivalence: String?, dispatchOnLocalHost: Bool, verbose: Bool)
     private let plugin: (data: String?, debug: Bool)
     private let eventPlugin: EventPlugin
     private let pluginUrl: URL
@@ -19,7 +19,7 @@ class Test {
     private let timestamp: String
     private var observers = [NSKeyValueObservation]()
 
-    init(configurationUrl: URL, device: Device, runHeadless: Bool, filePatterns: FilePatterns, testTimeoutSeconds: Int, failingTestsRetryCount: Int, dispatchOnLocalHost: Bool, pluginData: String?, debugPlugins: Bool, verbose: Bool) throws {
+    init(configurationUrl: URL, device: Device, runHeadless: Bool, filePatterns: FilePatterns, testTimeoutSeconds: Int, failingTestsRetryCount: Int, codeCoveragePathEquivalence: String?, dispatchOnLocalHost: Bool, pluginData: String?, debugPlugins: Bool, verbose: Bool) throws {
         plugin = (data: pluginData, debug: debugPlugins)
 
         let configurationData = try Data(contentsOf: configurationUrl)
@@ -31,7 +31,7 @@ class Test {
             configuration = updatedConfiguration
         }
 
-        userOptions = (configuration: configuration, device: device, runHeadless: runHeadless, filePatterns: filePatterns, testTimeoutSeconds: testTimeoutSeconds, failingTestsRetryCount: failingTestsRetryCount, dispatchOnLocalHost: dispatchOnLocalHost, verbose: verbose)
+        userOptions = (configuration: configuration, device: device, runHeadless: runHeadless, filePatterns: filePatterns, testTimeoutSeconds: testTimeoutSeconds, failingTestsRetryCount: failingTestsRetryCount, codeCoveragePathEquivalence: codeCoveragePathEquivalence, dispatchOnLocalHost: dispatchOnLocalHost, verbose: verbose)
 
         pluginUrl = configurationUrl.deletingLastPathComponent()
         eventPlugin = EventPlugin(baseUrl: pluginUrl, plugin: plugin)
@@ -55,6 +55,12 @@ class Test {
             }
         case .macos:
             break
+        }
+        
+        if let codeCoveragePathEquivalence = userOptions.codeCoveragePathEquivalence {
+            if codeCoveragePathEquivalence.components(separatedBy: ",").count != 2 {
+                throw Error("Invalid format for --llvm_cov_equivalence_path parameter, expecting --llvm_cov_equivalence_path=<from>,<to>".red)
+            }
         }
 
         print("ℹ️  Dispatching on".magenta.bold)
@@ -88,6 +94,7 @@ class Test {
         let configuration = userOptions.configuration
         let device = userOptions.device
         let filePatterns = userOptions.filePatterns
+        let codeCoveragePathEquivalence = userOptions.codeCoveragePathEquivalence
 
         let gitBaseUrl = gitStatus.url
         let project = try localProject(baseUrl: gitBaseUrl, path: configuration.projectPath)
@@ -114,8 +121,9 @@ class Test {
         let simulatorSetupOperation = SimulatorSetupOperation(configuration: configuration, nodes: uniqueNodes, device: device, runHeadless: userOptions.runHeadless, verbose: userOptions.verbose)
         let distributeTestBundleOperation = DistributeTestBundleOperation(nodes: uniqueNodes)
         let testRunnerOperation = TestRunnerOperation(configuration: configuration, buildTarget: targets.build.name, testTarget: targets.test.name, sdk: sdk, failingTestsRetryCount: userOptions.failingTestsRetryCount, testTimeoutSeconds: userOptions.testTimeoutSeconds, verbose: userOptions.verbose)
-
         let testCollectorOperation = TestCollectorOperation(configuration: configuration, timestamp: timestamp, buildTarget: targets.build.name, testTarget: targets.test.name)
+
+        let codeCoverageCollectionOperation = CodeCoverageCollectionOperation(configuration: configuration, pathEquivalence: codeCoveragePathEquivalence, baseUrl: gitBaseUrl, timestamp: timestamp)
         let testTearDownOperation = TestTearDownOperation(configuration: configuration, git: gitStatus, timestamp: timestamp)
         let cleanupOperation = CleanupOperation(configuration: configuration, timestamp: timestamp)
         let simulatorTearDownOperation = SimulatorTearDownOperation(configuration: configuration, nodes: uniqueNodes, verbose: userOptions.verbose)
@@ -135,6 +143,7 @@ class Test {
              distributeTestBundleOperation,
              testRunnerOperation,
              testCollectorOperation,
+             codeCoverageCollectionOperation,
              testTearDownOperation,
              simulatorTearDownOperation,
              cleanupOperation,
@@ -170,10 +179,11 @@ class Test {
 
         testCollectorOperation.addDependency(testRunnerOperation)
 
+        codeCoverageCollectionOperation.addDependency(testCollectorOperation)
         testTearDownOperation.addDependency(testCollectorOperation)
         simulatorTearDownOperation.addDependency(testCollectorOperation)
 
-        cleanupOperation.addDependency(testTearDownOperation)
+        cleanupOperation.addDependencies([codeCoverageCollectionOperation, testTearDownOperation])
 
         tearDownOperation.addDependencies([cleanupOperation, simulatorTearDownOperation])
 
@@ -282,6 +292,12 @@ class Test {
             testCollectorOperation.testCaseResults = testCaseResults
             testTearDownOperation.testCaseResults = testCaseResults
             try? self.eventPlugin.run(event: Event(kind: .stopTesting, info: [:]), device: device)
+        }
+        
+        codeCoverageCollectionOperation.didEnd = { [unowned self] coverage in
+            self.syncQueue.sync {
+                testSessionResult.lineCoveragePercentage = coverage?.data.first?.totals.lines?.percent ?? 0.0
+            }
         }
 
         tearDownOperation.didStart = { [unowned tearDownOperation] in
