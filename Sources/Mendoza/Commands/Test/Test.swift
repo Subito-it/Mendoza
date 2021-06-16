@@ -215,8 +215,11 @@ class Test {
         compileOperation.didStart = { [unowned self] in
             try? self.eventPlugin.run(event: Event(kind: .startCompiling, info: [:]), device: device)
         }
-        compileOperation.didEnd = { [unowned self] _ in
+        compileOperation.didEnd = { [unowned self] appInfo in
             try? self.eventPlugin.run(event: Event(kind: .stopCompiling, info: [:]), device: device)
+            self.syncQueue.sync {
+                testSessionResult.appInfo = appInfo
+            }
         }
 
         switch sdk {
