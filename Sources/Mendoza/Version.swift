@@ -6,5 +6,5 @@
 //
 
 enum Mendoza {
-    static let version = "12.4.2"
+    static let version = "12.4.3"
 }
