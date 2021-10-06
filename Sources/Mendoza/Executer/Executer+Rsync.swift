@@ -8,15 +8,16 @@
 import Foundation
 
 extension Executer {
-    func rsync(sourcePath: String, destinationPath: String, exclude: [String] = [], on destinationNode: Node) throws { // swiftlint:disable:this function_default_parameter_at_end
+    func rsync(sourcePath: String, destinationPath: String, include: [String] = [], exclude: [String] = [], on destinationNode: Node) throws { // swiftlint:disable:this function_default_parameter_at_end
         // https://gist.github.com/KartikTalwar/4393116
-        let excludes = exclude.map { "--exclude=\($0)" }.joined(separator: " ")
+        let includes = include.map { "--include='\($0)'" }.joined(separator: " ")
+        let excludes = exclude.map { "--exclude='\($0)'" }.joined(separator: " ")
 
         if AddressType(address: destinationNode.address) == .local {
             var rsyncCommand = ""
 
             if let remoteNode = (self as? RemoteExecuter)?.node {
-                rsyncCommand = "rsync -ax \(excludes) "
+                rsyncCommand = "rsync -ax \(includes) \(excludes) "
 
                 guard let authentication = remoteNode.authentication else {
                     throw Error("Missing authentication for destination \(remoteNode.address)")
@@ -33,12 +34,12 @@ extension Executer {
                     rsyncCommand = "sshpass -p '\(password)' " + rsyncCommand
                     rsyncCommand += "'\(username)@\(remoteNode.address):\(sourcePath)'"
                 case .none:
-                    rsyncCommand = #"rsync -ax \#(excludes) \#(sourcePath)"#
+                    rsyncCommand = #"rsync -ax \#(includes) \#(excludes) \#(sourcePath)"#
                 }
 
                 rsyncCommand += " \(destinationPath)"
             } else {
-                rsyncCommand = #"rsync -ax \#(excludes) \#(sourcePath) \#(destinationPath)"#
+                rsyncCommand = #"rsync -ax \#(includes) \#(excludes) \#(sourcePath) \#(destinationPath)"#
             }
 
             let destinationExecuter = try destinationNode.makeExecuter(logger: logger)
@@ -49,7 +50,7 @@ extension Executer {
                 throw Error("Missing authentication for destination \(destinationNode.address)")
             }
 
-            var rsyncCommand = #"rsync -ax \#(excludes) -e "ssh -T -q -c aes128-gcm@openssh.com -o Compression=no -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -x" \#(sourcePath) "#
+            var rsyncCommand = #"rsync -ax \#(includes) \#(excludes) -e "ssh -T -q -c aes128-gcm@openssh.com -o Compression=no -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -x" \#(sourcePath) "#
 
             let username: String
             switch authentication {

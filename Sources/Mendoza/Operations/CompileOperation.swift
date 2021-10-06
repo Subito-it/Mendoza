@@ -16,11 +16,13 @@ class CompileOperation: BaseOperation<AppInfo> {
     private let preCompilationPlugin: PreCompilationPlugin
     private let postCompilationPlugin: PostCompilationPlugin
     private let sdk: XcodeProject.SDK
+    private let clearDerivedDataOnCompilationFailure: Bool
+    
     private lazy var executer: Executer = {
         self.makeLocalExecuter()
     }()
 
-    init(configuration: Configuration, git: GitStatus?, baseUrl: URL, project: XcodeProject, scheme: String, preCompilationPlugin: PreCompilationPlugin, postCompilationPlugin: PostCompilationPlugin, sdk: XcodeProject.SDK) {
+    init(configuration: Configuration, git: GitStatus?, baseUrl: URL, project: XcodeProject, scheme: String, preCompilationPlugin: PreCompilationPlugin, postCompilationPlugin: PostCompilationPlugin, sdk: XcodeProject.SDK, clearDerivedDataOnCompilationFailure: Bool) {
         self.configuration = configuration
         self.git = git
         self.baseUrl = baseUrl
@@ -29,7 +31,10 @@ class CompileOperation: BaseOperation<AppInfo> {
         self.preCompilationPlugin = preCompilationPlugin
         self.postCompilationPlugin = postCompilationPlugin
         self.sdk = sdk
+        self.clearDerivedDataOnCompilationFailure = clearDerivedDataOnCompilationFailure
+        
         super.init()
+        
         loggers = loggers.union([preCompilationPlugin.logger, postCompilationPlugin.logger])
     }
 
@@ -84,16 +89,33 @@ class CompileOperation: BaseOperation<AppInfo> {
             case .macos:
                 command = "$(xcode-select -p)/usr/bin/xcodebuild \(projectFlag) -scheme '\(configuration.scheme)' -configuration \(configuration.buildConfiguration) -derivedDataPath '\(Path.build.rawValue)' -sdk 'macosx' COMPILER_INDEX_STORE_ENABLE=NO SWIFT_INDEX_STORE_ENABLE=NO MTL_ENABLE_INDEX_STORE=NO ONLY_ACTIVE_ARCH=\(configuration.compilation.onlyActiveArchitecture) VALID_ARCHS='\(configuration.compilation.architectures)' \(configuration.compilation.buildSettings) -UseNewBuildSystem=\(configuration.compilation.useNewBuildSystem) -enableCodeCoverage YES build-for-testing"
             }
-
-            _ = try executer.execute(command, currentUrl: baseUrl) { result, originalError in
-                if result.output.contains("** TEST BUILD FAILED **") {
-                    throw Error("Compilation failed!")
-                } else {
-                    throw originalError
+            
+            for iteration in 0...1 {
+                let shouldRetryCompilation = clearDerivedDataOnCompilationFailure && iteration == 0
+                
+                do {
+                    let output = try executer.execute(command, currentUrl: baseUrl)
+                        
+                    let compilationDidFail = output.contains("** TEST BUILD FAILED **")
+                    
+                    if compilationDidFail && shouldRetryCompilation {
+                        clearDerivedData(executer: executer)
+                    } else if compilationDidFail {
+                        throw Error("Compilation failed!")
+                    } else {
+                        compilationSucceeded = true
+                        return
+                    }
+                } catch {
+                    if shouldRetryCompilation {
+                        clearDerivedData(executer: executer)
+                    } else {
+                        throw error
+                    }
                 }
             }
-
-            compilationSucceeded = true
+            
+            throw Error("Compilation failed!")
         } catch {
             didThrow?(error)
         }
@@ -108,6 +130,11 @@ class CompileOperation: BaseOperation<AppInfo> {
         super.cancel()
     }
     
+    private func clearDerivedData(executer: Executer) {
+        _ = try? executer.execute("rm -rf '\(Path.build.rawValue)'")
+        print("💣 Compilation did fail, clearing derived data".red)
+    }
+        
     private func folderSize(_ path: String) throws -> UInt64 {
         let contents = try FileManager.default.contentsOfDirectory(atPath: path)
         

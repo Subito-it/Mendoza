@@ -15,15 +15,16 @@ class TestCollectorOperation: BaseOperation<Void> {
         makeConnectionPool(sources: configuration.nodes)
     }()
 
+    private let mergeResults: Bool
     private let timestamp: String
-    private let buildTarget: String
-    private let testTarget: String
+    private let productNames: [String]
+    private let loggersSyncQueue = DispatchQueue(label: String(describing: self))
 
-    init(configuration: Configuration, timestamp: String, buildTarget: String, testTarget: String) {
+    init(configuration: Configuration, mergeResults: Bool, timestamp: String, productNames: [String]) {
         self.configuration = configuration
+        self.mergeResults = mergeResults
         self.timestamp = timestamp
-        self.buildTarget = buildTarget
-        self.testTarget = testTarget
+        self.productNames = productNames
     }
 
     override func main() {
@@ -34,7 +35,7 @@ class TestCollectorOperation: BaseOperation<Void> {
 
             let destinationNode = configuration.resultDestination.node
 
-            let destinationPath = "\(configuration.resultDestination.path)/\(timestamp)"
+            let destinationPath = "\(configuration.resultDestination.path)/\(timestamp)/\(Environment.resultFoldername)"
 
             guard let testCaseResults = testCaseResults else { fatalError("💣 Required field `testCaseResults` not set") }
 
@@ -43,16 +44,39 @@ class TestCollectorOperation: BaseOperation<Void> {
                 guard testNodes.contains(source.node.address) else {
                     return
                 }
-
+                
+                // Copy code coverage files
                 let logPath = "\(Path.logs.rawValue)/*"
-                try executer.rsync(sourcePath: logPath, destinationPath: destinationPath, on: destinationNode)
+                try executer.rsync(sourcePath: logPath, destinationPath: destinationPath, include: ["*/", "*.profdata"], exclude: ["*"], on: destinationNode)
+
+                // Remote merging of partial results can be performed by uncommenting these lib could be performed on remote node
+                // if self.mergeResults {
+                //     try mergeResults(destinationNode: source.node, destinationPath: Path.results.rawValue, destinationName: "\(UUID().uuidString).xcresult")
+                // }
+
                 let resultsPath = "\(Path.results.rawValue)/*"
-                try executer.rsync(sourcePath: resultsPath, destinationPath: destinationPath, on: destinationNode)
+                try executer.rsync(sourcePath: resultsPath, destinationPath: destinationPath, include: ["*.xcresult"], on: destinationNode)
 
                 try self.clearDiagnosticReports(executer: executer)
             }
+            
+            let executer = try destinationNode.makeExecuter(logger: nil)
+            
+            let results = try executer.execute("find '\(destinationPath)' -type f -name '*.profdata'").components(separatedBy: "\n")
+            for (index, result) in results.enumerated() {
+                _ = try executer.execute("mv '\(result)' '\(destinationPath)/\(index).profdata'")
+            }
 
-            try mergeResults(destinationNode: destinationNode, destinationPath: destinationPath)
+            if self.mergeResults {
+                try mergeResults(destinationNode: destinationNode, destinationPath: destinationPath, destinationName: Environment.xcresultFilename)
+            } else {
+                let results = try executer.execute("find '\(destinationPath)' -type d -name '*.xcresult'").components(separatedBy: "\n")
+                for (index, result) in results.enumerated() {
+                    _ = try executer.execute("mv '\(result)' '\(destinationPath)/\(index).xcresult'")
+                }
+            }
+            
+            try cleanupEmptyFolders(executer: executer, destinationPath: destinationPath)
 
             didEnd?(())
         } catch {
@@ -66,20 +90,25 @@ class TestCollectorOperation: BaseOperation<Void> {
         }
         super.cancel()
     }
+    
+    private func cleanupEmptyFolders(executer: Executer, destinationPath: String) throws {
+            _ = try executer.execute("find '\(destinationPath)' -type d -empty -delete")
 
-    private func clearDiagnosticReports(executer: Executer) throws {
-        let path1 = "~/Library/Logs/DiagnosticReports/\(buildTarget)*"
-        let path2 = "~/Library/Logs/DiagnosticReports/\(testTarget)*"
-
-        _ = try executer.execute("rm \(path1) || true")
-        _ = try executer.execute("rm \(path2) || true")
     }
 
-    private func mergeResults(destinationNode: Node, destinationPath: String) throws {
-        let logger = ExecuterLogger(name: "TestCollectorOperation-Merge", address: destinationNode.address)
-        loggers.insert(logger)
+    private func clearDiagnosticReports(executer: Executer) throws {
+        for productName in productNames {
+            let path = "~/Library/Logs/DiagnosticReports/\(productName)_*"
 
-        let mergedDestinationPath = "\(destinationPath)/\(Environment.xcresultFilename)"
+            _ = try executer.execute("rm -f \(path) || true")
+        }
+    }
+
+    private func mergeResults(destinationNode: Node, destinationPath: String, destinationName: String) throws {
+        let logger = ExecuterLogger(name: "TestCollectorOperation-Merge", address: destinationNode.address)
+        _ = loggersSyncQueue.sync { loggers.insert(logger) }
+
+        let mergedDestinationPath = "\(destinationPath)/\(destinationName)"
 
         let executer = try destinationNode.makeExecuter(logger: logger)
         let sourcePaths = try executer.execute("find \(destinationPath) -type d -name '*.xcresult'").components(separatedBy: "\n")
@@ -91,16 +120,17 @@ class TestCollectorOperation: BaseOperation<Void> {
         let partsCount = sourcePaths.count / 50
         let sourcePathsParts = sourcePaths.split(in: partsCount)
         var partialMerges = [String]()
-            
+        
         if partsCount > 1 {
             let queue = OperationQueue()
-            let syncQueue = DispatchQueue(label: "com.subito.mendoza.collector.queue")
+            let syncQueue = DispatchQueue(label: "com.subito.mendoza.collector.queue", qos: .userInitiated)
             var mergeFailed = false
 
             for (index, part) in sourcePathsParts.enumerated() {
                 queue.addOperation {
                     let partialMergeDestination = mergedDestinationPath + index.description
                     do {
+                        let executer = try destinationNode.makeExecuter(logger: logger)
                         _ = try executer.execute(mergeCmd(part, partialMergeDestination))
                     } catch {
                         syncQueue.sync { mergeFailed = true }
@@ -128,7 +158,7 @@ class TestCollectorOperation: BaseOperation<Void> {
             _ = try executer.execute(moveCommand)
         }
 
-        let cleanupCmd = "rm -rf " + (sourcePaths + partialMerges).map { "'\($0)'" }.joined(separator: " ")
+        let cleanupCmd = "rm -rf " + (sourcePaths + partialMerges).uniqued().map { "'\($0)'" }.joined(separator: " ")
         _ = try executer.execute(cleanupCmd)
     }
 }

@@ -9,6 +9,10 @@ import Foundation
 
 class LocalSetupOperation: BaseOperation<Void> {
     private let fileManager: FileManager
+    private let xcodeBuildNumber: String?
+    private let administratorPassword: String?
+    private let clearDerivedDataOnCompilationFailure: Bool
+    
     private lazy var git = {
         Git(executer: self.executer)
     }()
@@ -17,8 +21,11 @@ class LocalSetupOperation: BaseOperation<Void> {
         makeLocalExecuter()
     }()
 
-    init(fileManager: FileManager = .default) {
+    init(fileManager: FileManager = .default, clearDerivedDataOnCompilationFailure: Bool, xcodeBuildNumber: String? , administratorPassword: String?) {
         self.fileManager = fileManager
+        self.clearDerivedDataOnCompilationFailure = clearDerivedDataOnCompilationFailure
+        self.xcodeBuildNumber = xcodeBuildNumber
+        self.administratorPassword = administratorPassword
     }
 
     override func main() {
@@ -31,11 +38,25 @@ class LocalSetupOperation: BaseOperation<Void> {
                 switch path {
                 case .base, .build:
                     break
-                case .logs, .temp, .testBundle, .results:
+                case .testBundle:
+                    // Reuse derived data
+                    if !clearDerivedDataOnCompilationFailure {
+                        _ = try executer.execute("rm -rf '\(path.rawValue)' || true")
+                    }
+                case .logs, .temp, .results:
                     _ = try executer.execute("rm -rf '\(path.rawValue)' || true")
                 }
 
                 _ = try executer.execute("mkdir -p '\(path.rawValue)' || true")
+            }
+            
+            if let xcodeBuildNumber = self.xcodeBuildNumber {
+                guard let administratorPassword = administratorPassword else {
+                    throw Error("You need to add administrator password for local node when specifying xcodeBuildNumber")
+                }
+                
+                let xcversion = XcodeVersion(executer: executer)
+                try xcversion.setCurrent(buildNumber: xcodeBuildNumber, administratorPassword: administratorPassword)
             }
 
             didEnd?(())

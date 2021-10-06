@@ -87,23 +87,34 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
                     }
                 }
 
-                try nodeSimulators.forEach { try proxy.bootSynchronously(simulator: $0) }
-
-                for nodeSimulator in nodeSimulators {
-                    try proxy.enableXcode11ReleaseNotesWorkarounds(on: nodeSimulator)
-                    try proxy.disableSlideToType(on: nodeSimulator)
-                }
+                let bootQueue = OperationQueue()
 
                 let bootedSimulators = try proxy.bootedSimulators()
-                for simulator in bootedSimulators {
-                    try proxy.terminateApp(identifier: self.configuration.buildBundleIdentifier, on: simulator)
-                    try proxy.terminateApp(identifier: self.configuration.testBundleIdentifier, on: simulator)
-                }
-
                 let unusedSimulators = bootedSimulators.filter { !nodeSimulators.contains($0) }
                 for unusedSimulator in unusedSimulators {
                     try proxy.shutdown(simulator: unusedSimulator)
                 }
+
+                for nodeSimulator in nodeSimulators {
+                    if !bootedSimulators.contains(nodeSimulator) {
+                        let queueExecuter = try source.node.makeExecuter(logger: self.logger)
+                        let queueProxy = CommandLineProxy.Simulators(executer: queueExecuter, verbose: self.verbose)
+
+                        bootQueue.addOperation {
+                            try? queueProxy.bootSynchronously(simulator: nodeSimulator)
+                        }
+                    }
+                }
+                bootQueue.waitUntilAllOperationsAreFinished()
+
+                for nodeSimulator in nodeSimulators {
+                    try proxy.enableXcode11ReleaseNotesWorkarounds(on: nodeSimulator)
+                    try proxy.disableSlideToType(on: nodeSimulator)
+
+                    try proxy.terminateApp(identifier: self.configuration.buildBundleIdentifier, on: nodeSimulator)
+                    try proxy.terminateApp(identifier: self.configuration.testBundleIdentifier, on: nodeSimulator)
+                }
+
 
                 if self.runHeadless == false {
                     if shouldRebootSimulators {
@@ -254,7 +265,7 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
         }
 
         guard let settings = loadSettings, let screenIdentifier = loadScreenIdentifier else {
-            fatalError("💣 Failed to get screenIdentifier from simulator plist")
+            fatalError("💣 Failed to get screenIdentifier from simulator plist on \(executer.address)")
         }
 
         settings.CurrentDeviceUDID = nil

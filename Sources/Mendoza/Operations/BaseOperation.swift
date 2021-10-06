@@ -7,37 +7,50 @@
 
 import Foundation
 
-protocol Starting: Operation {
+protocol StartingOperation: Operation {
     var didStart: (() -> Void)? { get set }
 }
 
-protocol Ending: Operation {
+protocol EndingOperation: Operation {
     associatedtype OutputType
     var didEnd: ((OutputType) -> Void)? { get set }
 }
 
-protocol Throwing: Operation {
+protocol ThrowingOperation: Operation {
     var didThrow: ((Swift.Error) -> Void)? { get set }
 }
 
-protocol LoggedOperation {
+protocol LoggedOperation: Operation {
     var logger: ExecuterLogger { get }
-    var loggers: Set<ExecuterLogger> { get set }
+    var loggers: Set<ExecuterLogger> { get }
 }
 
-class BaseOperation<Output: Any>: Operation, Starting, Ending, Throwing, LoggedOperation {
+protocol BenchmarkedOperation: Operation {
+    var startTimeInterval: TimeInterval { get }
+    var endTimeInterval: TimeInterval { get }
+    var poolStartTimeInterval: () -> [String: TimeInterval]  { get }
+    var poolEndTimeInterval: () -> [String: TimeInterval]  { get }
+}
+
+class BaseOperation<Output: Any>: Operation, StartingOperation, EndingOperation, ThrowingOperation, LoggedOperation, BenchmarkedOperation {
     typealias OutputType = Output
 
     var didStart: (() -> Void)?
     var didEnd: ((Output) -> Void)?
     var didThrow: ((Swift.Error) -> Void)?
 
-    lazy var logger = ExecuterLogger(name: "\(type(of: self))", address: "operation")
+    private(set) lazy var logger = ExecuterLogger(name: "\(type(of: self))", address: "operation")
     var loggers = Set<ExecuterLogger>()
 
-    var startTimeInterval: TimeInterval = 0.0
-
+    private(set) var startTimeInterval: TimeInterval = 0.0
+    private(set) var endTimeInterval: TimeInterval = 0.0
+    
+    private(set) var poolStartTimeInterval: () -> [String: TimeInterval] = { [:] }
+    private(set) var poolEndTimeInterval: () -> [String: TimeInterval] = { [:] }
+    
     private var isExecutingObserver: NSKeyValueObservation?
+
+    private let syncQueue = DispatchQueue(label: String(describing: BaseOperation.self))
 
     override init() {
         super.init()
@@ -47,13 +60,14 @@ class BaseOperation<Output: Any>: Operation, Starting, Ending, Throwing, LoggedO
 
             if op.isExecuting {
                 self.startTimeInterval = CFAbsoluteTimeGetCurrent()
-                print("🏃‍♀️ `\(op.className.components(separatedBy: ".").last ?? op.className)` did start".bold)
+                print("🚦 `\(op.className.components(separatedBy: ".").last ?? op.className)` did start".bold)
             } else {
-                let delta = CFAbsoluteTimeGetCurrent() - self.startTimeInterval
+                self.endTimeInterval = CFAbsoluteTimeGetCurrent()
+                let delta = self.endTimeInterval - self.startTimeInterval
                 print("🏁 `\(op.className.components(separatedBy: ".").last ?? op.className)` did complete in \(delta)s".bold)
             }
         }
-        loggers.insert(logger)
+        _ = syncQueue.sync { loggers.insert(logger) }
     }
 
     deinit {
@@ -76,8 +90,11 @@ class BaseOperation<Output: Any>: Operation, Starting, Ending, Throwing, LoggedO
         let pool = ConnectionPool(sources: poolSources)
 
         let poolLoggers = Set(poolSources.compactMap(\.logger))
-        loggers = loggers.union(poolLoggers)
-
+        syncQueue.sync { loggers = loggers.union(poolLoggers) }
+        
+        poolStartTimeInterval = { pool.startIntervals }
+        poolEndTimeInterval = { pool.endIntervals }
+        
         return pool
     }
 
@@ -88,24 +105,24 @@ class BaseOperation<Output: Any>: Operation, Starting, Ending, Throwing, LoggedO
     func makeLocalExecuter(currentDirectoryPath: String? = nil) -> LocalExecuter {
         let address = "localhost"
         var loggerName = "\(type(of: self))"
-        let addressCount = loggers.filter { $0.name == loggerName && $0.address == address }.count
+        let addressCount = syncQueue.sync { loggers.filter { $0.name == loggerName && $0.address == address }.count }
 
         if addressCount > 0 { loggerName += "-\(addressCount + 1)" }
 
         let logger = ExecuterLogger(name: loggerName, address: address)
-        let executerLogger = loggers.update(with: logger)
+        let executerLogger = syncQueue.sync { loggers.update(with: logger) }
         return LocalExecuter(currentDirectoryPath: currentDirectoryPath, logger: executerLogger ?? logger)
     }
 
     func makeRemoteExecuter(node: Node, currentDirectoryPath: String? = nil) -> RemoteExecuter {
         let address = node.address
-        let addressCount = loggers.filter { $0.address == address }.count
+        let addressCount = syncQueue.sync { loggers.filter { $0.address == address }.count }
 
         var loggerName = "\(type(of: self))"
         if addressCount > 0 { loggerName += "-\(addressCount + 1)" }
 
         let logger = ExecuterLogger(name: loggerName, address: address)
-        let executerLogger = loggers.update(with: logger)
+        let executerLogger = syncQueue.sync { loggers.update(with: logger) }
         return RemoteExecuter(node: node, currentDirectoryPath: currentDirectoryPath, logger: executerLogger ?? logger)
     }
 }

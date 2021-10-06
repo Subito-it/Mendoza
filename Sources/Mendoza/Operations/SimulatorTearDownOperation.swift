@@ -2,7 +2,7 @@
 //  SimulatorTearDownOperation.swift
 //  Mendoza
 //
-//  Created by tomas on 21/03/2019.
+//  Created by Tomas Camin on 21/03/2019.
 //
 
 import Foundation

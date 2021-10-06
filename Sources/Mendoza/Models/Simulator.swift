@@ -7,12 +7,18 @@
 
 import Foundation
 
-struct Simulator: Codable, Equatable {
+struct Simulator: Codable, Hashable {
     let id: String
     let name: String
     let device: Device
 
     static func == (lhs: Simulator, rhs: Simulator) -> Bool {
         lhs.id == rhs.id
+    }
+}
+
+extension Simulator {
+    static func defaultInit() -> Simulator {
+        Simulator(id: "", name: "", device: .defaultInit())
     }
 }

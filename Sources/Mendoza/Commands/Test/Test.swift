@@ -8,10 +8,12 @@
 import Foundation
 
 class Test {
+    typealias RunOperation = LoggedOperation & BenchmarkedOperation
+
     var didFail: ((Swift.Error) -> Void)?
 
     // swiftlint:disable:next large_tuple
-    private let userOptions: (configuration: Configuration, device: Device, runHeadless: Bool, filePatterns: FilePatterns, testTimeoutSeconds: Int, failingTestsRetryCount: Int, codeCoveragePathEquivalence: String?, dispatchOnLocalHost: Bool, verbose: Bool)
+    private let userOptions: (configuration: Configuration, runHeadless: Bool, skipResultMerge: Bool, filePatterns: FilePatterns, testTimeoutSeconds: Int, failingTestsRetryCount: Int, codeCoveragePathEquivalence: String?, clearDerivedDataOnCompilationFailure: Bool, dispatchOnLocalHost: Bool, xcresultBlobThresholdKB: Int?, verbose: Bool)
     private let plugin: (data: String?, debug: Bool)
     private let eventPlugin: EventPlugin
     private let pluginUrl: URL
@@ -19,19 +21,35 @@ class Test {
     private let timestamp: String
     private var observers = [NSKeyValueObservation]()
 
-    init(configurationUrl: URL, device: Device, runHeadless: Bool, filePatterns: FilePatterns, testTimeoutSeconds: Int, failingTestsRetryCount: Int, codeCoveragePathEquivalence: String?, dispatchOnLocalHost: Bool, pluginData: String?, debugPlugins: Bool, verbose: Bool) throws {
+    init(configurationUrl: URL, device: Device?, runHeadless: Bool, skipResultMerge: Bool, clearDerivedDataOnCompilationFailure: Bool, filePatterns: FilePatterns, testTimeoutSeconds: Int, failingTestsRetryCount: Int, codeCoveragePathEquivalence: String?, xcodeBuildNumber: String?, dispatchOnLocalHost: Bool, xcresultBlobThresholdKB: Int?, pluginData: String?, debugPlugins: Bool, verbose: Bool) throws {
         plugin = (data: pluginData, debug: debugPlugins)
 
         let configurationData = try Data(contentsOf: configurationUrl)
         var configuration = try JSONDecoder().decode(Configuration.self, from: configurationData)
 
+        var updatedNodes: [Node]?
         if dispatchOnLocalHost, !configuration.nodes.contains(where: { AddressType(node: $0) == .local }) { // add localhost
-            let updatedNodes = configuration.nodes + [Node.localhost()]
-            let updatedConfiguration = Configuration(projectPath: configuration.projectPath, workspacePath: configuration.workspacePath, buildBundleIdentifier: configuration.buildBundleIdentifier, testBundleIdentifier: configuration.testBundleIdentifier, scheme: configuration.scheme, buildConfiguration: configuration.buildConfiguration, storeAppleIdCredentials: configuration.storeAppleIdCredentials, resultDestination: configuration.resultDestination, nodes: updatedNodes, compilation: configuration.compilation, sdk: configuration.sdk)
-            configuration = updatedConfiguration
+            // This might be wrong since Node.localhost does not have an administrator password which might be needed for certain tasks
+            updatedNodes = configuration.nodes + [Node.localhost()]
         }
+        
+        let updatedConfiguration = Configuration(projectPath: configuration.projectPath,
+                                                 workspacePath: configuration.workspacePath,
+                                                 buildBundleIdentifier: configuration.buildBundleIdentifier,
+                                                 testBundleIdentifier: configuration.testBundleIdentifier,
+                                                 scheme: configuration.scheme,
+                                                 buildConfiguration: configuration.buildConfiguration,
+                                                 storeAppleIdCredentials: configuration.storeAppleIdCredentials,
+                                                 resultDestination: configuration.resultDestination,
+                                                 nodes: updatedNodes ?? configuration.nodes,
+                                                 compilation: configuration.compilation,
+                                                 sdk: configuration.sdk,
+                                                 xcodeBuildNumber: xcodeBuildNumber ?? configuration.xcodeBuildNumber,
+                                                 device: device ?? configuration.device,
+                                                 xcresultBlobThresholdKB: xcresultBlobThresholdKB ?? configuration.xcresultBlobThresholdKB)
+        configuration = updatedConfiguration
 
-        userOptions = (configuration: configuration, device: device, runHeadless: runHeadless, filePatterns: filePatterns, testTimeoutSeconds: testTimeoutSeconds, failingTestsRetryCount: failingTestsRetryCount, codeCoveragePathEquivalence: codeCoveragePathEquivalence, dispatchOnLocalHost: dispatchOnLocalHost, verbose: verbose)
+        userOptions = (configuration: configuration, runHeadless: runHeadless, skipResultMerge: skipResultMerge, filePatterns: filePatterns, testTimeoutSeconds: testTimeoutSeconds, failingTestsRetryCount: failingTestsRetryCount, codeCoveragePathEquivalence: codeCoveragePathEquivalence, clearDerivedDataOnCompilationFailure: clearDerivedDataOnCompilationFailure, dispatchOnLocalHost: dispatchOnLocalHost, xcresultBlobThresholdKB: xcresultBlobThresholdKB, verbose: verbose)
 
         pluginUrl = configurationUrl.deletingLastPathComponent()
         eventPlugin = EventPlugin(baseUrl: pluginUrl, plugin: plugin)
@@ -46,11 +64,11 @@ class Test {
 
         switch sdk {
         case .ios:
-            if userOptions.device.name.isEmpty, userOptions.device.name.isEmpty {
+            if userOptions.configuration.device?.name.isEmpty == true, userOptions.configuration.device?.name.isEmpty == true {
                 throw Error("Missing required arguments `--device_name=name, --device_runtime=version`".red)
-            } else if userOptions.device.name.isEmpty {
+            } else if userOptions.configuration.device?.name.isEmpty == true {
                 throw Error("Missing required arguments `--device_name=name`".red)
-            } else if userOptions.device.runtime.isEmpty {
+            } else if userOptions.configuration.device?.runtime.isEmpty == true {
                 throw Error("Missing required arguments `--device_runtime=version`".red)
             }
         case .macos:
@@ -58,11 +76,11 @@ class Test {
         }
         
         if let codeCoveragePathEquivalence = userOptions.codeCoveragePathEquivalence {
-            if codeCoveragePathEquivalence.components(separatedBy: ",").count != 2 {
-                throw Error("Invalid format for --llvm_cov_equivalence_path parameter, expecting --llvm_cov_equivalence_path=<from>,<to>".red)
+            if codeCoveragePathEquivalence.components(separatedBy: ",").count % 2 != 0 {
+                throw Error("Invalid format for --llvm_cov_equivalence_path parameter, expecting --llvm_cov_equivalence_path=<from>,<to> with even number of pairs".red)
             }
         }
-
+        
         print("ℹ️  Dispatching on".magenta.bold)
         let nodes = Array(Set(userOptions.configuration.nodes.map(\.address) + (userOptions.dispatchOnLocalHost ? ["localhost"] : []))).sorted()
         print(nodes.joined(separator: "\n").magenta)
@@ -73,8 +91,8 @@ class Test {
         let queue = OperationQueue()
 
         let testSessionResult = TestSessionResult()
-        let arguments: [String?] = [userOptions.device.name,
-                                    userOptions.device.runtime,
+        let arguments: [String?] = [userOptions.configuration.device?.name,
+                                    userOptions.configuration.device?.runtime,
                                     userOptions.filePatterns.include.sorted().joined(separator: ","),
                                     userOptions.filePatterns.exclude.sorted().joined(separator: ","),
                                     plugin.data]
@@ -88,20 +106,25 @@ class Test {
         tearDown(operations: operations, testSessionResult: testSessionResult, error: nil)
     }
 
-    private func makeOperations(gitStatus: GitStatus, testSessionResult: TestSessionResult, sdk: XcodeProject.SDK) throws -> [Operation & LoggedOperation] {
-        typealias RunOperation = Operation & LoggedOperation
-
+    private func makeOperations(gitStatus: GitStatus, testSessionResult: TestSessionResult, sdk: XcodeProject.SDK) throws -> [RunOperation] {
         let configuration = userOptions.configuration
-        let device = userOptions.device
+        
         let filePatterns = userOptions.filePatterns
         let codeCoveragePathEquivalence = userOptions.codeCoveragePathEquivalence
+        let clearDerivedDataOnCompilationFailure = userOptions.clearDerivedDataOnCompilationFailure
+        let xcresultBlobThresholdKB = userOptions.xcresultBlobThresholdKB
+        
+        guard let device = userOptions.configuration.device else { throw Error("Unexpected missing device") }
 
         let gitBaseUrl = gitStatus.url
         let project = try localProject(baseUrl: gitBaseUrl, path: configuration.projectPath)
-
+        
+        let localNode = (configuration.nodes + [configuration.resultDestination.node]).first(where: { AddressType(node: $0) == .local })
         let uniqueNodes = configuration.nodes.unique()
         let targets = try project.getTargetsInScheme(configuration.scheme)
         let testTargetSourceFiles = try project.testTargetSourceFilePaths(scheme: configuration.scheme)
+        
+        let productNames = project.getProductNames()
 
         let preCompilationPlugin = PreCompilationPlugin(baseUrl: pluginUrl, plugin: plugin)
         let postCompilationPlugin = PostCompilationPlugin(baseUrl: pluginUrl, plugin: plugin)
@@ -112,22 +135,21 @@ class Test {
         let initialSetupOperation = InitialSetupOperation(nodes: uniqueNodes)
         let validationOperation = ValidationOperation(configuration: configuration)
         let macOsValidationOperation = MacOsValidationOperation(configuration: configuration)
-        let localSetupOperation = LocalSetupOperation()
+        let localSetupOperation = LocalSetupOperation(clearDerivedDataOnCompilationFailure: clearDerivedDataOnCompilationFailure, xcodeBuildNumber: configuration.xcodeBuildNumber, administratorPassword: localNode?.administratorPassword ?? nil)
         let wakeupOperation = WakeupOperation(nodes: uniqueNodes)
-        let remoteSetupOperation = RemoteSetupOperation(nodes: uniqueNodes)
-        let compileOperation = CompileOperation(configuration: configuration, git: gitStatus, baseUrl: gitBaseUrl, project: project, scheme: configuration.scheme, preCompilationPlugin: preCompilationPlugin, postCompilationPlugin: postCompilationPlugin, sdk: sdk)
+        let remoteSetupOperation = RemoteSetupOperation(nodes: uniqueNodes, xcodeBuildNumber: configuration.xcodeBuildNumber)
+        let compileOperation = CompileOperation(configuration: configuration, git: gitStatus, baseUrl: gitBaseUrl, project: project, scheme: configuration.scheme, preCompilationPlugin: preCompilationPlugin, postCompilationPlugin: postCompilationPlugin, sdk: sdk, clearDerivedDataOnCompilationFailure: clearDerivedDataOnCompilationFailure)
         let testExtractionOperation = TestExtractionOperation(configuration: configuration, baseUrl: gitBaseUrl, testTargetSourceFiles: testTargetSourceFiles, filePatterns: filePatterns, device: device, plugin: testExtractionPlugin)
         let testSortingOperation = TestSortingOperation(device: device, plugin: testSortingPlugin, verbose: userOptions.verbose)
         let simulatorSetupOperation = SimulatorSetupOperation(configuration: configuration, nodes: uniqueNodes, device: device, runHeadless: userOptions.runHeadless, verbose: userOptions.verbose)
         let distributeTestBundleOperation = DistributeTestBundleOperation(nodes: uniqueNodes)
-        let testRunnerOperation = TestRunnerOperation(configuration: configuration, buildTarget: targets.build.name, testTarget: targets.test.name, sdk: sdk, failingTestsRetryCount: userOptions.failingTestsRetryCount, testTimeoutSeconds: userOptions.testTimeoutSeconds, verbose: userOptions.verbose)
-        let testCollectorOperation = TestCollectorOperation(configuration: configuration, timestamp: timestamp, buildTarget: targets.build.name, testTarget: targets.test.name)
+        let testRunnerOperation = TestRunnerOperation(configuration: configuration, testTarget: targets.test.name, productNames: productNames, sdk: sdk, failingTestsRetryCount: userOptions.failingTestsRetryCount, testTimeoutSeconds: userOptions.testTimeoutSeconds, xcresultBlobThresholdKB: xcresultBlobThresholdKB, verbose: userOptions.verbose)
+        let testCollectorOperation = TestCollectorOperation(configuration: configuration, mergeResults: !userOptions.skipResultMerge, timestamp: timestamp, productNames: productNames)
 
         let codeCoverageCollectionOperation = CodeCoverageCollectionOperation(configuration: configuration, pathEquivalence: codeCoveragePathEquivalence, baseUrl: gitBaseUrl, timestamp: timestamp)
-        let testTearDownOperation = TestTearDownOperation(configuration: configuration, git: gitStatus, timestamp: timestamp)
         let cleanupOperation = CleanupOperation(configuration: configuration, timestamp: timestamp)
         let simulatorTearDownOperation = SimulatorTearDownOperation(configuration: configuration, nodes: uniqueNodes, verbose: userOptions.verbose)
-        let tearDownOperation = TearDownOperation(configuration: configuration, plugin: tearDownPlugin)
+        let tearDownOperation = TearDownOperation(configuration: configuration, git: gitStatus, timestamp: timestamp, mergeResults: !userOptions.skipResultMerge, plugin: tearDownPlugin)
 
         let operations: [RunOperation] =
             [initialSetupOperation,
@@ -144,7 +166,6 @@ class Test {
              testRunnerOperation,
              testCollectorOperation,
              codeCoverageCollectionOperation,
-             testTearDownOperation,
              simulatorTearDownOperation,
              cleanupOperation,
              tearDownOperation]
@@ -180,10 +201,9 @@ class Test {
         testCollectorOperation.addDependency(testRunnerOperation)
 
         codeCoverageCollectionOperation.addDependency(testCollectorOperation)
-        testTearDownOperation.addDependency(testCollectorOperation)
         simulatorTearDownOperation.addDependency(testCollectorOperation)
 
-        cleanupOperation.addDependencies([codeCoverageCollectionOperation, testTearDownOperation])
+        cleanupOperation.addDependency(codeCoverageCollectionOperation)
 
         tearDownOperation.addDependencies([cleanupOperation, simulatorTearDownOperation])
 
@@ -195,13 +215,13 @@ class Test {
         testSessionResult.git = gitStatus
         testSessionResult.startTime = CFAbsoluteTimeGetCurrent()
 
-        operations.compactMap { $0 as? Throwing & LoggedOperation }.forEach { [unowned self] op in
+        operations.compactMap { $0 as? ThrowingOperation & LoggedOperation }.forEach { [unowned self] op in
             op.didThrow = { opError in
                 if (opError as? Error)?.didLogError == false {
                     op.logger.log(exception: opError.localizedDescription)
                 }
 
-                print("\n💥 \(op.className.components(separatedBy: ".").last ?? op.className) did throw exception, see session logs for details on what went wrong\n")
+                print("\n💣 \(op.className.components(separatedBy: ".").last ?? op.className) did throw exception, see session logs for details on what went wrong\n")
                 if opError.localizedDescription.count < 2000 {
                     print(opError.localizedDescription)
                 }
@@ -290,7 +310,7 @@ class Test {
             }
 
             testCollectorOperation.testCaseResults = testCaseResults
-            testTearDownOperation.testCaseResults = testCaseResults
+
             try? self.eventPlugin.run(event: Event(kind: .stopTesting, info: [:]), device: device)
         }
         
@@ -301,7 +321,10 @@ class Test {
         }
 
         tearDownOperation.didStart = { [unowned tearDownOperation] in
-            tearDownOperation.testSessionResult = testSessionResult
+            tearDownOperation.testSessionResult = self.syncQueue.sync {
+                // Make it thread safe
+                return testSessionResult.copy()
+            }
         }
 
         monitorOperationsExecutionTime(operations, testSessionResult: testSessionResult)
@@ -309,7 +332,7 @@ class Test {
         return operations
     }
 
-    private func tearDown(operations: [Operation & LoggedOperation], testSessionResult: TestSessionResult, error: Error?) {
+    private func tearDown(operations: [RunOperation], testSessionResult: TestSessionResult, error: Error?) {
         cancelOperation(operations)
 
         let logger = ExecuterLogger(name: "Test", address: "localhost")
@@ -321,28 +344,28 @@ class Test {
 
         let totalExecutionTime = CFAbsoluteTimeGetCurrent() - testSessionResult.startTime
         print("\nℹ️  Total time: \(totalExecutionTime) seconds".bold.yellow)
+        
+        let device = userOptions.configuration.device ?? Device.defaultInit()
 
         do {
-            try writeTestSuiteResult(syncQueue.sync { testSessionResult }, destinationPath: destinationPath, destination: destinationNode, timestamp: timestamp, logger: logger)
-
             try dumpOperationLogs(operations)
 
             try syncLogs(destinationPath: logsDestinationPath, destination: destinationNode, timestamp: timestamp, logger: logger)
-
+            
             if let error = error {
-                try eventPlugin.run(event: Event(kind: .error, info: ["error": error.localizedDescription]), device: userOptions.device)
+                try eventPlugin.run(event: Event(kind: .error, info: ["error": error.localizedDescription]), device: device)
                 didFail?(error)
             } else {
-                try eventPlugin.run(event: Event(kind: .stop, info: [:]), device: userOptions.device)
+                try eventPlugin.run(event: Event(kind: .stop, info: [:]), device: device)
             }
         } catch {
             try? dumpOperationLogs(operations)
-            try? eventPlugin.run(event: Event(kind: .error, info: ["error": error.localizedDescription]), device: userOptions.device)
+            try? eventPlugin.run(event: Event(kind: .error, info: ["error": error.localizedDescription]), device: device)
             didFail?(error)
         }
     }
 
-    private func cancelOperation(_ operations: [Operation & LoggedOperation]) {
+    private func cancelOperation(_ operations: [Operation]) {
         // To avoid that during cancellation an operation (that wasn't still cancelled) starts because all its dependencies where cancelled
         // we need to cancel from leafs to root
         var completedOperations: Set<Operation> = Set(operations.filter { $0.isCancelled || $0.isFinished })
@@ -365,16 +388,17 @@ class Test {
 
     private func monitorOperationsExecutionTime(_ operations: [Operation], testSessionResult: TestSessionResult) {
         operations.forEach { op in
-            let observer = op.observe(\Operation.isExecuting) { [unowned self] op, _ in
+            let observer = op.observe(\Operation.isFinished) { [unowned self] op, _ in
+                guard let op = op as? BenchmarkedOperation else { return }
+                
                 let name = "\(type(of: op))"
 
                 self.syncQueue.sync {
-                    if op.isFinished {
-                        guard let start = testSessionResult.operationExecutionTime[name] else { return }
-                        testSessionResult.operationExecutionTime[name] = CFAbsoluteTimeGetCurrent() - start
-                    } else {
-                        testSessionResult.operationExecutionTime[name] = CFAbsoluteTimeGetCurrent()
-                    }
+                    testSessionResult.operationStartInterval[name] = op.startTimeInterval
+                    testSessionResult.operationEndInterval[name] = op.endTimeInterval
+                    
+                    testSessionResult.operationPoolStartInterval[name] = op.poolStartTimeInterval()
+                    testSessionResult.operationPoolEndInterval[name] = op.poolEndTimeInterval()
                 }
             }
 
@@ -391,24 +415,10 @@ private extension Test {
         return dateFormatter.string(from: Date())
     }
 
-    func dumpOperationLogs(_ operations: [Operation & LoggedOperation]) throws {
+    func dumpOperationLogs(_ operations: [LoggedOperation]) throws {
         let loggerCoordinator = LoggerCoordinator(operations: operations)
 
         try loggerCoordinator.dump()
-    }
-
-    func writeTestSuiteResult(_ testSessionResult: TestSessionResult, destinationPath: String, destination: Node, timestamp _: String, logger: ExecuterLogger) throws {
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = .prettyPrinted
-        let data = try encoder.encode(testSessionResult)
-
-        let tempUrl = Path.temp.url.appendingPathComponent("\(UUID().uuidString).json")
-        try data.write(to: tempUrl)
-
-        let executer = try destination.makeExecuter(logger: logger)
-        _ = try executer.execute("mkdir -p '\(destinationPath)'")
-        try executer.upload(localUrl: tempUrl, remotePath: "\(destinationPath)/\(Environment.suiteResultFilename)")
-        try logger.dump()
     }
 
     func syncLogs(destinationPath: String, destination: Node, timestamp _: String, logger: ExecuterLogger) throws {
@@ -421,5 +431,12 @@ private extension Test {
 
     func localProject(baseUrl: URL, path: String) throws -> XcodeProject {
         try XcodeProject(url: baseUrl.appendingPathComponent(path))
+    }
+}
+
+private extension TestSessionResult {
+    func copy() -> TestSessionResult? {
+        guard let data = try? JSONEncoder().encode(self) else { return nil }
+        return try? JSONDecoder().decode(TestSessionResult.self, from: data)
     }
 }

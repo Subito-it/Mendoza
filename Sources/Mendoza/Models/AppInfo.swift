@@ -2,7 +2,7 @@
 //  AppInfo.swift
 //  Mendoza
 //
-//  Created by Jessica on 16/06/21.
+//  Created by Tomas Camin on 16/06/21.
 //
 
 import Foundation

@@ -25,7 +25,10 @@ final class TestSessionResult: Codable {
     }
 
     var launchArguments = ""
-    var operationExecutionTime = [String: TimeInterval]()
+    var operationStartInterval = [String: TimeInterval]()
+    var operationEndInterval = [String: TimeInterval]()
+    var operationPoolStartInterval = [String: [String: TimeInterval]]()
+    var operationPoolEndInterval = [String: [String: TimeInterval]]()
     var nodes = [String: NodeStatistics]()
     var git: GitStatus?
     var passedTests = [TestCaseResult]()

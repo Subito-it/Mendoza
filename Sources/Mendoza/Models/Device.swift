@@ -7,7 +7,7 @@
 
 import Foundation
 
-struct Device: Codable {
+struct Device: Codable, Hashable {
     let name: String
     let runtime: String
     let language: String?

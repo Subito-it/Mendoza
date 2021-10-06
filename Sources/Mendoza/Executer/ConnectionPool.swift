@@ -14,6 +14,9 @@ class ConnectionPool<SourceValue> {
         let value: Value
         let logger: ExecuterLogger?
     }
+    
+    var startIntervals = [String: TimeInterval]()
+    var endIntervals = [String: TimeInterval]()
 
     private let sources: [Source<SourceValue>]
     private let syncQueue = DispatchQueue(label: String(describing: ConnectionPool.self))
@@ -35,6 +38,9 @@ class ConnectionPool<SourceValue> {
         for source in sources {
             operationQueue.addOperation { [weak self] in
                 guard let self = self else { return }
+                
+                self.syncQueue.sync { [unowned self] in self.startIntervals[source.node.address] = CFAbsoluteTimeGetCurrent() }
+                defer { self.syncQueue.sync { [unowned self] in self.endIntervals[source.node.address] = CFAbsoluteTimeGetCurrent() } }
 
                 do {
                     let executer = try source.node.makeExecuter(logger: source.logger)

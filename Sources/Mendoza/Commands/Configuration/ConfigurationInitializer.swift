@@ -102,7 +102,10 @@ struct ConfigurationInitializer {
                                           resultDestination: resultDestination,
                                           nodes: nodes,
                                           compilation: Configuration.Compilation(),
-                                          sdk: sdk.rawValue)
+                                          sdk: sdk.rawValue,
+                                          xcodeBuildNumber: nil,
+                                          device: nil,
+                                          xcresultBlobThresholdKB: nil)
 
         let encoder = JSONEncoder()
         encoder.outputFormatting = .prettyPrinted

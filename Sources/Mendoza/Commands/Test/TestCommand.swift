@@ -29,15 +29,18 @@ class TestCommand: Command {
     let pluginCustomField = Argument<String>(name: "data", kind: .named(short: nil, long: "plugin_data"), optional: true, help: "A custom string that can be used to inject data to plugins")
     let failingTestsRetryCountField = Argument<Int>(name: "count", kind: .named(short: "r", long: "failure_retry"), optional: true, help: "Number of times a failing tests should be repeated")
     let codeCoveragePathEquivalence = Argument<String>(name: "path", kind: .named(short: nil, long: "llvm_cov_equivalence_path"), optional: true, help: "Path equivalence path passed to 'llvm-cov show' when extracting code coverage (<from>,<to>)")
+    let xcodeBuildNumber = Argument<String>(name: "number", kind: .named(short: nil, long: "xcode_buildnumber"), optional: true, help: "Build number of the Xcode version to user (e.g. 12E507)")
+    let skipResultMerge = Flag(short: nil, long: "skip_result_merge", help: "Skip xcresult merge (keep one xcresult per test in the result folder)")
+    let clearDerivedDataOnCompilationFailure = Flag(short: nil, long: "clear_derived_data_on_failure", help: "On compilation failure derived data will be cleared and compilation will be retried once")
+    let xcresultBlobThresholdKB = Argument<Int>(name: "size", kind: .named(short: nil, long: "xcresult_blob_threshold_kb"), optional: true, help: "Delete data blobs larger than the specified threshold")
 
     func run() -> Bool {
         do {
-            let device: Device
+            var device: Device?
             if let deviceName = deviceNameField.value, let deviceRuntime = deviceRuntimeField.value {
                 device = Device(name: deviceName, runtime: deviceRuntime, language: deviceLanguage.value, locale: deviceLocale.value)
-            } else {
-                device = Device.defaultInit()
             }
+            
             let timeout = timeoutField.value ?? 600
             let filePatterns = FilePatterns(commaSeparatedIncludePattern: includePatternField.value, commaSeparatedExcludePattern: excludePatternField.value)
             let failingTestsRetryCount = failingTestsRetryCountField.value ?? 0
@@ -45,11 +48,15 @@ class TestCommand: Command {
             let test = try Test(configurationUrl: configurationPathField.value!, // swiftlint:disable:this force_unwrapping
                                 device: device,
                                 runHeadless: !nonHeadlessSimulatorsFlag.value,
+                                skipResultMerge: skipResultMerge.value,
+                                clearDerivedDataOnCompilationFailure: clearDerivedDataOnCompilationFailure.value,
                                 filePatterns: filePatterns,
                                 testTimeoutSeconds: timeout,
                                 failingTestsRetryCount: failingTestsRetryCount,
                                 codeCoveragePathEquivalence: codeCoveragePathEquivalence.value,
+                                xcodeBuildNumber: xcodeBuildNumber.value,
                                 dispatchOnLocalHost: dispatchOnLocalHostFlag.value,
+                                xcresultBlobThresholdKB: xcresultBlobThresholdKB.value,
                                 pluginData: pluginCustomField.value,
                                 debugPlugins: debugPluginsFlag.value,
                                 verbose: verboseFlag.value)

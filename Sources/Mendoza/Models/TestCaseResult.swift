@@ -11,21 +11,26 @@ struct TestCaseResult: Codable, CustomStringConvertible, Hashable {
     enum Status: Int, Codable {
         case passed, failed
     }
+    
+    var duration: TimeInterval { endInterval - startInterval }
 
-    let node: String
-    let xcResultPath: String
-    let suite: String
-    let name: String
-    let status: Status
-    let duration: Double
+    var node: String
+    var runnerName: String
+    var runnerIdentifier: String
+    var xcResultPath: String
+    var suite: String
+    var name: String
+    var status: Status
+    var startInterval: TimeInterval
+    var endInterval: TimeInterval
 
-    var description: String { "\(testCaseIdentifier) (\(duration) seconds)" }
+    var description: String { "\(testCaseIdentifier) (\(Int(endInterval - startInterval)) seconds)" }
     var testCaseIdentifier: String { "\(suite)/\(name)" }
 }
 
 extension TestCaseResult: DefaultInitializable {
     static func defaultInit() -> TestCaseResult {
-        TestCaseResult(node: "", xcResultPath: "", suite: "", name: "", status: .passed, duration: 0.0)
+        TestCaseResult(node: "", runnerName: "", runnerIdentifier: "", xcResultPath: "", suite: "", name: "", status: .passed, startInterval: 0.0, endInterval: 0.0)
     }
 }
 

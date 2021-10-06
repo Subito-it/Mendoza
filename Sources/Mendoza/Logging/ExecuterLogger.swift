@@ -8,13 +8,15 @@
 import Foundation
 
 class ExecuterLogger: Logger, CustomDebugStringConvertible {
-    private enum LoggerEvent: CustomDebugStringConvertible {
-        case start(command: String)
-        case end(output: String, statusCode: Int32)
-        case exception(error: String)
+    private struct LoggerEvent: CustomDebugStringConvertible {
+        enum Kind {
+            case start(command: String)
+            case end(output: String, statusCode: Int32)
+            case exception(error: String)
+        }
 
         var isStart: Bool {
-            switch self {
+            switch kind {
             case .start:
                 return true
             default:
@@ -23,7 +25,7 @@ class ExecuterLogger: Logger, CustomDebugStringConvertible {
         }
 
         var isEnd: Bool {
-            switch self {
+            switch kind {
             case .end:
                 return true
             default:
@@ -32,7 +34,7 @@ class ExecuterLogger: Logger, CustomDebugStringConvertible {
         }
 
         var isError: Bool {
-            switch self {
+            switch kind {
             case .start:
                 return false
             case let .end(_, statusCode):
@@ -43,7 +45,7 @@ class ExecuterLogger: Logger, CustomDebugStringConvertible {
         }
 
         var debugDescription: String {
-            switch self {
+            switch kind {
             case let .start(command):
                 return "[START] \(command)"
             case let .end(output, statusCode):
@@ -52,6 +54,9 @@ class ExecuterLogger: Logger, CustomDebugStringConvertible {
                 return "[EXC] \(error)"
             }
         }
+        
+        let date: Date
+        let kind: Kind
     }
 
     let name: String
@@ -66,6 +71,7 @@ class ExecuterLogger: Logger, CustomDebugStringConvertible {
 
     private var logs = [LoggerEvent]()
     private var ignoreList = [String]()
+    private let syncQueue = DispatchQueue(label: String(describing: ExecuterLogger.self))
 
     init(name: String, address: String) {
         self.name = name
@@ -73,20 +79,28 @@ class ExecuterLogger: Logger, CustomDebugStringConvertible {
     }
 
     func log(command: String) {
-        logs.append(.start(command: redact(command)))
-        if dumpToStandardOutput { print(redact(command)) }
+        syncQueue.sync {
+            self.logs.append(LoggerEvent(date: Date(), kind: .start(command: self.redact(command))))
+            if dumpToStandardOutput { print(self.redact(command)) }
+        }
     }
 
     func log(output: String, statusCode: Int32) {
-        logs.append(.end(output: redact(output), statusCode: statusCode))
+        syncQueue.sync {
+            self.logs.append(LoggerEvent(date: Date(), kind: .end(output: self.redact(output), statusCode: statusCode)))
+        }
     }
 
     func log(exception: String) {
-        logs.append(.exception(error: redact(exception)))
+        syncQueue.sync {
+            self.logs.append(LoggerEvent(date: Date(), kind: .exception(error: self.redact(exception))))
+        }
     }
 
     func addIgnoreList(_ word: String) {
-        ignoreList.append(word)
+        syncQueue.sync {
+            self.ignoreList.append(word)
+        }
     }
 
     func dump() throws {
@@ -108,27 +122,30 @@ class ExecuterLogger: Logger, CustomDebugStringConvertible {
 
         var pairs = [(start: LoggerEvent, end: LoggerEvent)]()
 
-        var lastLog: LoggerEvent = .end(output: "", statusCode: 0)
+        var lastLog: LoggerEvent = LoggerEvent(date: Date(), kind: .end(output: "", statusCode: 0))
         for log in logs {
             defer { lastLog = log }
 
-            switch log {
+            switch log.kind {
             case .start:
-                guard !lastLog.isStart else { print(logs); assertionFailure("💣 Unexpected order of events, not expecting start event"); return }
+                guard !lastLog.isStart else { print(logs); /* assertionFailure("💣 Unexpected order of events, not expecting start event"); */ return }
             case .end:
-                guard lastLog.isStart else { print(logs); assertionFailure("💣 Unexpected order of events, expecting start event"); return }
+                guard lastLog.isStart else { print(logs); /* assertionFailure("💣 Unexpected order of events, expecting start event"); */ return }
                 pairs.append((start: lastLog, end: log))
             case .exception:
-                pairs.append((start: .start(command: "EXCEPTION"), end: log))
+                pairs.append((start: LoggerEvent(date: Date(), kind: .start(command: "EXCEPTION")), end: log))
             }
         }
-
+        
+        let startupDate = logs.first?.date ?? Date()
+        
         var templateBody = [String]()
+        templateBody.append("<p>Starting at \(startupDate.description)</p>")
         for (index, pair) in pairs.enumerated() {
             var detailCommand: String
-            switch pair.start {
+            switch pair.start.kind {
             case let .start(command):
-                detailCommand = command
+                detailCommand = "\(Int(pair.start.date.timeIntervalSince1970 - startupDate.timeIntervalSince1970))s - \(command)"
             default:
                 fatalError("Failed writing logs #1")
             }
@@ -136,7 +153,7 @@ class ExecuterLogger: Logger, CustomDebugStringConvertible {
             let detailStatusCode: Int32
             let detailOutput: String
             let detailError: Bool
-            switch pair.end {
+            switch pair.end.kind {
             case let .end(output, statusCode):
                 detailOutput = output
                 detailError = statusCode != 0

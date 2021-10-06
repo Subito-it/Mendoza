@@ -37,20 +37,24 @@ class CodeCoverageCollectionOperation: BaseOperation<Coverage?> {
             let resultPath = "\(configuration.resultDestination.path)/\(timestamp)"
             
             var coverage: Coverage? = nil
-            let coverageMerger = CodeCoverageMerger(executer: executer, searchPath: resultPath)
+            let coverageMerger = CodeCoverageMerger(executer: destinationExecuter, searchPath: resultPath)
             if let mergedPath = try coverageMerger.merge() {
                 let localCoverageUrl = Path.temp.url.appendingPathComponent("\(UUID().uuidString).profdata")
                 try destinationExecuter.download(remotePath: mergedPath, localUrl: localCoverageUrl)
-                                
-                let jsonCoverageSummaryUrl = try generateJsonCoverageSummary(coverageUrl: localCoverageUrl)
-                let jsonCoverageHtmlUrl = try generateHtmlCoverage(coverageUrl: localCoverageUrl, pathEquivalence: pathEquivalence)
                 
-                try destinationExecuter.upload(localUrl: jsonCoverageSummaryUrl, remotePath: "\(resultPath)/\(Environment.coverageFilename)")
-                try destinationExecuter.upload(localUrl: jsonCoverageHtmlUrl, remotePath: "\(resultPath)/\(Environment.coverageHtmlFilename)")
+                let jsonCoverageUrl = try generateJsonCoverage(coverageUrl: localCoverageUrl, summary: false)
+                let jsonCoverageSummaryUrl = try generateJsonCoverage(coverageUrl: localCoverageUrl, summary: true)
+                let htmlCoverageSummaryUrl = try generateHtmlCoverage(coverageUrl: localCoverageUrl, pathEquivalence: pathEquivalence)
+
+                try destinationExecuter.upload(localUrl: jsonCoverageSummaryUrl, remotePath: "\(resultPath)/\(Environment.resultFoldername)/\(Environment.coverageSummaryFilename)")
+                try destinationExecuter.upload(localUrl: jsonCoverageUrl, remotePath: "\(resultPath)/\(Environment.resultFoldername)/\(Environment.coverageFilename)")
+                try destinationExecuter.upload(localUrl: htmlCoverageSummaryUrl, remotePath: "\(resultPath)/\(Environment.resultFoldername)/\(Environment.coverageHtmlFilename)")
                 
                 if let coverageData = try? Data(contentsOf: jsonCoverageSummaryUrl) {
                     coverage = try? JSONDecoder().decode(Coverage.self, from: coverageData)
                 }
+                
+                _ = try destinationExecuter.execute("rm -f \(mergedPath)")
             }
 
             didEnd?(coverage)
@@ -59,7 +63,7 @@ class CodeCoverageCollectionOperation: BaseOperation<Coverage?> {
         }
     }
     
-    private func generateJsonCoverageSummary(coverageUrl: URL) throws -> URL {
+    private func generateJsonCoverage(coverageUrl: URL, summary: Bool) throws -> URL {
         let truncateDecimals = #"| sed -E 's/(percent":[0-9]*\.[0-9])[0-9]*/\1/g'"#
         let stripBasePath = #"| sed 's|\#(baseUrl.path + "/")||g'"#
         
@@ -74,7 +78,8 @@ class CodeCoverageCollectionOperation: BaseOperation<Coverage?> {
         
         let executablePath = try findExecutablePath(executer: executer, configuration: configuration)
         let url = Path.temp.url.appendingPathComponent("\(UUID().uuidString).json")
-        let cmd = "xcrun llvm-cov export -instr-profile \(coverageUrl.path) \(executablePath) --summary-only \(truncateDecimals) \(replacePath) \(stripBasePath) > \(url.path)"
+        let summaryParameter = summary ? "--summary-only" : ""
+        let cmd = "xcrun llvm-cov export -instr-profile \(coverageUrl.path) \(executablePath) \(summaryParameter) \(truncateDecimals) \(replacePath) \(stripBasePath) > \(url.path)"
         
         _ = try executer.execute(cmd)
 

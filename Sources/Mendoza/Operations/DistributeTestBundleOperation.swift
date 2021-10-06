@@ -63,22 +63,16 @@ class DistributeTestBundleOperation: BaseOperation<Void> {
                         receivingNodes.insert(destination)
                     }
 
-                    let executer: Executer
-                    switch AddressType(node: source) {
-                    case .local:
-                        executer = makeLocalExecuter()
-                    case .remote:
-                        let remoteExecuter = makeRemoteExecuter(node: source)
-                        try remoteExecuter.connect()
-                        executer = remoteExecuter
-                    }
-                    executers.append(executer)
-
                     DispatchQueue.global(qos: .userInitiated).async { [unowned self] in
                         do {
-                            let buildPath = Path.testBundle.rawValue
                             print("🛫 `\(self.className)` \(source.address) -> \(destination.address)".bold)
+
+                            let executer = try makeExecuter(node: source)
+                            executers.append(executer)
+
+                            let buildPath = Path.testBundle.rawValue
                             try executer.rsync(sourcePath: "\(buildPath)/*", destinationPath: buildPath, on: destination)
+
                             print("🛬 `\(self.className)` \(source.address) -> \(destination.address)".bold)
                         } catch {
                             self.didThrow?(error)
@@ -109,5 +103,19 @@ class DistributeTestBundleOperation: BaseOperation<Void> {
             }
         }
         super.cancel()
+    }
+
+    private func makeExecuter(node: Node) throws -> Executer {
+        let executer: Executer
+        switch AddressType(node: node) {
+        case .local:
+            executer = makeLocalExecuter()
+        case .remote:
+            let remoteExecuter = makeRemoteExecuter(node: node)
+            try remoteExecuter.connect()
+            executer = remoteExecuter
+        }
+
+        return executer
     }
 }

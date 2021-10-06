@@ -135,12 +135,18 @@ extension CommandLineProxy {
         func enableXcode11ReleaseNotesWorkarounds(on simulator: Simulator) throws {
             // See release notes workarounds: https://developer.apple.com/documentation/xcode_release_notes/xcode_11_release_notes?language=objc
             // These settings are hot loaded no reboot of the device is necessary
-            _ = try executer.execute("xcrun simctl spawn '\(simulator.id)' defaults write com.apple.springboard FBLaunchWatchdogScale 2")
+            _ = try? executer.execute("xcrun simctl spawn '\(simulator.id)' defaults write com.apple.springboard FBLaunchWatchdogScale 2")
         }
 
         func disableSlideToType(on simulator: Simulator) throws {
-            // These settings are hot loaded no reboot of the device is necessary
-            _ = try executer.execute("xcrun simctl spawn '\(simulator.id)' defaults write com.apple.Preferences DidShowContinuousPathIntroduction -bool true")
+            let numberFormatter = NumberFormatter()
+            numberFormatter.decimalSeparator = "."
+            let deviceVersion = numberFormatter.number(from: simulator.device.runtime)?.floatValue ?? 0.0
+
+            if deviceVersion >= 13.0 {
+                // These settings are hot loaded no reboot of the device is necessary
+                _ = try executer.execute("xcrun simctl spawn '\(simulator.id)' defaults write com.apple.Preferences DidShowContinuousPathIntroduction -bool true")
+            }
         }
 
         func updateLanguage(on simulator: Simulator, language: String?, locale: String?) throws -> Bool {
@@ -205,14 +211,14 @@ extension CommandLineProxy {
             // We use 'instruments -s devices' instead of 'xcrun simctl list devices' because it gives more complete infos including simulator version
             let simulatorsStatus = try cachedSimulatorStatus ?? (try rawSimulatorStatus())
 
-            let statusRegex = try NSRegularExpression(pattern: #"(.*)\s\((.*)\)\s\((.*)\)$"#)
+            let statusRegex = try NSRegularExpression(pattern: #"(.*?)\s(Simulator\s)?\((.*)\)\s\((.*)\)$"#)
             
             let simulatorStatus: (String) -> (String, String, String)? = { rawStatus in
                 let captureGroups = rawStatus.capturedGroups(regex: statusRegex)
 
-                guard captureGroups.count == 3 else { return nil }
+                guard captureGroups.count == 4 else { return nil }
 
-                return (captureGroups[0], captureGroups[1], captureGroups[2])
+                return (captureGroups[0], captureGroups[2], captureGroups[3])
             }
             
             for rawStatus in simulatorsStatus.components(separatedBy: "\n") {
@@ -235,7 +241,7 @@ extension CommandLineProxy {
             }
 
             #if DEBUG
-                print("📱  Simulator \(name) not found, creating a new one")
+                print("📱  Simulator \(name) not found, creating a new one on \(executer.address)")
             #endif
 
             // Simulator not found
@@ -306,7 +312,16 @@ extension CommandLineProxy {
         func bootSynchronously(simulator: Simulator) throws {
             // https://gist.github.com/keith/33d3e28de4217f3baecde15357bfe5f6
             // boot and synchronously wait for device to boot
-            _ = try executer.execute("xcrun simctl bootstatus '\(simulator.id)' -b || true")
+            for _ in 0..<2 {
+                _ = try executer.execute("xcrun simctl bootstatus '\(simulator.id)' -b || true")
+
+                let didBoot = try executer.execute("xcrun simctl list devices 2>/dev/null | grep '\(simulator.id)' | grep '(Booted)' | wc -l") == "1"
+                if didBoot {
+                    return
+                }
+
+                Thread.sleep(forTimeInterval: 10.0)
+            }
         }
 
         func loadSimulatorSettings() throws -> Simulators.Settings {

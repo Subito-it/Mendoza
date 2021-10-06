@@ -9,12 +9,14 @@ import Foundation
 
 class RemoteSetupOperation: BaseOperation<Void> {
     private let nodes: [Node]
+    private let xcodeBuildNumber: String?
     private lazy var pool: ConnectionPool = {
         makeConnectionPool(sources: nodes)
     }()
 
-    init(nodes: [Node]) {
+    init(nodes: [Node], xcodeBuildNumber: String?) {
         self.nodes = nodes
+        self.xcodeBuildNumber = xcodeBuildNumber
     }
 
     override func main() {
@@ -50,6 +52,20 @@ class RemoteSetupOperation: BaseOperation<Void> {
                 }
 
                 _ = try executer.execute("touch '\(Path.base.url.appendingPathComponent(".metadata_never_index").path)'")
+
+                switch AddressType(node: source.node) {
+                case .remote:
+                    if let xcodeBuildNumber = self.xcodeBuildNumber {
+                        guard let administratorPassword = (source.node.administratorPassword ?? nil) else {
+                            throw Error("You need to add administrator password for node '\(source.node.address)' when specifying xcodeBuildNumber")
+                        }
+                        
+                        let xcversion = XcodeVersion(executer: executer)
+                        try xcversion.setCurrent(buildNumber: xcodeBuildNumber, administratorPassword: administratorPassword)
+                    }
+                case .local:
+                    break // Xcode setup in LocalSetupOperation
+                }
             }
             
             didEnd?(())

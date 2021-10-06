@@ -37,6 +37,7 @@ final class RemoteExecuter: Executer {
 
     deinit {
         sftp?.shutdown()
+        try? connection?.terminate()
     }
 
     func clone() throws -> RemoteExecuter {
@@ -49,7 +50,6 @@ final class RemoteExecuter: Executer {
         guard let authentication = node.authentication else { throw Error("Missing authentication for node `\(node.address)`") }
 
         connection = try SSH(host: node.address)
-        connection?.ptyType = .xterm
 
         switch authentication {
         case let .agent(username):

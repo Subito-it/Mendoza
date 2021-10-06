@@ -2,7 +2,7 @@
 //  SimulatorWindowLocation.swift
 //  Mendoza
 //
-//  Created by tomas on 13/11/2019.
+//  Created by Tomas Camin on 13/11/2019.
 //
 
 import Foundation
