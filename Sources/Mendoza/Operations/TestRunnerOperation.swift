@@ -117,7 +117,7 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                         // We need to move results because xcodebuild test-without-building shows a weird behaviour not allowing more than 2 xcresults in the same folder.
                         // Repeatedly performing 'xcodebuild test-without-building' results in older xcresults being deleted
                         let resultUrl = Path.results.url.appendingPathComponent(testRunner.id)
-                        _ = try executer.capture("mkdir -p '\(resultUrl.path)'; mv '\(xcResultUrl.path)' '\(resultUrl.path)'")                        
+                        _ = try executer.capture("mkdir -p '\(resultUrl.path)'; mv '\(xcResultUrl.path)' '\(resultUrl.path)'")
                         for index in 0..<testResults.count {
                             testResults[index].xcResultPath = resultUrl.path
                         }
@@ -129,7 +129,7 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                         }
 
                         self.syncQueue.sync { [unowned self] in
-                            for test in self.testsToRetry(testResults: testResults, failingTestsRetryCount: self.failingTestsRetryCount) {
+                            for test in self.testsToRetry(testResults: testResults, testCases: testCases, failingTestsRetryCount: self.failingTestsRetryCount) {
                                 if self.sortedTestCases?.count == 0 {
                                     self.sortedTestCases?.append(test)
                                 } else {
@@ -256,7 +256,7 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                 throw originalError
             }
         }
-
+        
         // It should be rare but it may happen that stdout content is not processed in the partailBlock
         output = (output + "\n").replacingOccurrences(of: parsedProgress, with: "")
         progressHandler(output)
@@ -286,7 +286,7 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
 
         return (output: output, testCaseResults: testCaseResults)
     }
-    
+        
     private func shouldIgnoreTestExecutionError(_ error: Error) -> Bool {
         let ignoreErrors = ["Failed to require the PTY package", "Unable to send channel-open request"]
         
@@ -399,14 +399,14 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
         try? proxy.shutdown(simulator: simulator)
     }
 
-    private func testsToRetry(testResults: [TestCaseResult], failingTestsRetryCount: Int) -> [TestCase] {
+    private func testsToRetry(testResults: [TestCaseResult], testCases: [TestCase], failingTestsRetryCount: Int) -> [TestCase] {
         let failedTestCases = testResults.filter { $0.status == .failed }.map { TestCase(name: $0.name, suite: $0.suite) }
 
-        var testCases = [TestCase]()
+        var testToRetry = [TestCase]()
         for failedTestCase in failedTestCases {
             if retryCountMap.count(for: failedTestCase) < failingTestsRetryCount {
                 retryCountMap.add(failedTestCase)
-                testCases.insert(failedTestCase, at: 0)
+                testToRetry.insert(failedTestCase, at: 0)
                 testCasesCount += 1
 
                 if verbose {
@@ -414,8 +414,15 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                 }
             }
         }
+        
+        // We should reenqueue all tests that were scheduled (testCases) but were not included in results (testResults). While uncommon it can happen in some rare cases
+        for testCase in testCases {
+            if !testResults.contains(where: { $0.testCaseIdentifier == testCase.testIdentifier }) {
+                testToRetry.insert(testCase, at: 0)
+            }
+        }
 
-        return testCases
+        return testToRetry
     }
 
     private func findTestRun(executer: Executer) throws -> String {
