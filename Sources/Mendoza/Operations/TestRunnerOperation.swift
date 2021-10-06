@@ -418,7 +418,15 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
         // We should reenqueue all tests that were scheduled (testCases) but were not included in results (testResults). While uncommon it can happen in some rare cases
         for testCase in testCases {
             if !testResults.contains(where: { $0.testCaseIdentifier == testCase.testIdentifier }) {
-                testToRetry.insert(testCase, at: 0)
+                if retryCountMap.count(for: testCase) < failingTestsRetryCount {
+                    retryCountMap.add(testCase)
+                    testToRetry.insert(testCase, at: 0)
+                    testCasesCount += 1
+
+                    if verbose {
+                        print("🔁  Renqueuing (no result) \(testCase), retry count: \(retryCountMap.count(for: testCase))".yellow)
+                    }
+                }
             }
         }
 
