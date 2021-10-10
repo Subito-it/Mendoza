@@ -109,6 +109,7 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
 
                 for nodeSimulator in nodeSimulators {
                     try proxy.enableXcode11ReleaseNotesWorkarounds(on: nodeSimulator)
+                    try proxy.enableXcode13Workarounds(on: nodeSimulator)
                     try proxy.disableSlideToType(on: nodeSimulator)
 
                     try proxy.terminateApp(identifier: self.configuration.buildBundleIdentifier, on: nodeSimulator)

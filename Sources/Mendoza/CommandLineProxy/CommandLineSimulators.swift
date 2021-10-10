@@ -138,6 +138,12 @@ extension CommandLineProxy {
             _ = try? executer.execute("xcrun simctl spawn '\(simulator.id)' defaults write com.apple.springboard FBLaunchWatchdogScale 2")
         }
 
+        func enableXcode13Workarounds(on simulator: Simulator) throws {
+            // See https://developer.apple.com/forums/thread/683277?answerId=682047022#682047022
+            let path = "\(simulatorSettingsPath(for: simulator))/com.apple.suggestions.plist"
+            _ = try? executer.execute("plutil -replace SuggestionsAppLibraryEnabled -bool NO '\(path)'")
+        }
+
         func disableSlideToType(on simulator: Simulator) throws {
             let numberFormatter = NumberFormatter()
             numberFormatter.decimalSeparator = "."
