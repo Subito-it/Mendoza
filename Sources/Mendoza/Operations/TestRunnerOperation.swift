@@ -22,7 +22,8 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
     private let productNames: [String]
     private let sdk: XcodeProject.SDK
     private let failingTestsRetryCount: Int
-    private let testTimeoutSeconds: Int
+    private let maximumStdOutIdleTime: Int?
+    private let maximumTestExecutionTime: Int?
     private let syncQueue = DispatchQueue(label: String(describing: TestRunnerOperation.self))
     private let verbose: Bool
     private var retryCountMap = NSCountedSet()
@@ -51,13 +52,14 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
         return makeConnectionPool(sources: input.map { (node: $0.0.node, value: $0.0.testRunner) })
     }()
 
-    init(configuration: Configuration, testTarget: String, productNames: [String], sdk: XcodeProject.SDK, failingTestsRetryCount: Int, testTimeoutSeconds: Int, xcresultBlobThresholdKB: Int?, verbose: Bool) {
+    init(configuration: Configuration, testTarget: String, productNames: [String], sdk: XcodeProject.SDK, failingTestsRetryCount: Int, maximumStdOutIdleTime: Int?, maximumTestExecutionTime: Int?, xcresultBlobThresholdKB: Int?, verbose: Bool) {
         self.configuration = configuration
         self.testTarget = testTarget
         self.productNames = productNames
         self.sdk = sdk
         self.failingTestsRetryCount = failingTestsRetryCount
-        self.testTimeoutSeconds = testTimeoutSeconds
+        self.maximumStdOutIdleTime = maximumStdOutIdleTime
+        self.maximumTestExecutionTime = maximumTestExecutionTime
         self.verbose = verbose
         self.xcresultBlobThresholdKB = xcresultBlobThresholdKB
     }
@@ -182,18 +184,50 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
         var testCaseResults = [TestCaseResult]()
 
         var testWithoutBuilding: String
+        
+        var maxAllowedTestExecutionTimeParameter = ""
+        if let maximumTestExecutionTime = maximumTestExecutionTime {
+            maxAllowedTestExecutionTimeParameter = "-maximum-test-execution-time-allowance \(maximumTestExecutionTime)"
+        }
 
         switch sdk {
         case .ios:
-            testWithoutBuilding = #"$(xcode-select -p)/usr/bin/xcodebuild -parallel-testing-enabled NO -disable-concurrent-destination-testing -xctestrun '\#(testRun)' -destination 'platform=iOS Simulator,id=\#(testRunner.id)' -derivedDataPath '\#(destinationPath)' \#(onlyTesting) -enableCodeCoverage YES -destination-timeout 60 -test-timeouts-enabled YES -maximum-test-execution-time-allowance \#(testTimeoutSeconds) test-without-building"#
+            testWithoutBuilding = #"$(xcode-select -p)/usr/bin/xcodebuild -parallel-testing-enabled NO -disable-concurrent-destination-testing -xctestrun '\#(testRun)' -destination 'platform=iOS Simulator,id=\#(testRunner.id)' -derivedDataPath '\#(destinationPath)' \#(onlyTesting) -enableCodeCoverage YES -destination-timeout 60 -test-timeouts-enabled YES \#(maxAllowedTestExecutionTimeParameter) test-without-building"#
         case .macos:
-            testWithoutBuilding = #"$(xcode-select -p)/usr/bin/xcodebuild -parallel-testing-enabled NO -disable-concurrent-destination-testing -xctestrun '\#(testRun)' -destination 'platform=OS X,arch=x86_64' -derivedDataPath '\#(destinationPath)' \#(onlyTesting) -enableCodeCoverage YES -test-timeouts-enabled YES -maximum-test-execution-time-allowance \#(testTimeoutSeconds) test-without-building"#
+            testWithoutBuilding = #"$(xcode-select -p)/usr/bin/xcodebuild -parallel-testing-enabled NO -disable-concurrent-destination-testing -xctestrun '\#(testRun)' -destination 'platform=OS X,arch=x86_64' -derivedDataPath '\#(destinationPath)' \#(onlyTesting) -enableCodeCoverage YES -test-timeouts-enabled YES \#(maxAllowedTestExecutionTimeParameter) test-without-building"#
         }
         testWithoutBuilding += " || true"
 
+        var task: DispatchWorkItem?
+        var launchTimeoutHandler: (() -> Void)? = nil
+        if let maximumStdOutIdleTime = maximumStdOutIdleTime, self.sdk == .ios {
+            launchTimeoutHandler = {
+                task?.cancel()
+
+                task = DispatchWorkItem { [weak self] in
+                    guard let self = self else { return }
+
+                    if let simulator = testRunner as? Simulator, let localExecuter = try? executer.clone() {
+                        print("⏰  No stdout updates for more than \(maximumStdOutIdleTime)s, stopping test on {\(runnerIndex)}".red)
+
+                        let proxy = CommandLineProxy.Simulators(executer: localExecuter, verbose: self.verbose)
+                        try? proxy.terminateApp(identifier: self.configuration.buildBundleIdentifier, on: simulator)
+                        try? proxy.terminateApp(identifier: self.configuration.testBundleIdentifier, on: simulator)
+                        if self.verbose {
+                            print("⏰  Did terminate application".yellow)
+                        }
+                    }
+                }
+
+                DispatchQueue.main.asyncAfter(deadline: .now() + .seconds(maximumStdOutIdleTime), execute: task!)
+            }
+        }
+        
         var parsedProgress = ""
         var partialProgress = ""
         let progressHandler: ((String) -> Void) = { [unowned self] progress in
+            launchTimeoutHandler?()
+            
             parsedProgress += progress
             partialProgress += progress
             let lines = partialProgress.components(separatedBy: "\n")
@@ -257,6 +291,8 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
             }
         }
         
+        task?.cancel()
+                
         // It should be rare but it may happen that stdout content is not processed in the partailBlock
         output = (output + "\n").replacingOccurrences(of: parsedProgress, with: "")
         progressHandler(output)

@@ -25,7 +25,8 @@ class TestCommand: Command {
     let deviceRuntimeField = Argument<String>(name: "version", kind: .named(short: "v", long: "device_runtime"), optional: true, help: "Device runtime to use to run tests. e.g. '13.0'")
     let deviceLanguage = Argument<String>(name: "language", kind: .named(short: nil, long: "device_language"), optional: true, help: "Device language. e.g. 'en-EN'")
     let deviceLocale = Argument<String>(name: "locale", kind: .named(short: nil, long: "device_locale"), optional: true, help: "Device locale. e.g. 'en_US'")
-    let timeoutField = Argument<Int>(name: "seconds", kind: .named(short: nil, long: "timeout"), optional: true, help: "Maximum allowed idle time (in seconds) in test standard output before dispatch process is automatically terminated. Default 600 seconds")
+    let maximumStdOutIdleTime = Argument<Int>(name: "seconds", kind: .named(short: nil, long: "stdout_timeout"), optional: true, help: "Maximum allowed idle time (in seconds) in standard output before test is automatically terminated")
+    let maximumTestExecutionTime = Argument<Int>(name: "seconds", kind: .named(short: nil, long: "max_execution_time"), optional: true, help: "Maximum execution time (in seconds) before test fails with a timeout error")
     let pluginCustomField = Argument<String>(name: "data", kind: .named(short: nil, long: "plugin_data"), optional: true, help: "A custom string that can be used to inject data to plugins")
     let failingTestsRetryCountField = Argument<Int>(name: "count", kind: .named(short: "r", long: "failure_retry"), optional: true, help: "Number of times a failing tests should be repeated")
     let codeCoveragePathEquivalence = Argument<String>(name: "path", kind: .named(short: nil, long: "llvm_cov_equivalence_path"), optional: true, help: "Path equivalence path passed to 'llvm-cov show' when extracting code coverage (<from>,<to>)")
@@ -41,9 +42,7 @@ class TestCommand: Command {
                 device = Device(name: deviceName, runtime: deviceRuntime, language: deviceLanguage.value, locale: deviceLocale.value)
             }
             
-            let timeout = timeoutField.value ?? 600
             let filePatterns = FilePatterns(commaSeparatedIncludePattern: includePatternField.value, commaSeparatedExcludePattern: excludePatternField.value)
-            let failingTestsRetryCount = failingTestsRetryCountField.value ?? 0
 
             let test = try Test(configurationUrl: configurationPathField.value!, // swiftlint:disable:this force_unwrapping
                                 device: device,
@@ -51,8 +50,9 @@ class TestCommand: Command {
                                 skipResultMerge: skipResultMerge.value,
                                 clearDerivedDataOnCompilationFailure: clearDerivedDataOnCompilationFailure.value,
                                 filePatterns: filePatterns,
-                                testTimeoutSeconds: timeout,
-                                failingTestsRetryCount: failingTestsRetryCount,
+                                maximumStdOutIdleTime: maximumStdOutIdleTime.value,
+                                maximumTestExecutionTime: maximumTestExecutionTime.value,
+                                failingTestsRetryCount: failingTestsRetryCountField.value ?? 0,
                                 codeCoveragePathEquivalence: codeCoveragePathEquivalence.value,
                                 xcodeBuildNumber: xcodeBuildNumber.value,
                                 dispatchOnLocalHost: dispatchOnLocalHostFlag.value,
