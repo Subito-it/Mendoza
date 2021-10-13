@@ -198,9 +198,36 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
         }
         testWithoutBuilding += " || true"
 
+        var task: DispatchWorkItem?
+        var launchTimeoutHandler: (() -> Void)? = nil
+        if let maximumStdOutIdleTime = maximumStdOutIdleTime, self.sdk == .ios {
+            launchTimeoutHandler = {
+                task?.cancel()
+
+                task = DispatchWorkItem { [weak self] in
+                    guard let self = self else { return }
+
+                    if let simulator = testRunner as? Simulator, let localExecuter = try? executer.clone() {
+                        print("⏰  No stdout updates for more than \(maximumStdOutIdleTime)s, stopping test on {\(runnerIndex)}".red)
+
+                        let proxy = CommandLineProxy.Simulators(executer: localExecuter, verbose: self.verbose)
+                        try? proxy.terminateApp(identifier: self.configuration.buildBundleIdentifier, on: simulator)
+                        try? proxy.terminateApp(identifier: self.configuration.testBundleIdentifier, on: simulator)
+                        if self.verbose {
+                            print("⏰  Did terminate application".yellow)
+                        }
+                    }
+                }
+
+                DispatchQueue.main.asyncAfter(deadline: .now() + .seconds(maximumStdOutIdleTime), execute: task!)
+            }
+        }
+        
         var parsedProgress = ""
         var partialProgress = ""
         let progressHandler: ((String) -> Void) = { [unowned self] progress in
+            launchTimeoutHandler?()
+            
             parsedProgress += progress
             partialProgress += progress
             let lines = partialProgress.components(separatedBy: "\n")
@@ -264,6 +291,8 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
             }
         }
         
+        task?.cancel()
+                
         // It should be rare but it may happen that stdout content is not processed in the partailBlock
         output = (output + "\n").replacingOccurrences(of: parsedProgress, with: "")
         progressHandler(output)
