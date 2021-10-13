@@ -184,12 +184,17 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
         var testCaseResults = [TestCaseResult]()
 
         var testWithoutBuilding: String
+        
+        var maxAllowedTestExecutionTimeParameter = ""
+        if let maximumTestExecutionTime = maximumTestExecutionTime {
+            maxAllowedTestExecutionTimeParameter = "-maximum-test-execution-time-allowance \(maximumTestExecutionTime)"
+        }
 
         switch sdk {
         case .ios:
-            testWithoutBuilding = #"$(xcode-select -p)/usr/bin/xcodebuild -parallel-testing-enabled NO -disable-concurrent-destination-testing -xctestrun '\#(testRun)' -destination 'platform=iOS Simulator,id=\#(testRunner.id)' -derivedDataPath '\#(destinationPath)' \#(onlyTesting) -enableCodeCoverage YES -destination-timeout 60 -test-timeouts-enabled YES -maximum-test-execution-time-allowance \#(testTimeoutSeconds) test-without-building"#
+            testWithoutBuilding = #"$(xcode-select -p)/usr/bin/xcodebuild -parallel-testing-enabled NO -disable-concurrent-destination-testing -xctestrun '\#(testRun)' -destination 'platform=iOS Simulator,id=\#(testRunner.id)' -derivedDataPath '\#(destinationPath)' \#(onlyTesting) -enableCodeCoverage YES -destination-timeout 60 -test-timeouts-enabled YES \#(maxAllowedTestExecutionTimeParameter) test-without-building"#
         case .macos:
-            testWithoutBuilding = #"$(xcode-select -p)/usr/bin/xcodebuild -parallel-testing-enabled NO -disable-concurrent-destination-testing -xctestrun '\#(testRun)' -destination 'platform=OS X,arch=x86_64' -derivedDataPath '\#(destinationPath)' \#(onlyTesting) -enableCodeCoverage YES -test-timeouts-enabled YES -maximum-test-execution-time-allowance \#(testTimeoutSeconds) test-without-building"#
+            testWithoutBuilding = #"$(xcode-select -p)/usr/bin/xcodebuild -parallel-testing-enabled NO -disable-concurrent-destination-testing -xctestrun '\#(testRun)' -destination 'platform=OS X,arch=x86_64' -derivedDataPath '\#(destinationPath)' \#(onlyTesting) -enableCodeCoverage YES -test-timeouts-enabled YES \#(maxAllowedTestExecutionTimeParameter) test-without-building"#
         }
         testWithoutBuilding += " || true"
 
