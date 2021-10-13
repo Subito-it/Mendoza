@@ -22,7 +22,8 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
     private let productNames: [String]
     private let sdk: XcodeProject.SDK
     private let failingTestsRetryCount: Int
-    private let testTimeoutSeconds: Int
+    private let maximumStdOutIdleTime: Int?
+    private let maximumTestExecutionTime: Int?
     private let syncQueue = DispatchQueue(label: String(describing: TestRunnerOperation.self))
     private let verbose: Bool
     private var retryCountMap = NSCountedSet()
@@ -51,13 +52,14 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
         return makeConnectionPool(sources: input.map { (node: $0.0.node, value: $0.0.testRunner) })
     }()
 
-    init(configuration: Configuration, testTarget: String, productNames: [String], sdk: XcodeProject.SDK, failingTestsRetryCount: Int, testTimeoutSeconds: Int, xcresultBlobThresholdKB: Int?, verbose: Bool) {
+    init(configuration: Configuration, testTarget: String, productNames: [String], sdk: XcodeProject.SDK, failingTestsRetryCount: Int, maximumStdOutIdleTime: Int?, maximumTestExecutionTime: Int?, xcresultBlobThresholdKB: Int?, verbose: Bool) {
         self.configuration = configuration
         self.testTarget = testTarget
         self.productNames = productNames
         self.sdk = sdk
         self.failingTestsRetryCount = failingTestsRetryCount
-        self.testTimeoutSeconds = testTimeoutSeconds
+        self.maximumStdOutIdleTime = maximumStdOutIdleTime
+        self.maximumTestExecutionTime = maximumTestExecutionTime
         self.verbose = verbose
         self.xcresultBlobThresholdKB = xcresultBlobThresholdKB
     }
