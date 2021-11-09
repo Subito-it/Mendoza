@@ -42,6 +42,8 @@ class LocalSetupOperation: BaseOperation<Void> {
                     // Reuse derived data
                     if !clearDerivedDataOnCompilationFailure {
                         _ = try executer.execute("rm -rf '\(path.rawValue)' || true")
+                    } else {
+                        _ = try executer.execute("rm -rf '\(path.rawValue)/*.xctestrun' || true")
                     }
                 case .logs, .temp, .results:
                     _ = try executer.execute("rm -rf '\(path.rawValue)' || true")
