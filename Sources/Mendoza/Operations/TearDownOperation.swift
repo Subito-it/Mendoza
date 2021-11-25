@@ -59,7 +59,7 @@ class TearDownOperation: BaseOperation<Void> {
             } else {
                 infoPlistPath = "\(configuration.resultDestination.path)/\(timestamp)/\(Environment.resultFoldername)/\(Environment.xcresultFirstUnmergedFilename)/Info.plist"
             }
-            try writeGitInfoInResultBundleInfoPlist(executer: executer, infoPlistPath: infoPlistPath)
+            try writeResultBundleInfoPlist(executer: executer, infoPlistPath: infoPlistPath)
 
             try pool.execute { executer, source in
                 if AddressType(node: source.node) == .remote {
@@ -232,7 +232,7 @@ class TearDownOperation: BaseOperation<Void> {
         try executer.upload(localUrl: tempUrl, remotePath: destinationPath)
     }
 
-    private func writeGitInfoInResultBundleInfoPlist(executer: Executer, infoPlistPath: String) throws {
+    private func writeResultBundleInfoPlist(executer: Executer, infoPlistPath: String) throws {
         guard let git = git else { return }
 
         let uniqueUrl = Path.temp.url.appendingPathComponent("\(UUID().uuidString).plist")
@@ -245,6 +245,7 @@ class TearDownOperation: BaseOperation<Void> {
         infoPlist["branchName"] = AnyCodable(git.branch)
         infoPlist["commitMessage"] = AnyCodable(git.commitMessage)
         infoPlist["commitHash"] = AnyCodable(git.commitHash)
+        infoPlist["metadata"] = AnyCodable(plugin.plugin.data)
 
         guard let contentData = try? PropertyListEncoder().encode(infoPlist) else {
             throw Error("Failed writing json git data to xcresult bundle Info.plit")
