@@ -71,6 +71,8 @@ extension AnyCodable: CustomStringConvertible {
         switch value {
         case is Void:
             return String(describing: nil as Any?)
+        case let value as Date:
+            return value.timeIntervalSince1970.description
         case let value as CustomStringConvertible:
             return value.description
         default:

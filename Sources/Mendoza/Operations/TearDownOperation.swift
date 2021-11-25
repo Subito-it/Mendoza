@@ -246,6 +246,10 @@ class TearDownOperation: BaseOperation<Void> {
         infoPlist["commitMessage"] = AnyCodable(git.commitMessage)
         infoPlist["commitHash"] = AnyCodable(git.commitHash)
         infoPlist["metadata"] = AnyCodable(plugin.plugin.data)
+        if let startTime = testSessionResult?.startTime {
+            infoPlist["startDate"] = AnyCodable(Date(timeIntervalSinceReferenceDate: startTime))
+            infoPlist["endDate"] = AnyCodable(Date())
+        }
 
         guard let contentData = try? PropertyListEncoder().encode(infoPlist) else {
             throw Error("Failed writing json git data to xcresult bundle Info.plit")
