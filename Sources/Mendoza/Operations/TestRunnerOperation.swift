@@ -114,8 +114,7 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                     try autoreleasepool {
                         var (output, testResults) = try self.testWithoutBuilding(executer: executer, node: source.node.address, testTarget: self.testTarget, testCases: testCases, testRunner: testRunner, runnerIndex: runnerIndex)
 
-                        let xcResultUrl = try self.findTestResultUrl(executer: executer, testRunner: testRunner)
-
+                        if let xcResultUrl = try self.findTestResultUrl(executer: executer, testRunner: testRunner) {
                         // We need to move results because xcodebuild test-without-building shows a weird behaviour not allowing more than 2 xcresults in the same folder.
                         // Repeatedly performing 'xcodebuild test-without-building' results in older xcresults being deleted
                         let resultUrl = Path.results.url.appendingPathComponent(testRunner.id)
@@ -128,6 +127,7 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                             testResults += bootstrappingTestResults
 
                             self.forceResetSimulator(executer: executer, testRunner: testRunner)
+                        }
                         }
 
                         self.syncQueue.sync { [unowned self] in
@@ -479,9 +479,12 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
         return testRun
     }
 
-    private func findTestResultUrl(executer: Executer, testRunner: TestRunner) throws -> URL {
+    private func findTestResultUrl(executer: Executer, testRunner: TestRunner) throws -> URL? {
         let testResults = try findTestResultsUrl(executer: executer, testRunner: testRunner)
-        guard let testResult = testResults.first else { throw Error("No test result found", logger: executer.logger) }
+        guard let testResult = testResults.first else {
+            // Under certain failures xcodebuild does not produce an .xcresult
+            return nil
+        }
         guard testResults.count == 1 else { throw Error("Too many test results found", logger: executer.logger) }
 
         return testResult
