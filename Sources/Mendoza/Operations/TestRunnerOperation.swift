@@ -115,19 +115,19 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                         var (output, testResults) = try self.testWithoutBuilding(executer: executer, node: source.node.address, testTarget: self.testTarget, testCases: testCases, testRunner: testRunner, runnerIndex: runnerIndex)
 
                         if let xcResultUrl = try self.findTestResultUrl(executer: executer, testRunner: testRunner) {
-                        // We need to move results because xcodebuild test-without-building shows a weird behaviour not allowing more than 2 xcresults in the same folder.
-                        // Repeatedly performing 'xcodebuild test-without-building' results in older xcresults being deleted
-                        let resultUrl = Path.results.url.appendingPathComponent(testRunner.id)
-                        _ = try executer.capture("mkdir -p '\(resultUrl.path)'; mv '\(xcResultUrl.path)' '\(resultUrl.path)'")
-                        for index in 0..<testResults.count {
-                            testResults[index].xcResultPath = resultUrl.path
-                        }
-                                                
-                        if let bootstrappingTestResults = try self.handleBootstrappingErrors(output, partialResult: testResults, candidates: testCases, node: source.node.address, runnerName: testRunner.name, runnerIdentifier: testRunner.id, xcResultPath: xcResultUrl.path) {
-                            testResults += bootstrappingTestResults
+                            // We need to move results because xcodebuild test-without-building shows a weird behaviour not allowing more than 2 xcresults in the same folder.
+                            // Repeatedly performing 'xcodebuild test-without-building' results in older xcresults being deleted
+                            let resultUrl = Path.results.url.appendingPathComponent(testRunner.id)
+                            _ = try executer.capture("mkdir -p '\(resultUrl.path)'; mv '\(xcResultUrl.path)' '\(resultUrl.path)'")
+                            for index in 0..<testResults.count {
+                                testResults[index].xcResultPath = resultUrl.path
+                            }
+                                                    
+                            if let bootstrappingTestResults = try self.handleBootstrappingErrors(output, partialResult: testResults, candidates: testCases, node: source.node.address, runnerName: testRunner.name, runnerIdentifier: testRunner.id, xcResultPath: xcResultUrl.path) {
+                                testResults += bootstrappingTestResults
 
-                            self.forceResetSimulator(executer: executer, testRunner: testRunner)
-                        }
+                                self.forceResetSimulator(executer: executer, testRunner: testRunner)
+                            }
                         }
 
                         self.syncQueue.sync { [unowned self] in
@@ -197,7 +197,7 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
             testWithoutBuilding = #"$(xcode-select -p)/usr/bin/xcodebuild -parallel-testing-enabled NO -disable-concurrent-destination-testing -xctestrun '\#(testRun)' -destination 'platform=OS X,arch=x86_64' -derivedDataPath '\#(destinationPath)' \#(onlyTesting) -enableCodeCoverage YES -test-timeouts-enabled YES \#(maxAllowedTestExecutionTimeParameter) test-without-building"#
         }
         testWithoutBuilding += " || true"
-
+        
         var task: DispatchWorkItem?
         var launchTimeoutHandler: (() -> Void)? = nil
         if let maximumStdOutIdleTime = maximumStdOutIdleTime, self.sdk == .ios {
@@ -294,7 +294,7 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
         task?.cancel()
                 
         // It should be rare but it may happen that stdout content is not processed in the partailBlock
-        output = (output + "\n").replacingOccurrences(of: parsedProgress, with: "")
+        output = (output.trimmingCharacters(in: .whitespacesAndNewlines)).replacingOccurrences(of: parsedProgress.trimmingCharacters(in: .whitespacesAndNewlines), with: "") + "\n"
         progressHandler(output)
         
         // xcodebuild returns 0 even on ** TEST EXECUTE FAILED ** when missing
