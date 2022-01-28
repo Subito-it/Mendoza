@@ -1,4 +1,4 @@
-#!/usr/local/bin/swift-sh
+#!/usr/bin/swift sh
 // swiftlint:disable all
 
 import Foundation
