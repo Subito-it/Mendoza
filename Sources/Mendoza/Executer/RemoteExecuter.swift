@@ -163,7 +163,8 @@ final class RemoteExecuter: Executer {
     }
     
     private func terminateProcessOnDisconnect() throws {
-        try connection?.execute("/bin/bash -c \"shopt -s huponexit\"")
+        let shell = Shell.current()
+        try connection?.execute("\(shell.rawValue) -c \"\(shell.source)\"")
     }
 
     private func updateCurrentDirectoryPath() throws {
