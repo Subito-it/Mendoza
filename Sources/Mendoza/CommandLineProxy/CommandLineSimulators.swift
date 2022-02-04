@@ -36,10 +36,6 @@ extension CommandLineProxy {
         }
 
         func launch() throws {
-            guard try executer.execute("ps aux | grep \"$(xcode-select -p)/Applications/Simulator.app\" | wc -l") != "2" else {
-                return
-            }
-
             let commands = ["defaults read com.apple.iphonesimulator &>/dev/null",
                             "open -a \"$(xcode-select -p)/Applications/Simulator.app\"",
                             "sleep 3"]
