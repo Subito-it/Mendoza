@@ -69,61 +69,48 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
                 let shouldArrangeSimulators = self.runHeadless == false
                 try self.updateSimulatorsSettings(executer: executer, simulators: nodeSimulators, arrangeSimulators: shouldArrangeSimulators)
 
-                var shouldRebootSimulators = false
                 if shouldArrangeSimulators {
-                    shouldRebootSimulators = !(try self.simulatorsProperlyArranged(executer: executer, simulators: nodeSimulators))
+                    _ = !(try self.simulatorsProperlyArranged(executer: executer, simulators: nodeSimulators))
                 }
 
                 for nodeSimulator in nodeSimulators {
-                    let languageUpdated = try proxy.updateLanguage(on: nodeSimulator, language: self.device.language, locale: self.device.locale)
-                    shouldRebootSimulators = shouldRebootSimulators || languageUpdated
+                    _ = try proxy.updateLanguage(on: nodeSimulator, language: self.device.language, locale: self.device.locale)
                 }
 
-                if shouldRebootSimulators {
-                    nodeSimulators.forEach { try? proxy.shutdown(simulator: $0) }
+                try? proxy.shutdownAll() // Always shutting down simulators is the safest way to workaround unexpected Simulator.app hangs
 
-                    if self.runHeadless == false {
-                        try proxy.gracefullyQuit()
-                    }
+                if self.runHeadless == false {
+                    try proxy.gracefullyQuit()
                 }
-
+                
                 let bootQueue = OperationQueue()
-
-                let bootedSimulators = try proxy.bootedSimulators()
-                let unusedSimulators = bootedSimulators.filter { !nodeSimulators.contains($0) }
-                for unusedSimulator in unusedSimulators {
-                    try proxy.shutdown(simulator: unusedSimulator)
-                }
-
+                
                 for nodeSimulator in nodeSimulators {
-                    if !bootedSimulators.contains(nodeSimulator) {
-                        let queueExecuter = try source.node.makeExecuter(logger: self.logger)
-                        let queueProxy = CommandLineProxy.Simulators(executer: queueExecuter, verbose: self.verbose)
+                    let queueExecuter = try source.node.makeExecuter(logger: self.logger)
+                    let queueProxy = CommandLineProxy.Simulators(executer: queueExecuter, verbose: self.verbose)
 
-                        bootQueue.addOperation {
-                            try? queueProxy.bootSynchronously(simulator: nodeSimulator)
+                    var bootSuccess = true
+                    bootQueue.addOperation {
+                        try? queueProxy.bootSynchronously(simulator: nodeSimulator)
+                        
+                        do {
+                            try queueProxy.enableXcode11ReleaseNotesWorkarounds(on: nodeSimulator)
+                            try queueProxy.enableXcode13Workarounds(on: nodeSimulator)
+                            try queueProxy.disableSlideToType(on: nodeSimulator)
+                        } catch {
+                            bootSuccess = false
                         }
+                    }
+                    if !bootSuccess {
+                        throw Error("Failed post boot setup on \(source.node.address) - \(nodeSimulator.name)")
                     }
                 }
                 bootQueue.waitUntilAllOperationsAreFinished()
-
-                for nodeSimulator in nodeSimulators {
-                    try proxy.enableXcode11ReleaseNotesWorkarounds(on: nodeSimulator)
-                    try proxy.enableXcode13Workarounds(on: nodeSimulator)
-                    try proxy.disableSlideToType(on: nodeSimulator)
-
-                    try proxy.terminateApp(identifier: self.configuration.buildBundleIdentifier, on: nodeSimulator)
-                    try proxy.terminateApp(identifier: self.configuration.testBundleIdentifier, on: nodeSimulator)
-                }
-
-
-                if self.runHeadless == false {
-                    if shouldRebootSimulators {
-                        try proxy.gracefullyQuit()
-                    }
-                    try proxy.launch()
-                } else {
+                
+                if self.runHeadless {
                     try proxy.gracefullyQuit()
+                } else {
+                    try proxy.launch()
                 }
 
                 self.syncQueue.sync { [unowned self] in
