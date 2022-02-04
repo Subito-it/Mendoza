@@ -128,9 +128,10 @@ class ExecuterLogger: Logger, CustomDebugStringConvertible {
 
             switch log.kind {
             case .start:
-                guard !lastLog.isStart else { print(logs); /* assertionFailure("💣 Unexpected order of events, not expecting start event"); */ return }
+                // guard !lastLog.isStart else { print(logs); /* assertionFailure("💣 Unexpected order of events, not expecting start event"); */ return }
+                break
             case .end:
-                guard lastLog.isStart else { print(logs); /* assertionFailure("💣 Unexpected order of events, expecting start event"); */ return }
+                // guard lastLog.isStart else { print(logs); /* assertionFailure("💣 Unexpected order of events, expecting start event"); */ return }
                 pairs.append((start: lastLog, end: log))
             case .exception:
                 pairs.append((start: LoggerEvent(date: Date(), kind: .start(command: "EXCEPTION")), end: log))
