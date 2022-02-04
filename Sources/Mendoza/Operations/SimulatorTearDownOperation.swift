@@ -15,8 +15,6 @@ class SimulatorTearDownOperation: BaseOperation<Void> {
         makeConnectionPool(sources: nodes)
     }()
 
-    private let resetSimulatorsOnCompletion = false
-
     init(configuration: Configuration, nodes: [Node], verbose: Bool) {
         self.configuration = configuration
         self.nodes = nodes
@@ -30,18 +28,7 @@ class SimulatorTearDownOperation: BaseOperation<Void> {
             didStart?()
 
             try pool.execute { executer, _ in
-                let proxy = CommandLineProxy.Simulators(executer: executer, verbose: self.verbose)
-
-                let bootedSimulators = try proxy.bootedSimulators()
-                for simulator in bootedSimulators {
-                    try proxy.terminateApp(identifier: self.configuration.buildBundleIdentifier, on: simulator)
-                    try proxy.terminateApp(identifier: self.configuration.testBundleIdentifier, on: simulator)
-                }
-
-                if self.resetSimulatorsOnCompletion == true {
-                    try proxy.gracefullyQuit()
-                    try proxy.launch()
-                }
+                // Do nothing
             }
 
             didEnd?(())
