@@ -318,16 +318,9 @@ extension CommandLineProxy {
         func bootSynchronously(simulator: Simulator) throws {
             // https://gist.github.com/keith/33d3e28de4217f3baecde15357bfe5f6
             // boot and synchronously wait for device to boot
-            for _ in 0..<2 {
-                _ = try executer.execute("xcrun simctl bootstatus '\(simulator.id)' -b || true")
-
-                let didBoot = try executer.execute("xcrun simctl list devices 2>/dev/null | grep '\(simulator.id)' | grep '(Booted)' | wc -l") == "1"
-                if didBoot {
-                    return
-                }
-
-                Thread.sleep(forTimeInterval: 10.0)
-            }
+            _ = try executer.execute("xcrun simctl bootstatus '\(simulator.id)' -b || true")
+            
+            Thread.sleep(forTimeInterval: 5.0)
         }
 
         func loadSimulatorSettings() throws -> Simulators.Settings {
