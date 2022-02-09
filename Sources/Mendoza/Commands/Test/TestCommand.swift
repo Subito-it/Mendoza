@@ -16,7 +16,6 @@ class TestCommand: Command {
     let debugPluginsFlag = Flag(short: nil, long: "plugin_debug", help: "Dump plugin invocation commands")
     let dispatchOnLocalHostFlag = Flag(short: "l", long: "use_localhost", help: "Use localhost to execute tests")
     let verboseFlag = Flag(short: nil, long: "verbose", help: "Dump debug messages")
-    let nonHeadlessSimulatorsFlag = Flag(short: nil, long: "non_headless_simulators", help: "Run simulators in non headless mode")
 
     let configurationPathField = Argument<URL>(name: "configuration_file", kind: .positional, optional: false, help: "Mendoza's configuration file path", autocomplete: .files("json"))
     let includePatternField = Argument<String>(name: "files", kind: .named(short: "f", long: "include_files"), optional: true, help: "Specify from which files UI tests should be extracted. Accepts wildcards and comma separated. e.g SBTA*.swift,SBTF*.swift. Default: '*.swift'", autocomplete: .files("swift"))
@@ -46,7 +45,6 @@ class TestCommand: Command {
 
             let test = try Test(configurationUrl: configurationPathField.value!, // swiftlint:disable:this force_unwrapping
                                 device: device,
-                                runHeadless: !nonHeadlessSimulatorsFlag.value,
                                 skipResultMerge: skipResultMerge.value,
                                 clearDerivedDataOnCompilationFailure: clearDerivedDataOnCompilationFailure.value,
                                 filePatterns: filePatterns,

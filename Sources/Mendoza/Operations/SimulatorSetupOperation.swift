@@ -18,17 +18,15 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
     private let configuration: Configuration
     private let nodes: [Node]
     private let device: Device
-    private let runHeadless: Bool
     private let verbose: Bool
     private lazy var pool: ConnectionPool = {
         makeConnectionPool(sources: nodes)
     }()
 
-    init(configuration: Configuration, nodes: [Node], device: Device, runHeadless: Bool, verbose: Bool) {
+    init(configuration: Configuration, nodes: [Node], device: Device, verbose: Bool) {
         self.nodes = nodes
         self.configuration = configuration
         self.device = device
-        self.runHeadless = runHeadless
         self.verbose = verbose
     }
 
@@ -66,12 +64,9 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
                 try proxy.enableLowQualityGraphicOverrides()
                 try proxy.disableSimulatorBezel()
 
-                let shouldArrangeSimulators = self.runHeadless == false
-                try self.updateSimulatorsSettings(executer: executer, simulators: nodeSimulators, arrangeSimulators: shouldArrangeSimulators)
+                try self.updateSimulatorsSettings(executer: executer, simulators: nodeSimulators, arrangeSimulators: true)
 
-                if shouldArrangeSimulators {
-                    _ = !(try self.simulatorsProperlyArranged(executer: executer, simulators: nodeSimulators))
-                }
+                _ = !(try self.simulatorsProperlyArranged(executer: executer, simulators: nodeSimulators))
 
                 for nodeSimulator in nodeSimulators {
                     _ = try proxy.updateLanguage(on: nodeSimulator, language: self.device.language, locale: self.device.locale)
@@ -79,9 +74,7 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
 
                 try? proxy.shutdownAll() // Always shutting down simulators is the safest way to workaround unexpected Simulator.app hangs
 
-                if self.runHeadless == false {
-                    try proxy.gracefullyQuit()
-                }
+                try proxy.gracefullyQuit()
                 
                 let bootQueue = OperationQueue()
                 
@@ -107,11 +100,7 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
                 }
                 bootQueue.waitUntilAllOperationsAreFinished()
                 
-                if self.runHeadless {
-                    try proxy.gracefullyQuit()
-                } else {
-                    try proxy.launch()
-                }
+                try proxy.launch()
 
                 self.syncQueue.sync { [unowned self] in
                     self.simulators += nodeSimulators.map { (simulator: $0, node: source.node) }
