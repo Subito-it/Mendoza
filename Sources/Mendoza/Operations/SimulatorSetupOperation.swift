@@ -80,7 +80,6 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
                 
                 for nodeSimulator in nodeSimulators {
                     let logger = ExecuterLogger(name: "\(type(of: self))-AsyncBoot", address: node.address)
-                    defer { try? logger.dump() }
                     
                     let queueExecuter = try source.node.makeExecuter(logger: logger)
                     let queueProxy = CommandLineProxy.Simulators(executer: queueExecuter, verbose: self.verbose)
@@ -96,6 +95,8 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
                         } catch {
                             print("Failed booting simulators on \(node.address)")
                         }
+                        
+                        try? logger.dump()
                     }
                 }
                 bootQueue.waitUntilAllOperationsAreFinished()
