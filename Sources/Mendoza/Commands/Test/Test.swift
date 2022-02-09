@@ -281,14 +281,21 @@ class Test {
                     let isRetriedTestCase = testSessionResult.retriedTests.contains { $0.testCaseIdentifier == testCase.testCaseIdentifier }
                     return testCase.status == .failed && !isRetriedTestCase
                 }
+                
+                // Keep only one failure per testCaseIdentifier
+                var uniqueFailedSet = Set<String>()
+                let uniqueFailedTests = testSessionResult.failedTests.filter {
+                    uniqueFailedSet.update(with: $0.testCaseIdentifier) == nil
+                }
                                 
                 let testCount = Double(testCaseResults.count)
-                let failureRate = Double(100 * testSessionResult.failedTests.count) / testCount
+                let failureRate = Double(100 * uniqueFailedTests.count) / testCount
                 let retryRate = Double(100 * testSessionResult.retriedTests.count) / testCount
                 
                 testSessionResult.failureRate = failureRate
                 testSessionResult.retryRate = retryRate
                 testSessionResult.totalTestCount = Int(testCount)
+                testSessionResult.uniqueFailedTestCount = Int(uniqueFailedTests.count)
 
                 let nodes = Set(testCaseResults.map(\.node))
                 for node in nodes {
