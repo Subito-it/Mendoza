@@ -416,7 +416,7 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
             }
             
             let startInterval: TimeInterval = CFAbsoluteTimeGetCurrent()
-            let endInterval: TimeInterval = startInterval - 1.0
+            let endInterval: TimeInterval = startInterval
 
             return failedCandidates.map { TestCaseResult(node: node, runnerName: runnerName, runnerIdentifier: runnerIdentifier, xcResultPath: resultPath, suite: $0.suite, name: $0.name, status: .failed, startInterval: startInterval, endInterval: endInterval) }
         }
