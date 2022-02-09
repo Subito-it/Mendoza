@@ -86,11 +86,14 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
                 let bootQueue = OperationQueue()
                 
                 for nodeSimulator in nodeSimulators {
-                    let queueExecuter = try source.node.makeExecuter(logger: self.logger)
+                    let logger = ExecuterLogger(name: "\(type(of: self))-AsyncBoot", address: node.address)
+                    defer { try? logger.dump() }
+                    
+                    let queueExecuter = try source.node.makeExecuter(logger: logger)
                     let queueProxy = CommandLineProxy.Simulators(executer: queueExecuter, verbose: self.verbose)
 
-                    var bootSuccess = true
                     bootQueue.addOperation {
+                        try? queueProxy.shutdown(simulator: nodeSimulator)
                         try? queueProxy.bootSynchronously(simulator: nodeSimulator)
                         
                         do {
@@ -98,11 +101,8 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
                             try queueProxy.enableXcode13Workarounds(on: nodeSimulator)
                             try queueProxy.disableSlideToType(on: nodeSimulator)
                         } catch {
-                            bootSuccess = false
+                            print("Failed booting simulators on \(node.address)")
                         }
-                    }
-                    if !bootSuccess {
-                        throw Error("Failed post boot setup on \(source.node.address) - \(nodeSimulator.name)")
                     }
                 }
                 bootQueue.waitUntilAllOperationsAreFinished()
