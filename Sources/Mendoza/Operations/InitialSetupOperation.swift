@@ -36,6 +36,7 @@ class InitialSetupOperation: BaseOperation<Void> {
                 }
 
                 if currentUidProcessCount > maxUidProcessCount * 0.8 {
+                    print("🚨 High number of processes detected, trying to mitigate by shutting down simulator")
                     try CommandLineProxy.Simulators(executer: executer, verbose: false).reset()
                 }
             }
