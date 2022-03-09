@@ -132,7 +132,7 @@ private extension Process {
                 launch()
             }
         } catch {
-            fatalError(error.localizedDescription)
+            throw Error(error)
         }
 
         var outputData = Data()
