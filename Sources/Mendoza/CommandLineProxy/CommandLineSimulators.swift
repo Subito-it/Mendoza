@@ -18,6 +18,11 @@ extension CommandLineProxy {
             self.executer = executer
             self.verbose = verbose
         }
+        
+        func deleteAll() throws {
+            let commands = ["xcrun simctl delete all"]
+            try commands.forEach { _ = try executer.execute("\($0) 2>/dev/null || true") }
+        }
 
         func reset() throws {
             try gracefullyQuit()
