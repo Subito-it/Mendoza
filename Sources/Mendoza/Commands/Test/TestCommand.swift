@@ -24,6 +24,7 @@ class TestCommand: Command {
     let deviceRuntimeField = Argument<String>(name: "version", kind: .named(short: "v", long: "device_runtime"), optional: true, help: "Device runtime to use to run tests. e.g. '13.0'")
     let deviceLanguage = Argument<String>(name: "language", kind: .named(short: nil, long: "device_language"), optional: true, help: "Device language. e.g. 'en-EN'")
     let deviceLocale = Argument<String>(name: "locale", kind: .named(short: nil, long: "device_locale"), optional: true, help: "Device locale. e.g. 'en_US'")
+    let autodeleteSlowDevices = Flag(short: nil, long: "delete_slow_devices", help: "Automatically delete devices that took longer than expected to start dispatching tests. When such a case is detected on a node all its devices will be deleted which is the only workaround to avoid this delay to happen in future test dispatches")
     let maximumStdOutIdleTime = Argument<Int>(name: "seconds", kind: .named(short: nil, long: "stdout_timeout"), optional: true, help: "Maximum allowed idle time (in seconds) in standard output before test is automatically terminated")
     let maximumTestExecutionTime = Argument<Int>(name: "seconds", kind: .named(short: nil, long: "max_execution_time"), optional: true, help: "Maximum execution time (in seconds) before test fails with a timeout error")
     let pluginCustomField = Argument<String>(name: "data", kind: .named(short: nil, long: "plugin_data"), optional: true, help: "A custom string that can be used to inject data to plugins")
@@ -53,6 +54,7 @@ class TestCommand: Command {
                                 failingTestsRetryCount: failingTestsRetryCountField.value ?? 0,
                                 codeCoveragePathEquivalence: codeCoveragePathEquivalence.value,
                                 xcodeBuildNumber: xcodeBuildNumber.value,
+                                autodeleteSlowDevices: autodeleteSlowDevices.value,
                                 dispatchOnLocalHost: dispatchOnLocalHostFlag.value,
                                 xcresultBlobThresholdKB: xcresultBlobThresholdKB.value,
                                 pluginData: pluginCustomField.value,

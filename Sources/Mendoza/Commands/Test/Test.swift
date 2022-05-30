@@ -13,7 +13,7 @@ class Test {
     var didFail: ((Swift.Error) -> Void)?
 
     // swiftlint:disable:next large_tuple
-    private let userOptions: (configuration: Configuration, skipResultMerge: Bool, filePatterns: FilePatterns, maximumStdOutIdleTime: Int?, maximumTestExecutionTime: Int?, failingTestsRetryCount: Int, codeCoveragePathEquivalence: String?, clearDerivedDataOnCompilationFailure: Bool, dispatchOnLocalHost: Bool, xcresultBlobThresholdKB: Int?, verbose: Bool)
+    private let userOptions: (configuration: Configuration, skipResultMerge: Bool, filePatterns: FilePatterns, maximumStdOutIdleTime: Int?, maximumTestExecutionTime: Int?, failingTestsRetryCount: Int, codeCoveragePathEquivalence: String?, clearDerivedDataOnCompilationFailure: Bool, autodeleteSlowDevices: Bool, dispatchOnLocalHost: Bool, xcresultBlobThresholdKB: Int?, verbose: Bool)
     private let plugin: (data: String?, debug: Bool)
     private let eventPlugin: EventPlugin
     private let pluginUrl: URL
@@ -21,7 +21,7 @@ class Test {
     private let timestamp: String
     private var observers = [NSKeyValueObservation]()
 
-    init(configurationUrl: URL, device: Device?, skipResultMerge: Bool, clearDerivedDataOnCompilationFailure: Bool, filePatterns: FilePatterns, maximumStdOutIdleTime: Int?, maximumTestExecutionTime: Int?, failingTestsRetryCount: Int, codeCoveragePathEquivalence: String?, xcodeBuildNumber: String?, dispatchOnLocalHost: Bool, xcresultBlobThresholdKB: Int?, pluginData: String?, debugPlugins: Bool, verbose: Bool) throws {
+    init(configurationUrl: URL, device: Device?, skipResultMerge: Bool, clearDerivedDataOnCompilationFailure: Bool, filePatterns: FilePatterns, maximumStdOutIdleTime: Int?, maximumTestExecutionTime: Int?, failingTestsRetryCount: Int, codeCoveragePathEquivalence: String?, xcodeBuildNumber: String?, autodeleteSlowDevices: Bool, dispatchOnLocalHost: Bool, xcresultBlobThresholdKB: Int?, pluginData: String?, debugPlugins: Bool, verbose: Bool) throws {
         plugin = (data: pluginData, debug: debugPlugins)
 
         let configurationData = try Data(contentsOf: configurationUrl)
@@ -49,7 +49,7 @@ class Test {
                                                  xcresultBlobThresholdKB: xcresultBlobThresholdKB ?? configuration.xcresultBlobThresholdKB)
         configuration = updatedConfiguration
 
-        userOptions = (configuration: configuration, skipResultMerge: skipResultMerge, filePatterns: filePatterns, maximumStdOutIdleTime: maximumTestExecutionTime, maximumTestExecutionTime: maximumTestExecutionTime, failingTestsRetryCount: failingTestsRetryCount, codeCoveragePathEquivalence: codeCoveragePathEquivalence, clearDerivedDataOnCompilationFailure: clearDerivedDataOnCompilationFailure, dispatchOnLocalHost: dispatchOnLocalHost, xcresultBlobThresholdKB: xcresultBlobThresholdKB, verbose: verbose)
+        userOptions = (configuration: configuration, skipResultMerge: skipResultMerge, filePatterns: filePatterns, maximumStdOutIdleTime: maximumTestExecutionTime, maximumTestExecutionTime: maximumTestExecutionTime, failingTestsRetryCount: failingTestsRetryCount, codeCoveragePathEquivalence: codeCoveragePathEquivalence, clearDerivedDataOnCompilationFailure: clearDerivedDataOnCompilationFailure, autodeleteSlowDevices: autodeleteSlowDevices, dispatchOnLocalHost: dispatchOnLocalHost, xcresultBlobThresholdKB: xcresultBlobThresholdKB, verbose: verbose)
 
         pluginUrl = configurationUrl.deletingLastPathComponent()
         eventPlugin = EventPlugin(baseUrl: pluginUrl, plugin: plugin)
@@ -149,7 +149,7 @@ class Test {
         let codeCoverageCollectionOperation = CodeCoverageCollectionOperation(configuration: configuration, pathEquivalence: codeCoveragePathEquivalence, baseUrl: gitBaseUrl, timestamp: timestamp)
         let cleanupOperation = CleanupOperation(configuration: configuration, timestamp: timestamp)
         let simulatorTearDownOperation = SimulatorTearDownOperation(configuration: configuration, nodes: uniqueNodes, verbose: userOptions.verbose)
-        let tearDownOperation = TearDownOperation(configuration: configuration, git: gitStatus, timestamp: timestamp, mergeResults: !userOptions.skipResultMerge, plugin: tearDownPlugin)
+        let tearDownOperation = TearDownOperation(configuration: configuration, git: gitStatus, timestamp: timestamp, mergeResults: !userOptions.skipResultMerge, autodeleteSlowDevices: userOptions.autodeleteSlowDevices, plugin: tearDownPlugin)
 
         let operations: [RunOperation] =
             [initialSetupOperation,

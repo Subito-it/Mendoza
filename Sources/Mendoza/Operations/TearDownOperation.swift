@@ -25,14 +25,16 @@ class TearDownOperation: BaseOperation<Void> {
         let logger = ExecuterLogger(name: "\(type(of: self))", address: destinationNode.address)
         return try? destinationNode.makeExecuter(logger: logger)
     }()
+    private let autodeleteSlowDevices: Bool
     private let plugin: TearDownPlugin
 
 
-    init(configuration: Configuration, git: GitStatus?, timestamp: String, mergeResults: Bool, plugin: TearDownPlugin) {
+    init(configuration: Configuration, git: GitStatus?, timestamp: String, mergeResults: Bool, autodeleteSlowDevices: Bool, plugin: TearDownPlugin) {
         self.configuration = configuration
         self.git = git
         self.timestamp = timestamp
         self.mergeResults = mergeResults
+        self.autodeleteSlowDevices = autodeleteSlowDevices
         self.plugin = plugin
         super.init()
         loggers.insert(plugin.logger)
