@@ -8,7 +8,7 @@
 import Foundation
 import Shout
 
-protocol Executer {
+protocol Executer: AnyObject {
     var currentDirectoryPath: String? { get set }
     var homePath: String { get }
     var address: String { get }
