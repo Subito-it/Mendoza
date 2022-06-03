@@ -70,7 +70,7 @@ class TearDownOperation: BaseOperation<Void> {
             }
             
             if autodeleteSlowDevices {
-//                try? deleteSlowDevices() This might not be needed
+                try? deleteSlowDevices()
             }
 
             if plugin.isInstalled {
