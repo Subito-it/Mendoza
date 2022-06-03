@@ -40,14 +40,16 @@ class ValidationOperation: BaseOperation<Void> {
 
                 guard let remoteSwiftVersion = try executer.execute("swiftc --version").capturedGroups(withRegexString: #"swiftlang(.*)\)"#).first else { throw Error("Failed fetching swift version, expecting 'swiftlang(.*)' when running `swiftc --version`", logger: executer.logger) }
 
-                guard remoteSwiftVersion == compilingSwiftVersion else {
-                    throw Error("Incompatible swift compiler version, check that Xcode's versions match on all nodes.\n\nExpecting:\n`\(compilingSwiftVersion)`\n\nGot:\n`\(remoteSwiftVersion)` on \(executer.address)", logger: executer.logger)
-                }
+                #if !DEBUG
+                    guard remoteSwiftVersion == compilingSwiftVersion else {
+                        throw Error("Incompatible swift compiler version, check that Xcode's versions match on all nodes.\n\nExpecting:\n`\(compilingSwiftVersion)`\n\nGot:\n`\(remoteSwiftVersion)` on \(executer.address)", logger: executer.logger)
+                    }
 
-                let remoteMendozaVersion = try executer.execute("mendoza --version")
-                guard Mendoza.version == remoteMendozaVersion else {
-                    throw Error("Incompatible mendoza versions, check that Mendoza's versions match on all nodes.\n\nExpecting:\n`\(Mendoza.version)`\n\nGot:\n`\(remoteMendozaVersion)` on \(executer.address)", logger: executer.logger)
-                }
+                    let remoteMendozaVersion = try executer.execute("mendoza --version")
+                    guard Mendoza.version == remoteMendozaVersion else {
+                        throw Error("Incompatible mendoza versions, check that Mendoza's versions match on all nodes.\n\nExpecting:\n`\(Mendoza.version)`\n\nGot:\n`\(remoteMendozaVersion)` on \(executer.address)", logger: executer.logger)
+                    }
+                #endif
 
                 try self.checkDependencies(executer: executer)
             }
