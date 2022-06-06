@@ -91,7 +91,9 @@ class TestExecuter {
         testResult = result?.testCaseResult
 
         if testResult == nil {
-            print("🚨", "No test case result for \(testCase.suite)/\(testCase.name)!".red)
+            if self.verbose {
+                print("🚨", "No test case result for \(testCase.suite)/\(testCase.name)!".red)
+            }
         
             let startInterval: TimeInterval = CFAbsoluteTimeGetCurrent()
             let endInterval: TimeInterval = startInterval
