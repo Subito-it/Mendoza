@@ -28,7 +28,6 @@ enum Shell: String, CaseIterable {
         let fm = FileManager.default
         let homeUrl = URL(fileURLWithPath: NSHomeDirectory())
 
-
         for shell in Shell.allCases {
             if shell == .bash, fm.fileExists(atPath: homeUrl.appendingPathComponent(".bash_profile").path) {
                 return shell
