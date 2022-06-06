@@ -18,7 +18,7 @@ class TestCollectorOperation: BaseOperation<Void> {
     private let mergeResults: Bool
     private let timestamp: String
     private let productNames: [String]
-    private let loggersSyncQueue = DispatchQueue(label: String(describing: self))
+    private let loggersSyncQueue = DispatchQueue(label: String(describing: TestCollectorOperation.self))
 
     init(configuration: Configuration, mergeResults: Bool, timestamp: String, productNames: [String]) {
         self.configuration = configuration
