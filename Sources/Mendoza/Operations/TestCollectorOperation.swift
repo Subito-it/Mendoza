@@ -63,17 +63,23 @@ class TestCollectorOperation: BaseOperation<Void> {
             let executer = try destinationNode.makeExecuter(logger: nil)
             
             let results = try executer.execute("find '\(destinationPath)' -type f -name '*.profdata'").components(separatedBy: "\n")
+            
+            var moveCommands = [String]()
             for (index, result) in results.enumerated() {
-                _ = try executer.execute("mv '\(result)' '\(destinationPath)/\(index).profdata'")
+                moveCommands.append("mv '\(result)' '\(destinationPath)/\(index).profdata'")
             }
+            _ = try executer.execute(moveCommands.joined(separator: "; "))
 
             if self.mergeResults {
                 try mergeResults(destinationNode: destinationNode, destinationPath: destinationPath, destinationName: Environment.xcresultFilename)
             } else {
                 let results = try executer.execute("find '\(destinationPath)' -type d -name '*.xcresult'").components(separatedBy: "\n")
+                
+                var moveCommands = [String]()
                 for (index, result) in results.enumerated() {
-                    _ = try executer.execute("mv '\(result)' '\(destinationPath)/\(index).xcresult'")
+                    moveCommands.append("mv '\(result)' '\(destinationPath)/\(index).xcresult'")
                 }
+                _ = try executer.execute(moveCommands.joined(separator: "; "))
             }
             
             try cleanupEmptyFolders(executer: executer, destinationPath: destinationPath)
