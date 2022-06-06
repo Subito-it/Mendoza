@@ -97,6 +97,7 @@ class TestExecuter {
             let endInterval: TimeInterval = startInterval
 
             testResult = TestCaseResult(node: node.address, runnerName: testRunner.name, runnerIdentifier: testRunner.id, xcResultPath: "", suite: testCase.suite, name: testCase.name, status: .failed, startInterval: startInterval, endInterval: endInterval)
+            previewCompletionBlock(testResult!)
         }
         
         return (output: output, testResult: testResult!)

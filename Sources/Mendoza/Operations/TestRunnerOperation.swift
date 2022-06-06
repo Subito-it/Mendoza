@@ -104,11 +104,12 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                         try testResultsUrls.forEach { _ = try executer.execute("rm -rf '\($0.path)' || true") }
 
                         let testExecuter = testExecuterBuilder(executer, testCase, source.node, testRunner, runnerIndex)
-                        var (xcodebuildOutput, testCaseResult) = try testExecuter.launch() { previewTestCaseResult in
+                        var (xcodebuildOutput, testCaseResult) = try testExecuter.launch { previewTestCaseResult in
                             self.handleTestCaseResultPreview(previewTestCaseResult, testCase: testCase, runnerIndex: runnerIndex)
 
                             self.syncQueue.sync { self.testCasesCompletedCount += 1 }
                         }
+                        
                         
                         
                         // Inspect output for failures that require additional
