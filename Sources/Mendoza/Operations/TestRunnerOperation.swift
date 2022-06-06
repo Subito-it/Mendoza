@@ -110,6 +110,7 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                             self.syncQueue.sync { self.testCasesCompletedCount += 1 }
                         }
                         
+                        
                         // Inspect output for failures that require additional
                         if testDidFailLoadingAccessibility(in: xcodebuildOutput) {
                             self.forceResetSimulator(executer: executer, testRunner: testRunner)
@@ -143,7 +144,7 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                             // Repeatedly performing 'xcodebuild test-without-building' results in older xcresults being deleted
                             let resultUrl = Path.results.url.appendingPathComponent(testRunner.id)
                             _ = try executer.capture("mkdir -p '\(resultUrl.path)'; mv '\(xcResultUrl.path)' '\(resultUrl.path)'")
-                            testCaseResult.xcResultPath = resultUrl.path
+                            testCaseResult.xcResultPath = resultUrl.appendingPathComponent(xcResultUrl.lastPathComponent).path
                         }
                         
                         result += [testCaseResult]
