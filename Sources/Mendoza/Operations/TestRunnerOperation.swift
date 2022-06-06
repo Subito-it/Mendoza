@@ -164,8 +164,6 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                 try self.copyDiagnosticReports(executer: executer, testRunner: testRunner)
 
                 try self.reclaimDiskSpace(executer: executer, testRunner: testRunner)
-                                
-                print("\nℹ️  Node {\(runnerIndex)} did execute tests in \(hoursMinutesSeconds(in: CFAbsoluteTimeGetCurrent() - self.startTimeInterval))\n".magenta)
             }
 
             didEnd?(result)
