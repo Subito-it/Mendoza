@@ -130,7 +130,8 @@ class TestCollectorOperation: BaseOperation<Void> {
                 queue.addOperation {
                     let partialMergeDestination = mergedDestinationPath + index.description
                     do {
-                        let executer = try destinationNode.makeExecuter(logger: logger)
+                        let partialLogger = ExecuterLogger(name: "\(logger.name)-\(index)", address: logger.address)
+                        let executer = try destinationNode.makeExecuter(logger: partialLogger)
                         _ = try executer.execute(mergeCmd(part, partialMergeDestination))
                     } catch {
                         syncQueue.sync { mergeFailed = true }
