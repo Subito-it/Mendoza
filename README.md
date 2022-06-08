@@ -252,7 +252,7 @@ Set `MaxSessions` to 100 in /etc/ssh/sshd_config
 
 ## Increase pseudo terminals
 
-`/usr/sbin/sysctl -w kern.tty.ptmx_max=5120`
+`/usr/sbin/sysctl -w kern.tty.ptmx_max=999`
 
 # Contributions
 
