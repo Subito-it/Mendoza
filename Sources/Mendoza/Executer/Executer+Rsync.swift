@@ -25,32 +25,32 @@ extension Executer {
 
                 switch authentication {
                 case let .agent(username):
-                    rsyncCommand += "'\(username)@\(remoteNode.address):\(sourcePath)'"
+                    rsyncCommand += "'\(username)@\(remoteNode.address):\(escapeSpaces(sourcePath))'"
                 case let .key(username, _, _, passphrase):
                     guard passphrase == nil else { fatalError("passphare in key not supported yet") }
-                    rsyncCommand += "'\(username)@\(remoteNode.address):\(sourcePath)'"
+                    rsyncCommand += "'\(username)@\(remoteNode.address):\(escapeSpaces(sourcePath))'"
                 case let .credentials(username, password):
                     logger?.addIgnoreList(password)
                     rsyncCommand = "sshpass -p '\(password)' " + rsyncCommand
-                    rsyncCommand += "'\(username)@\(remoteNode.address):\(sourcePath)'"
+                    rsyncCommand += "'\(username)@\(remoteNode.address):\(escapeSpaces(sourcePath))'"
                 case .none:
-                    rsyncCommand = #"rsync -ax \#(includes) \#(excludes) \#(sourcePath)"#
+                    rsyncCommand = #"rsync -ax \#(includes) \#(excludes) \#(escapeSpaces(sourcePath))"#
                 }
 
-                rsyncCommand += " \(destinationPath)"
+                rsyncCommand += " \(escapeSpaces(destinationPath))"
             } else {
-                rsyncCommand = #"rsync -ax \#(includes) \#(excludes) \#(sourcePath) \#(destinationPath)"#
+                rsyncCommand = #"rsync -ax \#(includes) \#(excludes) \#(escapeSpaces(sourcePath)) \#(escapeSpaces(destinationPath))"#
             }
 
             let destinationExecuter = try destinationNode.makeExecuter(logger: logger)
-            _ = try destinationExecuter.execute("mkdir -p \(destinationPath)")
+            _ = try destinationExecuter.execute("mkdir -p \(escapeSpaces(destinationPath))")
             _ = try destinationExecuter.execute(rsyncCommand)
         } else {
             guard let authentication = destinationNode.authentication else {
                 throw Error("Missing authentication for destination \(destinationNode.address)")
             }
 
-            var rsyncCommand = #"rsync -ax \#(includes) \#(excludes) -e "ssh -T -q -c aes128-gcm@openssh.com -o Compression=no -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -x" \#(sourcePath) "#
+            var rsyncCommand = #"rsync -ax \#(includes) \#(excludes) -e "ssh -T -q -c aes128-gcm@openssh.com -o Compression=no -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -x" \#(escapeSpaces(sourcePath)) "#
 
             let username: String
             switch authentication {
@@ -67,11 +67,15 @@ extension Executer {
                 fatalError("Unexpected none authentication")
             }
 
-            rsyncCommand += "'\(username)@\(destinationNode.address):\(destinationPath)'"
+            rsyncCommand += "'\(username)@\(destinationNode.address):\(escapeSpaces(destinationPath))'"
 
             let destinationExecuter = try destinationNode.makeExecuter(logger: logger)
-            _ = try destinationExecuter.execute("mkdir -p \(destinationPath)")
+            _ = try destinationExecuter.execute("mkdir -p \(escapeSpaces(destinationPath))")
             _ = try execute(rsyncCommand)
         }
+    }
+
+    private func escapeSpaces(_ path: String) -> String {
+        path.replacingOccurrences(of: " ", with: "\\ ")
     }
 }
