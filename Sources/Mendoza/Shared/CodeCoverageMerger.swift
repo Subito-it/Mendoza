@@ -31,15 +31,20 @@ class CodeCoverageMerger {
         } else {
             // Workaround: as of Xcode 9.2 llvm-profdata isn't able to merge multiple big profdatas
             // merging in pairs seems to work though
-            _ = try executer.execute("mv '\(coverageFiles[0])' '\(coveragePath)/0.tmpprofdata'")
+            var mergeCommands = [String]()
+            mergeCommands.append("mv '\(coverageFiles[0])' '\(coveragePath)/0.tmpprofdata'")
+            
             for index in 1..<coverageFiles.count {
-                _ = try executer.execute("xcrun llvm-profdata merge '\(coveragePath)/\(index - 1).tmpprofdata' '\(coverageFiles[index])' -output '\(coveragePath)/\(index).tmpprofdata'")
-                _ = try executer.execute("rm '\(coverageFiles[index])'")
+                mergeCommands.append("xcrun llvm-profdata merge '\(coveragePath)/\(index - 1).tmpprofdata' '\(coverageFiles[index])' -output '\(coveragePath)/\(index).tmpprofdata'")
+                mergeCommands.append("rm '\(coverageFiles[index])'")
             }
-            _ = try executer.execute("mv '\(coveragePath)/\(coverageFiles.count - 1).tmpprofdata' '\(coverageDestinationPath)'")
+            
+            mergeCommands.append("mv '\(coveragePath)/\(coverageFiles.count - 1).tmpprofdata' '\(coverageDestinationPath)'")
             
             let filesToRemoveCommand = Array(0...coverageFiles.count - 2).map { "rm '\(coveragePath)/\($0).tmpprofdata'" }
-            _ = try executer.execute(filesToRemoveCommand.joined(separator: "; "))
+            mergeCommands.append(contentsOf: filesToRemoveCommand)
+            
+            _ = try executer.execute(mergeCommands.joined(separator: "; "))
         }
         
         return coverageDestinationPath
