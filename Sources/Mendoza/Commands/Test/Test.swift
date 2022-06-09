@@ -108,6 +108,7 @@ class Test {
 
     private func makeOperations(gitStatus: GitStatus, testSessionResult: TestSessionResult, sdk: XcodeProject.SDK) throws -> [RunOperation] {
         let configuration = userOptions.configuration
+        let resultDestinationPath = "\(configuration.resultDestination.path)/\(timestamp)/\(Environment.resultFoldername)"
         
         let filePatterns = userOptions.filePatterns
         let codeCoveragePathEquivalence = userOptions.codeCoveragePathEquivalence
@@ -143,8 +144,8 @@ class Test {
         let testSortingOperation = TestSortingOperation(device: device, plugin: testSortingPlugin, verbose: userOptions.verbose)
         let simulatorSetupOperation = SimulatorSetupOperation(configuration: configuration, nodes: uniqueNodes, device: device, verbose: userOptions.verbose)
         let distributeTestBundleOperation = DistributeTestBundleOperation(nodes: uniqueNodes)
-        let testRunnerOperation = TestRunnerOperation(configuration: configuration, testTarget: targets.test.name, productNames: productNames, sdk: sdk, failingTestsRetryCount: userOptions.failingTestsRetryCount, maximumStdOutIdleTime: userOptions.maximumStdOutIdleTime, maximumTestExecutionTime: userOptions.maximumTestExecutionTime, xcresultBlobThresholdKB: xcresultBlobThresholdKB, verbose: userOptions.verbose)
-        let testCollectorOperation = TestCollectorOperation(configuration: configuration, mergeResults: !userOptions.skipResultMerge, timestamp: timestamp, productNames: productNames)
+        let testRunnerOperation = TestRunnerOperation(configuration: configuration, destinationPath: resultDestinationPath, testTarget: targets.test.name, productNames: productNames, sdk: sdk, failingTestsRetryCount: userOptions.failingTestsRetryCount, maximumStdOutIdleTime: userOptions.maximumStdOutIdleTime, maximumTestExecutionTime: userOptions.maximumTestExecutionTime, xcresultBlobThresholdKB: xcresultBlobThresholdKB, verbose: userOptions.verbose)
+        let testCollectorOperation = TestCollectorOperation(configuration: configuration, mergeResults: !userOptions.skipResultMerge, destinationPath: resultDestinationPath, productNames: productNames)
 
         let codeCoverageCollectionOperation = CodeCoverageCollectionOperation(configuration: configuration, pathEquivalence: codeCoveragePathEquivalence, baseUrl: gitBaseUrl, timestamp: timestamp)
         let cleanupOperation = CleanupOperation(configuration: configuration, timestamp: timestamp)

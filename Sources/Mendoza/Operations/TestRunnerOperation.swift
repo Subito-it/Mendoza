@@ -26,6 +26,11 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
         retryCountMap.reduce(0) { $0 + retryCountMap.count(for: $1) }
     }
     private let xcresultBlobThresholdKB: Int?
+    
+    private let configuration: Configuration
+    private let destinationPath: String
+    
+    private let postExecutionQueue = ThreadQueue()
 
     private lazy var pool: ConnectionPool<TestRunner> = {
         guard let sortedTestCases = sortedTestCases else { fatalError("💣 Required field `distributedTestCases` not set") }
@@ -35,7 +40,7 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
         return makeConnectionPool(sources: input.map { (node: $0.0.node, value: $0.0.testRunner) })
     }()
 
-    init(configuration: Configuration, testTarget: String, productNames: [String], sdk: XcodeProject.SDK, failingTestsRetryCount: Int, maximumStdOutIdleTime: Int?, maximumTestExecutionTime: Int?, xcresultBlobThresholdKB: Int?, verbose: Bool) {
+    init(configuration: Configuration, destinationPath: String, testTarget: String, productNames: [String], sdk: XcodeProject.SDK, failingTestsRetryCount: Int, maximumStdOutIdleTime: Int?, maximumTestExecutionTime: Int?, xcresultBlobThresholdKB: Int?, verbose: Bool) {
         self.testExecuterBuilder = { executer, testCase, node, testRunner, runnerIndex in
             TestExecuter(executer: executer, testCase: testCase, testTarget: testTarget, configuration: configuration, sdk: sdk, maximumStdOutIdleTime: maximumStdOutIdleTime, maximumTestExecutionTime: maximumTestExecutionTime, node: node, testRunner: testRunner, runnerIndex: runnerIndex, verbose: verbose)
         }
@@ -44,6 +49,8 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
         self.failingTestsRetryCount = failingTestsRetryCount
         self.verbose = verbose
         self.xcresultBlobThresholdKB = xcresultBlobThresholdKB
+        self.configuration = configuration
+        self.destinationPath = destinationPath
     }
     
     enum State {
@@ -70,28 +77,35 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                 print("\n\nℹ️  Repeating failing tests".magenta)
             }
 
-            try pool.execute { [unowned self] executer, source in
+            try pool.execute { [weak self] executer, source in
+                guard let self = self else { return }
+                
                 let testRunner = source.value
-                let runnerIndex = runnerIndex(for: testRunner)
+                let runnerIndex = self.runnerIndex(for: testRunner)
                 
                 while true {
                     var testCase: TestCase!
-                    var allRunnersCompleted = false
+                    var shouldBreak = false
                     
-                    syncQueue.sync {
-                        if let nextTestCase = nextTestCase() {
+                    self.syncQueue.sync {
+                        if let nextTestCase = self.nextTestCase() {
                             testCase = nextTestCase
                         } else {
-                            allRunnersCompleted = testRunners?.allSatisfy({ $0.idle }) == true
+                            let idleRunners = self.testRunners?.filter(\.idle)
+                            let idleRunnersCount = idleRunners?.count ?? 0
+                            let activeRunnersCount = (self.testRunners?.count ?? 0) - idleRunnersCount
+                            
+                            // We want to leave a bucket of idleRunners that are ready to retry failing tests
+                            shouldBreak = idleRunnersCount > 2 * activeRunnersCount
                         }
                         
-                        if let testRunnerIndex = testRunners?.firstIndex(where: { $0.node == source.node && $0.testRunner.id == testRunner.id && $0.testRunner.name == testRunner.name }) {
-                            testRunners?[testRunnerIndex].idle = testCase == nil
+                        if let testRunnerIndex = self.testRunners?.firstIndex(where: { $0.node == source.node && $0.testRunner.id == testRunner.id && $0.testRunner.name == testRunner.name }) {
+                            self.testRunners?[testRunnerIndex].idle = testCase == nil
                         }
                     }
                     
                     if testCase == nil {
-                        if allRunnersCompleted {
+                        if shouldBreak {
                             break
                         } else {
                             Thread.sleep(forTimeInterval: 1.0)
@@ -100,36 +114,34 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                     }
 
                     try autoreleasepool {
-                        let testResultsUrls = try findTestResultsUrl(executer: executer, testRunner: testRunner)
+                        let testResultsUrls = try self.findTestResultsUrl(executer: executer, testRunner: testRunner)
                         try testResultsUrls.forEach { _ = try executer.execute("rm -rf '\($0.path)' || true") }
 
-                        let testExecuter = testExecuterBuilder(executer, testCase, source.node, testRunner, runnerIndex)
+                        let testExecuter = self.testExecuterBuilder(executer, testCase, source.node, testRunner, runnerIndex)
                         var (xcodebuildOutput, testCaseResult) = try testExecuter.launch { previewTestCaseResult in
                             self.handleTestCaseResultPreview(previewTestCaseResult, testCase: testCase, runnerIndex: runnerIndex)
 
                             self.syncQueue.sync { self.testCasesCompletedCount += 1 }
                         }
                         
-                        
-                        
                         // Inspect output for failures that require additional
-                        if testDidFailLoadingAccessibility(in: xcodebuildOutput) {
+                        if self.testDidFailLoadingAccessibility(in: xcodebuildOutput) {
                             self.forceResetSimulator(executer: executer, testRunner: testRunner)
                         }
                         
                         // xcodebuild returns 0 even on ** TEST EXECUTE FAILED ** when missing
                         // accessibility permissions or other errors like the bootstrapping once we check in testsDidFailToStart
-                        try assertAccessibilityPermissions(in: xcodebuildOutput)
+                        try self.assertAccessibilityPermissions(in: xcodebuildOutput)
                         
-                        if testsDidFailBootstrapping(in: xcodebuildOutput) {
+                        if self.testsDidFailBootstrapping(in: xcodebuildOutput) {
                             Thread.sleep(forTimeInterval: 10.0)
                         }
                         
-                        if testDidFailPreflightChecks(in: xcodebuildOutput) {
+                        if self.testDidFailPreflightChecks(in: xcodebuildOutput) {
                             self.forceResetSimulator(executer: executer, testRunner: testRunner)
                         }
                         
-                        if testDidFailBecauseOfDamagedBuild(in: xcodebuildOutput) {
+                        if self.testDidFailBecauseOfDamagedBuild(in: xcodebuildOutput) {
                             switch AddressType(address: executer.address) {
                             case .local:
                                 _ = try executer.execute("rm -rf '\(Path.build.rawValue)' || true")
@@ -150,16 +162,34 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                         
                         result += [testCaseResult]
                     }
+                                        
+                    let destinationNode = self.configuration.resultDestination.node
                     
-                    // We progressively merge coverage results since everytime we launch a test a brand new coverage file is created
+                    let groupExecuter = try executer.clone()
+                    groupExecuter.logger = ExecuterLogger(name: String(describing: executer.logger?.name) + "-async", address: String(describing: executer.logger?.address))
                     
-                    let searchPath = Path.logs.url.appendingPathComponent(testRunner.id).path
-                    let coverageMerger = CodeCoverageMerger(executer: executer, searchPath: searchPath)
-                    
-                    let start = CFAbsoluteTimeGetCurrent()
-                    _ = try? coverageMerger.merge()
-                    if self.verbose {
-                        print("🙈 [\(Date().description)] Node \(source.node.address) took \(CFAbsoluteTimeGetCurrent() - start)s for coverage merge {\(runnerIndex)}".magenta)
+                    self.postExecutionQueue.addOperation {
+                        // We progressively merge coverage results since everytime we launch a test a brand new coverage file is created
+                        let searchPath = Path.logs.url.appendingPathComponent(testRunner.id).path
+                        let coverageMerger = CodeCoverageMerger(executer: groupExecuter, searchPath: searchPath)
+                        
+                        let start = CFAbsoluteTimeGetCurrent()
+                        _ = try? coverageMerger.merge()
+                        if self.verbose {
+                            print("🙈 [\(Date().description)] Node \(source.node.address) took \(CFAbsoluteTimeGetCurrent() - start)s for coverage merge {\(runnerIndex)}".magenta)
+                        }
+                        
+                        let runnerDestinationPath = "\(self.destinationPath)/\(testRunner.id)"
+                        
+                        // Copy code coverage files
+                        let runnerLogPath = "\(Path.logs.rawValue)/\(testRunner.id)/*"
+                        try? groupExecuter.rsync(sourcePath: runnerLogPath, destinationPath: runnerDestinationPath, include: ["*/", "*.profdata"], exclude: ["*"], on: destinationNode)
+
+                        // Copy result file
+                        let runnerResultsPath = "\(Path.results.rawValue)/\(testRunner.id)/*"
+                        try? groupExecuter.rsync(sourcePath: runnerResultsPath, destinationPath: runnerDestinationPath, include: ["*.xcresult"], on: destinationNode)
+                        
+                        _ = try? groupExecuter.execute("rm -rf '\(Path.logs.rawValue)/\(testRunner.id)'; rm -rf '\(Path.results.rawValue)/\(testRunner.id)';")
                     }
                 }
 
@@ -167,6 +197,8 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
 
                 try self.reclaimDiskSpace(executer: executer, testRunner: testRunner)
             }
+            
+            postExecutionQueue.waitUntilAllOperationsAreFinished()
 
             didEnd?(result)
         } catch {

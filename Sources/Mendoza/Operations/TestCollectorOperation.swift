@@ -16,14 +16,14 @@ class TestCollectorOperation: BaseOperation<Void> {
     }()
 
     private let mergeResults: Bool
-    private let timestamp: String
+    private let destinationPath: String
     private let productNames: [String]
     private let loggersSyncQueue = DispatchQueue(label: String(describing: TestCollectorOperation.self))
 
-    init(configuration: Configuration, mergeResults: Bool, timestamp: String, productNames: [String]) {
+    init(configuration: Configuration, mergeResults: Bool, destinationPath: String, productNames: [String]) {
         self.configuration = configuration
         self.mergeResults = mergeResults
-        self.timestamp = timestamp
+        self.destinationPath = destinationPath
         self.productNames = productNames
     }
 
@@ -34,31 +34,6 @@ class TestCollectorOperation: BaseOperation<Void> {
             didStart?()
 
             let destinationNode = configuration.resultDestination.node
-
-            let destinationPath = "\(configuration.resultDestination.path)/\(timestamp)/\(Environment.resultFoldername)"
-
-            guard let testCaseResults = testCaseResults else { fatalError("💣 Required field `testCaseResults` not set") }
-
-            let testNodes = Set(testCaseResults.map(\.node))
-            try pool.execute { [unowned self] executer, source in
-                guard testNodes.contains(source.node.address) else {
-                    return
-                }
-                
-                // Copy code coverage files
-                let logPath = "\(Path.logs.rawValue)/*"
-                try executer.rsync(sourcePath: logPath, destinationPath: destinationPath, include: ["*/", "*.profdata"], exclude: ["*"], on: destinationNode)
-
-                // Remote merging of partial results can be performed by uncommenting these lib could be performed on remote node
-                // if self.mergeResults {
-                //     try mergeResults(destinationNode: source.node, destinationPath: Path.results.rawValue, destinationName: "\(UUID().uuidString).xcresult")
-                // }
-
-                let resultsPath = "\(Path.results.rawValue)/*"
-                try executer.rsync(sourcePath: resultsPath, destinationPath: destinationPath, include: ["*.xcresult"], on: destinationNode)
-
-                try self.clearDiagnosticReports(executer: executer)
-            }
             
             let executer = try destinationNode.makeExecuter(logger: nil)
             
@@ -72,12 +47,27 @@ class TestCollectorOperation: BaseOperation<Void> {
 
             if self.mergeResults {
                 try mergeResults(destinationNode: destinationNode, destinationPath: destinationPath, destinationName: Environment.xcresultFilename)
+                
+                let totalResults = testCaseResults?.count ?? 0
+                for index in 0..<totalResults {
+                    testCaseResults?[index].xcResultPath = Environment.xcresultFilename
+                }
             } else {
                 let results = try executer.execute("find '\(destinationPath)' -type d -name '*.xcresult'").components(separatedBy: "\n")
                 
+                let lastTwoPathComponents: (String) -> String = { path in
+                    let components = path.components(separatedBy: "/")
+                    guard components.count > 2 else { return path }
+                    return "\(components[components.count - 2])/\(components[components.count - 1])"
+                }
+                
                 var moveCommands = [String]()
                 for (index, result) in results.enumerated() {
-                    moveCommands.append("mv '\(result)' '\(destinationPath)/\(index).xcresult'")
+                    let updatedResultPath = "\(destinationPath)/\(index).xcresult"
+                    moveCommands.append("mv '\(result)' '\(updatedResultPath)'")
+                    if let index = testCaseResults?.firstIndex(where: { lastTwoPathComponents($0.xcResultPath) == lastTwoPathComponents(result) }) {
+                        testCaseResults?[index].xcResultPath = lastTwoPathComponents(updatedResultPath)
+                    }
                 }
                 _ = try executer.execute(moveCommands.joined(separator: "; "))
             }
