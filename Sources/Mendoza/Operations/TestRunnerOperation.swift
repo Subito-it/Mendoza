@@ -85,18 +85,13 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
 
                 while true {
                     var testCase: TestCase!
-                    var shouldBreak = false
+                    var allRunnersCompleted = false
 
                     self.syncQueue.sync {
                         if let nextTestCase = self.nextTestCase() {
                             testCase = nextTestCase
                         } else {
-                            let idleRunners = self.testRunners?.filter(\.idle)
-                            let idleRunnersCount = idleRunners?.count ?? 0
-                            let activeRunnersCount = (self.testRunners?.count ?? 0) - idleRunnersCount
-
-                            // We want to leave a bucket of idleRunners that are ready to retry failing tests
-                            shouldBreak = idleRunnersCount > 2 * activeRunnersCount
+                            allRunnersCompleted = self.testRunners?.allSatisfy(\.idle) == true
                         }
 
                         if let testRunnerIndex = self.testRunners?.firstIndex(where: { $0.node == source.node && $0.testRunner.id == testRunner.id && $0.testRunner.name == testRunner.name }) {
@@ -105,20 +100,23 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                     }
 
                     if testCase == nil {
-                        if shouldBreak {
+                        if allRunnersCompleted {
                             break
                         } else {
                             Thread.sleep(forTimeInterval: 1.0)
                             continue
                         }
                     }
+                    
+                    var testCaseResult: TestCaseResult?
 
                     try autoreleasepool {
                         let testResultsUrls = try self.findTestResultsUrl(executer: executer, testRunner: testRunner)
                         try testResultsUrls.forEach { _ = try executer.execute("rm -rf '\($0.path)' || true") }
 
                         let testExecuter = self.testExecuterBuilder(executer, testCase, source.node, testRunner, runnerIndex)
-                        var (xcodebuildOutput, testCaseResult) = try testExecuter.launch { previewTestCaseResult in
+                        var xcodebuildOutput = ""
+                        (xcodebuildOutput, testCaseResult) = try testExecuter.launch { previewTestCaseResult in
                             self.handleTestCaseResultPreview(previewTestCaseResult, testCase: testCase, runnerIndex: runnerIndex)
 
                             self.syncQueue.sync { self.testCasesCompletedCount += 1 }
@@ -157,42 +155,36 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                             // Repeatedly performing 'xcodebuild test-without-building' results in older xcresults being deleted
                             let resultUrl = Path.results.url.appendingPathComponent(testRunner.id)
                             _ = try executer.capture("mkdir -p '\(resultUrl.path)'; mv '\(xcResultUrl.path)' '\(resultUrl.path)'")
-                            testCaseResult.xcResultPath = resultUrl.appendingPathComponent(xcResultUrl.lastPathComponent).path
+                            testCaseResult?.xcResultPath = resultUrl.appendingPathComponent(xcResultUrl.lastPathComponent).path
                         }
 
-                        result += [testCaseResult]
+                        if let testCaseResult = testCaseResult {
+                            result += [testCaseResult]
+                        }
+                    }
+
+                    // We need to progressively merge coverage results since everytime we launch a test a brand new coverage file is created
+                    let searchPath = Path.logs.url.appendingPathComponent(testRunner.id).path
+                    let coverageMerger = CodeCoverageMerger(executer: executer, searchPath: searchPath)
+
+                    let start = CFAbsoluteTimeGetCurrent()
+                    _ = try? coverageMerger.merge()
+                    if self.verbose {
+                        print("🙈 [\(Date().description)] Node \(source.node.address) took \(CFAbsoluteTimeGetCurrent() - start)s for coverage merge {\(runnerIndex)}".magenta)
                     }
 
                     let destinationNode = self.configuration.resultDestination.node
 
                     let groupExecuter = try executer.clone()
                     groupExecuter.logger = ExecuterLogger(name: String(describing: executer.logger?.name) + "-async", address: String(describing: executer.logger?.address))
-
+                    
                     self.postExecutionQueue.addOperation {
-                        // We progressively merge coverage results since everytime we launch a test a brand new coverage file is created
-                        let searchPath = Path.logs.url.appendingPathComponent(testRunner.id).path
-                        let coverageMerger = CodeCoverageMerger(executer: groupExecuter, searchPath: searchPath)
-
-                        let start = CFAbsoluteTimeGetCurrent()
-                        _ = try? coverageMerger.merge()
-                        if self.verbose {
-                            print("🙈 [\(Date().description)] Node \(source.node.address) took \(CFAbsoluteTimeGetCurrent() - start)s for coverage merge {\(runnerIndex)}".magenta)
-                        }
-
+                        guard let xcResultPath = testCaseResult?.xcResultPath else { return }
+                        
                         let runnerDestinationPath = "\(self.destinationPath)/\(testRunner.id)"
+                        try? groupExecuter.rsync(sourcePath: xcResultPath, destinationPath: runnerDestinationPath, on: destinationNode)
 
-                        // Copy code coverage files
-                        let runnerLogPath = "\(Path.logs.rawValue)/\(testRunner.id)"
-
-                        try? self.reclaimDiskSpace(executer: groupExecuter, testRunner: testRunner, path: runnerLogPath)
-
-                        try? groupExecuter.rsync(sourcePath: "\(runnerLogPath)/*", destinationPath: runnerDestinationPath, include: ["*/", "*.profdata"], exclude: ["*"], on: destinationNode)
-
-                        // Copy result file
-                        let runnerResultsPath = "\(Path.results.rawValue)/\(testRunner.id)/*"
-                        try? groupExecuter.rsync(sourcePath: runnerResultsPath, destinationPath: runnerDestinationPath, include: ["*.xcresult"], on: destinationNode)
-
-                        _ = try? groupExecuter.execute("rm -rf '\(Path.logs.rawValue)/\(testRunner.id)'; rm -rf '\(Path.results.rawValue)/\(testRunner.id)';")
+                        _ = try? groupExecuter.execute("rm -rf '\(xcResultPath)'")
                     }
                 }
 

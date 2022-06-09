@@ -34,6 +34,19 @@ class TestCollectorOperation: BaseOperation<Void> {
             didStart?()
 
             let destinationNode = configuration.resultDestination.node
+
+            guard var testCaseResults = testCaseResults else { fatalError("💣 Required field `testCaseResults` not set") }
+
+            let testNodes = Set(testCaseResults.map(\.node))
+            try pool.execute { [unowned self] executer, source in
+                guard testNodes.contains(source.node.address) else { return }
+
+                // Copy code coverage files
+                let logPath = "\(Path.logs.rawValue)/*"
+                try executer.rsync(sourcePath: logPath, destinationPath: destinationPath, include: ["*/", "*.profdata"], exclude: ["*"], on: destinationNode)
+
+                try self.clearDiagnosticReports(executer: executer)
+            }
             
             let executer = try destinationNode.makeExecuter(logger: nil)
             
@@ -48,9 +61,9 @@ class TestCollectorOperation: BaseOperation<Void> {
             if self.mergeResults {
                 try mergeResults(destinationNode: destinationNode, destinationPath: destinationPath, destinationName: Environment.xcresultFilename)
                 
-                let totalResults = testCaseResults?.count ?? 0
+                let totalResults = testCaseResults.count
                 for index in 0..<totalResults {
-                    testCaseResults?[index].xcResultPath = Environment.xcresultFilename
+                    testCaseResults[index].xcResultPath = Environment.xcresultFilename
                 }
             } else {
                 let results = try executer.execute("find '\(destinationPath)' -type d -name '*.xcresult'").components(separatedBy: "\n")
@@ -65,8 +78,8 @@ class TestCollectorOperation: BaseOperation<Void> {
                 for (index, result) in results.enumerated() {
                     let updatedResultPath = "\(destinationPath)/\(index).xcresult"
                     moveCommands.append("mv '\(result)' '\(updatedResultPath)'")
-                    if let index = testCaseResults?.firstIndex(where: { lastTwoPathComponents($0.xcResultPath) == lastTwoPathComponents(result) }) {
-                        testCaseResults?[index].xcResultPath = lastTwoPathComponents(updatedResultPath)
+                    if let index = testCaseResults.firstIndex(where: { lastTwoPathComponents($0.xcResultPath) == lastTwoPathComponents(result) }) {
+                        testCaseResults[index].xcResultPath = lastTwoPathComponents(updatedResultPath)
                     }
                 }
                 _ = try executer.execute(moveCommands.joined(separator: "; "))
