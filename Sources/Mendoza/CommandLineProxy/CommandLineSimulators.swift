@@ -18,6 +18,12 @@ extension CommandLineProxy {
             self.executer = executer
             self.verbose = verbose
         }
+        
+        func deleteAll(synchronously: Bool = true) throws {
+            let asyncFlag = synchronously ? "" : "&"
+            let commands = ["xcrun simctl delete all \(asyncFlag)"]
+            try commands.forEach { _ = try executer.execute("\($0) 2>/dev/null || true") }
+        }
 
         func reset() throws {
             try gracefullyQuit()
@@ -36,10 +42,6 @@ extension CommandLineProxy {
         }
 
         func launch() throws {
-            guard try executer.execute("ps aux | grep \"$(xcode-select -p)/Applications/Simulator.app\" | wc -l") != "2" else {
-                return
-            }
-
             let commands = ["defaults read com.apple.iphonesimulator &>/dev/null",
                             "open -a \"$(xcode-select -p)/Applications/Simulator.app\"",
                             "sleep 3"]
@@ -61,6 +63,10 @@ extension CommandLineProxy {
             try? gracefullyQuit()
         }
 
+        func shutdownAll() throws {
+            _ = try executer.execute("xcrun simctl shutdown all")
+        }
+        
         func shutdown(simulator: Simulator) throws {
             _ = try executer.execute("xcrun simctl shutdown \(simulator.id)")
         }
@@ -318,16 +324,9 @@ extension CommandLineProxy {
         func bootSynchronously(simulator: Simulator) throws {
             // https://gist.github.com/keith/33d3e28de4217f3baecde15357bfe5f6
             // boot and synchronously wait for device to boot
-            for _ in 0..<2 {
-                _ = try executer.execute("xcrun simctl bootstatus '\(simulator.id)' -b || true")
-
-                let didBoot = try executer.execute("xcrun simctl list devices 2>/dev/null | grep '\(simulator.id)' | grep '(Booted)' | wc -l") == "1"
-                if didBoot {
-                    return
-                }
-
-                Thread.sleep(forTimeInterval: 10.0)
-            }
+            _ = try executer.execute("xcrun simctl bootstatus '\(simulator.id)' -b || true")
+            
+            Thread.sleep(forTimeInterval: 5.0)
         }
 
         func loadSimulatorSettings() throws -> Simulators.Settings {

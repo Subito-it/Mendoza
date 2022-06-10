@@ -13,7 +13,7 @@ class Test {
     var didFail: ((Swift.Error) -> Void)?
 
     // swiftlint:disable:next large_tuple
-    private let userOptions: (configuration: Configuration, runHeadless: Bool, skipResultMerge: Bool, filePatterns: FilePatterns, maximumStdOutIdleTime: Int?, maximumTestExecutionTime: Int?, failingTestsRetryCount: Int, codeCoveragePathEquivalence: String?, clearDerivedDataOnCompilationFailure: Bool, dispatchOnLocalHost: Bool, xcresultBlobThresholdKB: Int?, verbose: Bool)
+    private let userOptions: (configuration: Configuration, skipResultMerge: Bool, filePatterns: FilePatterns, maximumStdOutIdleTime: Int?, maximumTestExecutionTime: Int?, failingTestsRetryCount: Int, codeCoveragePathEquivalence: String?, clearDerivedDataOnCompilationFailure: Bool, autodeleteSlowDevices: Bool, dispatchOnLocalHost: Bool, xcresultBlobThresholdKB: Int?, verbose: Bool)
     private let plugin: (data: String?, debug: Bool)
     private let eventPlugin: EventPlugin
     private let pluginUrl: URL
@@ -21,7 +21,7 @@ class Test {
     private let timestamp: String
     private var observers = [NSKeyValueObservation]()
 
-    init(configurationUrl: URL, device: Device?, runHeadless: Bool, skipResultMerge: Bool, clearDerivedDataOnCompilationFailure: Bool, filePatterns: FilePatterns, maximumStdOutIdleTime: Int?, maximumTestExecutionTime: Int?, failingTestsRetryCount: Int, codeCoveragePathEquivalence: String?, xcodeBuildNumber: String?, dispatchOnLocalHost: Bool, xcresultBlobThresholdKB: Int?, pluginData: String?, debugPlugins: Bool, verbose: Bool) throws {
+    init(configurationUrl: URL, device: Device?, skipResultMerge: Bool, clearDerivedDataOnCompilationFailure: Bool, filePatterns: FilePatterns, maximumStdOutIdleTime: Int?, maximumTestExecutionTime: Int?, failingTestsRetryCount: Int, codeCoveragePathEquivalence: String?, xcodeBuildNumber: String?, autodeleteSlowDevices: Bool, dispatchOnLocalHost: Bool, xcresultBlobThresholdKB: Int?, pluginData: String?, debugPlugins: Bool, verbose: Bool) throws {
         plugin = (data: pluginData, debug: debugPlugins)
 
         let configurationData = try Data(contentsOf: configurationUrl)
@@ -49,7 +49,7 @@ class Test {
                                                  xcresultBlobThresholdKB: xcresultBlobThresholdKB ?? configuration.xcresultBlobThresholdKB)
         configuration = updatedConfiguration
 
-        userOptions = (configuration: configuration, runHeadless: runHeadless, skipResultMerge: skipResultMerge, filePatterns: filePatterns, maximumStdOutIdleTime: maximumTestExecutionTime, maximumTestExecutionTime: maximumTestExecutionTime, failingTestsRetryCount: failingTestsRetryCount, codeCoveragePathEquivalence: codeCoveragePathEquivalence, clearDerivedDataOnCompilationFailure: clearDerivedDataOnCompilationFailure, dispatchOnLocalHost: dispatchOnLocalHost, xcresultBlobThresholdKB: xcresultBlobThresholdKB, verbose: verbose)
+        userOptions = (configuration: configuration, skipResultMerge: skipResultMerge, filePatterns: filePatterns, maximumStdOutIdleTime: maximumTestExecutionTime, maximumTestExecutionTime: maximumTestExecutionTime, failingTestsRetryCount: failingTestsRetryCount, codeCoveragePathEquivalence: codeCoveragePathEquivalence, clearDerivedDataOnCompilationFailure: clearDerivedDataOnCompilationFailure, autodeleteSlowDevices: autodeleteSlowDevices, dispatchOnLocalHost: dispatchOnLocalHost, xcresultBlobThresholdKB: xcresultBlobThresholdKB, verbose: verbose)
 
         pluginUrl = configurationUrl.deletingLastPathComponent()
         eventPlugin = EventPlugin(baseUrl: pluginUrl, plugin: plugin)
@@ -108,6 +108,7 @@ class Test {
 
     private func makeOperations(gitStatus: GitStatus, testSessionResult: TestSessionResult, sdk: XcodeProject.SDK) throws -> [RunOperation] {
         let configuration = userOptions.configuration
+        let resultDestinationPath = "\(configuration.resultDestination.path)/\(timestamp)/\(Environment.resultFoldername)"
         
         let filePatterns = userOptions.filePatterns
         let codeCoveragePathEquivalence = userOptions.codeCoveragePathEquivalence
@@ -141,15 +142,15 @@ class Test {
         let compileOperation = CompileOperation(configuration: configuration, git: gitStatus, baseUrl: gitBaseUrl, project: project, scheme: configuration.scheme, preCompilationPlugin: preCompilationPlugin, postCompilationPlugin: postCompilationPlugin, sdk: sdk, clearDerivedDataOnCompilationFailure: clearDerivedDataOnCompilationFailure)
         let testExtractionOperation = TestExtractionOperation(configuration: configuration, baseUrl: gitBaseUrl, testTargetSourceFiles: testTargetSourceFiles, filePatterns: filePatterns, device: device, plugin: testExtractionPlugin)
         let testSortingOperation = TestSortingOperation(device: device, plugin: testSortingPlugin, verbose: userOptions.verbose)
-        let simulatorSetupOperation = SimulatorSetupOperation(configuration: configuration, nodes: uniqueNodes, device: device, runHeadless: userOptions.runHeadless, verbose: userOptions.verbose)
+        let simulatorSetupOperation = SimulatorSetupOperation(configuration: configuration, nodes: uniqueNodes, device: device, verbose: userOptions.verbose)
         let distributeTestBundleOperation = DistributeTestBundleOperation(nodes: uniqueNodes)
-        let testRunnerOperation = TestRunnerOperation(configuration: configuration, testTarget: targets.test.name, productNames: productNames, sdk: sdk, failingTestsRetryCount: userOptions.failingTestsRetryCount, maximumStdOutIdleTime: userOptions.maximumStdOutIdleTime, maximumTestExecutionTime: userOptions.maximumTestExecutionTime, xcresultBlobThresholdKB: xcresultBlobThresholdKB, verbose: userOptions.verbose)
-        let testCollectorOperation = TestCollectorOperation(configuration: configuration, mergeResults: !userOptions.skipResultMerge, timestamp: timestamp, productNames: productNames)
+        let testRunnerOperation = TestRunnerOperation(configuration: configuration, destinationPath: resultDestinationPath, testTarget: targets.test.name, productNames: productNames, sdk: sdk, failingTestsRetryCount: userOptions.failingTestsRetryCount, maximumStdOutIdleTime: userOptions.maximumStdOutIdleTime, maximumTestExecutionTime: userOptions.maximumTestExecutionTime, xcresultBlobThresholdKB: xcresultBlobThresholdKB, verbose: userOptions.verbose)
+        let testCollectorOperation = TestCollectorOperation(configuration: configuration, mergeResults: !userOptions.skipResultMerge, destinationPath: resultDestinationPath, productNames: productNames)
 
         let codeCoverageCollectionOperation = CodeCoverageCollectionOperation(configuration: configuration, pathEquivalence: codeCoveragePathEquivalence, baseUrl: gitBaseUrl, timestamp: timestamp)
         let cleanupOperation = CleanupOperation(configuration: configuration, timestamp: timestamp)
         let simulatorTearDownOperation = SimulatorTearDownOperation(configuration: configuration, nodes: uniqueNodes, verbose: userOptions.verbose)
-        let tearDownOperation = TearDownOperation(configuration: configuration, git: gitStatus, timestamp: timestamp, mergeResults: !userOptions.skipResultMerge, plugin: tearDownPlugin)
+        let tearDownOperation = TearDownOperation(configuration: configuration, git: gitStatus, timestamp: timestamp, mergeResults: !userOptions.skipResultMerge, autodeleteSlowDevices: userOptions.autodeleteSlowDevices, plugin: tearDownPlugin)
 
         let operations: [RunOperation] =
             [initialSetupOperation,
@@ -254,10 +255,10 @@ class Test {
 
         switch sdk {
         case .macos:
-            testRunnerOperation.testRunners = uniqueNodes.map { (testRunner: $0, node: $0) }
+            testRunnerOperation.testRunners = uniqueNodes.map { (testRunner: $0, node: $0, idle: false) }
         case .ios:
             simulatorSetupOperation.didEnd = { simulators in
-                testRunnerOperation.testRunners = simulators.map { (testRunner: $0.0, node: $0.1) }
+                testRunnerOperation.testRunners = simulators.map { (testRunner: $0.0, node: $0.1, idle: false) }
             }
         }
 
@@ -283,18 +284,19 @@ class Test {
                 }
                 
                 // Keep only one failure per testCaseIdentifier
-                var uniqueFailedSessions = Set<String>()
-                testSessionResult.failedTests = testSessionResult.failedTests.filter {
-                    uniqueFailedSessions.update(with: $0.testCaseIdentifier) == nil
+                var uniqueFailedSet = Set<String>()
+                let uniqueFailedTests = testSessionResult.failedTests.filter {
+                    uniqueFailedSet.update(with: $0.testCaseIdentifier) == nil
                 }
-                
+                                
                 let testCount = Double(testCaseResults.count)
-                let failureRate = Double(100 * testSessionResult.failedTests.count) / testCount
+                let failureRate = Double(100 * uniqueFailedTests.count) / testCount
                 let retryRate = Double(100 * testSessionResult.retriedTests.count) / testCount
                 
                 testSessionResult.failureRate = failureRate
                 testSessionResult.retryRate = retryRate
                 testSessionResult.totalTestCount = Int(testCount)
+                testSessionResult.uniqueFailedTestCount = Int(uniqueFailedTests.count)
 
                 let nodes = Set(testCaseResults.map(\.node))
                 for node in nodes {

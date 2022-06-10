@@ -38,7 +38,7 @@ struct ConfigurationInitializer {
         guard let project = (try? XcodeProject(url: url)) else { throw Error("Failed to load .xcodeproj!") }
 
         let testingSchemes = project.testingSchemes().sorted { $0.name > $1.name }
-        guard !testingSchemes.isEmpty else { throw Error("No shared testing scheme found in \(url.path), does your UI Testing target have a dedicated scheme?1") }
+        guard !testingSchemes.isEmpty else { throw Error("No shared testing scheme found in \(url.path), does your UI Testing target have a dedicated scheme?") }
 
         let selectedScheme = Bariloche.ask(title: "Select UI Testing scheme:", array: testingSchemes)
 

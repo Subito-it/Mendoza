@@ -21,12 +21,7 @@ class ConnectionPool<SourceValue> {
     private let sources: [Source<SourceValue>]
     private let syncQueue = DispatchQueue(label: String(describing: ConnectionPool.self))
     private var executers = [Executer]()
-    private let operationQueue: OperationQueue = {
-        let queue = OperationQueue()
-        queue.maxConcurrentOperationCount = .max
-        queue.qualityOfService = .default
-        return queue
-    }()
+    private let operationQueue = ThreadQueue()
 
     init(sources: [Source<SourceValue>]) {
         self.sources = sources

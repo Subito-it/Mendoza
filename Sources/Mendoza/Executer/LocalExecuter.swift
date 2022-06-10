@@ -102,12 +102,14 @@ private extension Process {
 
         let exports = (environment ?? [:]).map { k, v in "; export \(k)=\(v)" }.joined(separator: "; ")
 
-        arguments = ["-c", "source ~/.bash_profile; shopt -s huponexit; \(LocalExecuter.executablePathExport()) \(exports)\(cmd) 2>&1"]
+        arguments = ["-c", "\(Shell.current().source) \(LocalExecuter.executablePathExport()) \(exports)\(cmd) 2>&1"]
 
         let pipe = Pipe()
         standardOutput = pipe
         standardError = pipe
         qualityOfService = .userInitiated
+
+        let currentShell = Shell.current()
 
         do {
             if #available(OSX 10.13, *) {
@@ -115,22 +117,22 @@ private extension Process {
                     currentDirectoryURL = currentUrl
                 }
 
-                executableURL = URL(fileURLWithPath: "/bin/bash")
+                executableURL = currentShell.url
                 try run()
             } else {
                 if let currentPath = currentUrl?.path {
                     currentDirectoryPath = currentPath
                 }
 
-                launchPath = "/bin/bash"
-                guard FileManager.default.fileExists(atPath: "/bin/bash") else {
-                    throw Error("/bin/bash does not exists")
+                launchPath = currentShell.rawValue
+                guard FileManager.default.fileExists(atPath: currentShell.rawValue) else {
+                    throw Error("\(currentShell.rawValue) does not exists")
                 }
 
                 launch()
             }
         } catch {
-            fatalError(error.localizedDescription)
+            throw Error(error)
         }
 
         var outputData = Data()

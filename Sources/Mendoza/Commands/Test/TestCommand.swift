@@ -16,7 +16,6 @@ class TestCommand: Command {
     let debugPluginsFlag = Flag(short: nil, long: "plugin_debug", help: "Dump plugin invocation commands")
     let dispatchOnLocalHostFlag = Flag(short: "l", long: "use_localhost", help: "Use localhost to execute tests")
     let verboseFlag = Flag(short: nil, long: "verbose", help: "Dump debug messages")
-    let nonHeadlessSimulatorsFlag = Flag(short: nil, long: "non_headless_simulators", help: "Run simulators in non headless mode")
 
     let configurationPathField = Argument<URL>(name: "configuration_file", kind: .positional, optional: false, help: "Mendoza's configuration file path", autocomplete: .files("json"))
     let includePatternField = Argument<String>(name: "files", kind: .named(short: "f", long: "include_files"), optional: true, help: "Specify from which files UI tests should be extracted. Accepts wildcards and comma separated. e.g SBTA*.swift,SBTF*.swift. Default: '*.swift'", autocomplete: .files("swift"))
@@ -25,6 +24,7 @@ class TestCommand: Command {
     let deviceRuntimeField = Argument<String>(name: "version", kind: .named(short: "v", long: "device_runtime"), optional: true, help: "Device runtime to use to run tests. e.g. '13.0'")
     let deviceLanguage = Argument<String>(name: "language", kind: .named(short: nil, long: "device_language"), optional: true, help: "Device language. e.g. 'en-EN'")
     let deviceLocale = Argument<String>(name: "locale", kind: .named(short: nil, long: "device_locale"), optional: true, help: "Device locale. e.g. 'en_US'")
+    let autodeleteSlowDevices = Flag(short: nil, long: "delete_slow_devices", help: "Automatically delete devices that took longer than expected to start dispatching tests. When such a case is detected on a node all its devices will be deleted which is the only workaround to avoid this delay to happen in future test dispatches")
     let maximumStdOutIdleTime = Argument<Int>(name: "seconds", kind: .named(short: nil, long: "stdout_timeout"), optional: true, help: "Maximum allowed idle time (in seconds) in standard output before test is automatically terminated")
     let maximumTestExecutionTime = Argument<Int>(name: "seconds", kind: .named(short: nil, long: "max_execution_time"), optional: true, help: "Maximum execution time (in seconds) before test fails with a timeout error")
     let pluginCustomField = Argument<String>(name: "data", kind: .named(short: nil, long: "plugin_data"), optional: true, help: "A custom string that can be used to inject data to plugins")
@@ -46,7 +46,6 @@ class TestCommand: Command {
 
             let test = try Test(configurationUrl: configurationPathField.value!, // swiftlint:disable:this force_unwrapping
                                 device: device,
-                                runHeadless: !nonHeadlessSimulatorsFlag.value,
                                 skipResultMerge: skipResultMerge.value,
                                 clearDerivedDataOnCompilationFailure: clearDerivedDataOnCompilationFailure.value,
                                 filePatterns: filePatterns,
@@ -55,6 +54,7 @@ class TestCommand: Command {
                                 failingTestsRetryCount: failingTestsRetryCountField.value ?? 0,
                                 codeCoveragePathEquivalence: codeCoveragePathEquivalence.value,
                                 xcodeBuildNumber: xcodeBuildNumber.value,
+                                autodeleteSlowDevices: autodeleteSlowDevices.value,
                                 dispatchOnLocalHost: dispatchOnLocalHostFlag.value,
                                 xcresultBlobThresholdKB: xcresultBlobThresholdKB.value,
                                 pluginData: pluginCustomField.value,

@@ -8,7 +8,7 @@
 import Foundation
 import Shout
 
-protocol Executer {
+protocol Executer: AnyObject {
     var currentDirectoryPath: String? { get set }
     var homePath: String { get }
     var address: String { get }
@@ -29,7 +29,7 @@ protocol Executer {
 
 extension Executer {
     static func executablePathExport() -> String {
-        "export PATH=~/.rbenv/shims:/usr/bin:/usr/local/bin:/usr/sbin:/sbin:/bin;"
+        "export PATH=~/.rbenv/shims:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/usr/sbin:/sbin:/bin;"
     }
 }
 

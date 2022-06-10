@@ -34,7 +34,9 @@ final class TestSessionResult: Codable {
     var passedTests = [TestCaseResult]()
     var failedTests = [TestCaseResult]()
     var retriedTests = [TestCaseResult]()
+    var tests: [TestCaseResult] { passedTests + failedTests + retriedTests }
     var totalTestCount = 0
+    var uniqueFailedTestCount = 0
     var failureRate: Double = 0.0
     var retryRate: Double = 0.0
     var destination = Destination()

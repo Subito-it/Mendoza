@@ -25,14 +25,16 @@ class TearDownOperation: BaseOperation<Void> {
         let logger = ExecuterLogger(name: "\(type(of: self))", address: destinationNode.address)
         return try? destinationNode.makeExecuter(logger: logger)
     }()
+    private let autodeleteSlowDevices: Bool
     private let plugin: TearDownPlugin
 
 
-    init(configuration: Configuration, git: GitStatus?, timestamp: String, mergeResults: Bool, plugin: TearDownPlugin) {
+    init(configuration: Configuration, git: GitStatus?, timestamp: String, mergeResults: Bool, autodeleteSlowDevices: Bool, plugin: TearDownPlugin) {
         self.configuration = configuration
         self.git = git
         self.timestamp = timestamp
         self.mergeResults = mergeResults
+        self.autodeleteSlowDevices = autodeleteSlowDevices
         self.plugin = plugin
         super.init()
         loggers.insert(plugin.logger)
@@ -63,8 +65,12 @@ class TearDownOperation: BaseOperation<Void> {
 
             try pool.execute { executer, source in
                 if AddressType(node: source.node) == .remote {
-                    _ = try? executer.execute("rm -rf '\(Path.base.rawValue)/*'")
+                    _ = try? executer.execute("rm -rf '\(Path.base.rawValue)'")
                 }
+            }
+            
+            if autodeleteSlowDevices {
+                try? deleteSlowDevices()
             }
 
             if plugin.isInstalled {
@@ -257,6 +263,45 @@ class TearDownOperation: BaseOperation<Void> {
 
         try contentData.write(to: uniqueUrl)
         try executer.upload(localUrl: uniqueUrl, remotePath: infoPlistPath)
+    }
+    
+    private func deleteSlowDevices() throws {
+        // Here we check that there are no nodes that started executing its tests with a delay compared to the average of other nodes.
+        // This can be clearly seen in the test_graph.html output where it can be seen how all tests require a significant amount of
+        // time to start executing. This significantly impacts the total execution time of the test.
+        // Once this starts happening in one session it will occur in all subsequent ones and the only way to fix this is to delete
+        // the simulator and create a new one.
+        
+        guard let testSessionResult = testSessionResult else { return }
+        
+        let testsByNode = Dictionary(grouping: testSessionResult.tests, by: { $0.node }) as [String: [TestCaseResult]]
+
+        var maxStartTimeByNode = [String: TimeInterval]()
+        var minStartTime = Double.greatestFiniteMagnitude
+        for (node, tests) in testsByNode  {
+            let testsByRunner = Dictionary(grouping: tests, by: { $0.runnerName })
+            let startIntervals = testsByRunner.values.compactMap { $0.map { $0.startInterval }.min() }
+            if startIntervals.count > 0 {
+                let maxStartTime = startIntervals.max()!
+                maxStartTimeByNode[node] = maxStartTime
+                minStartTime = min(maxStartTime, minStartTime)
+            }
+        }
+
+        // If the last test initial test in a node took longer than a threshold to start we need to reset that device
+        let threshold = 12.0
+        let performReset = maxStartTimeByNode.filter { $0.value - minStartTime > threshold }.map { $0.key }
+
+        if !performReset.isEmpty {
+            print("\nℹ️ Slow devices found on \(performReset.joined(separator: ", ")). Deleting simulators...".bold.yellow)
+
+            try pool.execute { executer, source in
+                if performReset.contains(source.node.address) {
+                    let proxy = CommandLineProxy.Simulators(executer: executer, verbose: false)
+                    try proxy.deleteAll(synchronously: false)
+                }
+            }
+        }
     }
 }
 

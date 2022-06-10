@@ -42,8 +42,15 @@ final class RemoteExecuter: Executer {
 
     func clone() throws -> RemoteExecuter {
         let executer = RemoteExecuter(node: node, currentDirectoryPath: currentDirectoryPath, logger: nil) // we cannot pass logger since it's not thread-safe
-        try executer.connect()
-        return executer
+        do {
+            try executer.connect()
+            return executer
+        } catch {
+            if error.localizedDescription.contains("failed getting banner") {
+                print("Did fail connecting. You might need to increase the MaxSessions in /etc/ssh/sshd_config")
+            }
+            throw error
+        }
     }
 
     func connect() throws {
@@ -115,7 +122,7 @@ final class RemoteExecuter: Executer {
                 try rethrow((status: -1, output: redactedError), Error("While running `\(redactedCmd)` got: \(redactedError)"))
                 return result
             } else {
-                throw error
+                throw Error(error)
             }
         }
     }
@@ -163,7 +170,8 @@ final class RemoteExecuter: Executer {
     }
     
     private func terminateProcessOnDisconnect() throws {
-        try connection?.execute("/bin/bash -c \"shopt -s huponexit\"")
+        let shell = Shell.current()
+        try connection?.execute("\(shell.rawValue) -c \"\(shell.source)\"")
     }
 
     private func updateCurrentDirectoryPath() throws {
