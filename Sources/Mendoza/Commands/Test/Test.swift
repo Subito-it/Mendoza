@@ -21,16 +21,22 @@ class Test {
     private let timestamp: String
     private var observers = [NSKeyValueObservation]()
 
-    init(configurationUrl: URL, device: Device?, skipResultMerge: Bool, clearDerivedDataOnCompilationFailure: Bool, filePatterns: FilePatterns, maximumStdOutIdleTime: Int?, maximumTestExecutionTime: Int?, failingTestsRetryCount: Int, codeCoveragePathEquivalence: String?, xcodeBuildNumber: String?, autodeleteSlowDevices: Bool, dispatchOnLocalHost: Bool, xcresultBlobThresholdKB: Int?, pluginData: String?, debugPlugins: Bool, verbose: Bool) throws {
+    init(configurationUrl: URL, device: Device?, skipResultMerge: Bool, clearDerivedDataOnCompilationFailure: Bool, filePatterns: FilePatterns, maximumStdOutIdleTime: Int?, maximumTestExecutionTime: Int?, failingTestsRetryCount: Int, codeCoveragePathEquivalence: String?, xcodeBuildNumber: String?, autodeleteSlowDevices: Bool, dispatchOnLocalHost: Bool, excludedNodes: String?, xcresultBlobThresholdKB: Int?, pluginData: String?, debugPlugins: Bool, verbose: Bool) throws {
         plugin = (data: pluginData, debug: debugPlugins)
 
         let configurationData = try Data(contentsOf: configurationUrl)
         var configuration = try JSONDecoder().decode(Configuration.self, from: configurationData)
 
-        var updatedNodes: [Node]?
+        var configurationNodes = configuration.nodes
         if dispatchOnLocalHost, !configuration.nodes.contains(where: { AddressType(node: $0) == .local }) { // add localhost
             // This might be wrong since Node.localhost does not have an administrator password which might be needed for certain tasks
-            updatedNodes = configuration.nodes + [Node.localhost()]
+            configurationNodes = configuration.nodes + [Node.localhost()]
+        }
+        if let excludedNodes = excludedNodes?.components(separatedBy: ",") {
+            configurationNodes = configurationNodes.filter { node in !excludedNodes.contains(node.address) && !excludedNodes.contains(node.name) }
+            if configurationNodes.isEmpty {
+                throw Error("No dispatch nodes left, double check that the --exclude_nodes parameter does not contain all nodes specified in the configuration files")
+            }
         }
         
         let updatedConfiguration = Configuration(projectPath: configuration.projectPath,
@@ -41,7 +47,7 @@ class Test {
                                                  buildConfiguration: configuration.buildConfiguration,
                                                  storeAppleIdCredentials: configuration.storeAppleIdCredentials,
                                                  resultDestination: configuration.resultDestination,
-                                                 nodes: updatedNodes ?? configuration.nodes,
+                                                 nodes: configurationNodes,
                                                  compilation: configuration.compilation,
                                                  sdk: configuration.sdk,
                                                  xcodeBuildNumber: xcodeBuildNumber ?? configuration.xcodeBuildNumber,
