@@ -7,11 +7,12 @@
 
 import Foundation
 
-class InitialSetupOperation: BaseOperation<Void> {
+class InitialSetupOperation: BaseOperation<[String: [String: String]]?> {
     private let nodes: [Node]
     private lazy var pool: ConnectionPool = {
         makeConnectionPool(sources: nodes)
     }()
+    private let syncQueue = DispatchQueue(label: String(describing: InitialSetupOperation.self))
 
     init(nodes: [Node]) {
         self.nodes = nodes
@@ -22,8 +23,19 @@ class InitialSetupOperation: BaseOperation<Void> {
 
         do {
             didStart?()
+            
+            var nodesEnvironment = [String: [String: String]]()
 
-            try pool.execute { executer, _ in
+            let extractDeveloperDirEnvironmentalVariable: (String, Executer) -> Void = { [weak self] address, executer in
+                if let xcodeBuildNumber = self?.xcodeBuildNumber {
+                    let xcversion = XcodeVersion(executer: executer)
+                    if let path = try? xcversion.path(buildNumber: xcodeBuildNumber) {
+                        self?.syncQueue.sync { nodesEnvironment[address] = ["DEVELOPER_DIR": "\(path)/Contents/Developer"] }
+                    }
+                }
+            }
+            
+            try pool.execute { executer, source in
                 guard let maxUidProcessCountRaw = try executer.execute("sysctl kern.maxprocperuid").components(separatedBy: " ").last,
                       let maxUidProcessCount = Double(maxUidProcessCountRaw)
                 else {
@@ -39,9 +51,14 @@ class InitialSetupOperation: BaseOperation<Void> {
                     print("🚨 High number of processes detected, trying to mitigate by shutting down simulator")
                     try CommandLineProxy.Simulators(executer: executer, verbose: false).reset()
                 }
+
+                extractDeveloperDirEnvironmentalVariable(source.node.address, executer)
             }
 
-            didEnd?(())
+            let executer = LocalExecuter()
+            extractDeveloperDirEnvironmentalVariable(executer.address, executer)
+
+            didEnd?(nodesEnvironment.count > 0 ? nodesEnvironment : nil)
         } catch {
             didThrow?(error)
         }

@@ -81,7 +81,7 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
                 for nodeSimulator in nodeSimulators {
                     let logger = ExecuterLogger(name: "\(type(of: self))-AsyncBoot", address: node.address)
                     
-                    let queueExecuter = try source.node.makeExecuter(logger: logger)
+                    let queueExecuter = try source.node.makeExecuter(logger: logger, environment: self.nodesEnvironment[source.node.address] ?? [:])
                     let queueProxy = CommandLineProxy.Simulators(executer: queueExecuter, verbose: self.verbose)
 
                     bootQueue.addOperation {

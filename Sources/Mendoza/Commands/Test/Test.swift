@@ -236,6 +236,23 @@ class Test {
                 self.tearDown(operations: operations, testSessionResult: testSessionResult, error: opError as? Error)
             }
         }
+        
+        initialSetupOperation.didEnd = { nodesEnvironment in
+            guard let nodesEnvironment = nodesEnvironment,
+                  let operations = operations as? [EnvironmentedOperation] else {
+                return
+            }
+            
+            for (address, environment) in nodesEnvironment {
+                for (k, v) in environment {
+                    for operation in operations {
+                        var environment = operation.nodesEnvironment[address] ?? [:]
+                        environment[k] = v
+                        operation.nodesEnvironment[address] = environment
+                    }
+                }
+            }
+        }
 
         validationOperation.didStart = { [unowned self] in
             try? self.eventPlugin.run(event: Event(kind: .start, info: [:]), device: device)

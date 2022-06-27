@@ -48,7 +48,7 @@ class TestCollectorOperation: BaseOperation<Void> {
                 try self.clearDiagnosticReports(executer: executer)
             }
             
-            let executer = try destinationNode.makeExecuter(logger: nil)
+            let executer = try destinationNode.makeExecuter(logger: nil, environment: nodesEnvironment[destinationNode.address] ?? [:])
             
             let results = try executer.execute("find '\(destinationPath)' -type f -name '*.profdata'").components(separatedBy: "\n")
             
@@ -119,7 +119,7 @@ class TestCollectorOperation: BaseOperation<Void> {
 
         let mergedDestinationPath = "\(destinationPath)/\(destinationName)"
 
-        let executer = try destinationNode.makeExecuter(logger: logger)
+        let executer = try destinationNode.makeExecuter(logger: logger, environment: nodesEnvironment[destinationNode.address] ?? [:])
         let sourcePaths = try executer.execute("find \(destinationPath) -type d -name '*.xcresult'").components(separatedBy: "\n")
 
         let mergeCmd: (_ sourcePaths: [String], _ destinationPath: String) -> String = { "xcrun xcresulttool merge " + $0.map { "'\($0)'" }.joined(separator: " ") + " --output-path '\($1)'" }
@@ -140,7 +140,7 @@ class TestCollectorOperation: BaseOperation<Void> {
                     let partialMergeDestination = mergedDestinationPath + index.description
                     do {
                         let partialLogger = ExecuterLogger(name: "\(logger.name)-\(index)", address: logger.address)
-                        let executer = try destinationNode.makeExecuter(logger: partialLogger)
+                        let executer = try destinationNode.makeExecuter(logger: partialLogger, environment: self.nodesEnvironment[destinationNode.address] ?? [:])
                         _ = try executer.execute(mergeCmd(part, partialMergeDestination))
                     } catch {
                         syncQueue.sync { mergeFailed = true }
@@ -167,7 +167,7 @@ class TestCollectorOperation: BaseOperation<Void> {
             let moveCommand = "mv '\(partialMerges[0])' '\(mergedDestinationPath)'"
             _ = try executer.execute(moveCommand)
         }
-
+        
         let cleanupCmd = "rm -rf " + (sourcePaths + partialMerges).uniqued().map { "'\($0)'" }.joined(separator: " ")
         _ = try executer.execute(cleanupCmd)
     }

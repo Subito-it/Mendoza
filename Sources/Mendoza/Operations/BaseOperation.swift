@@ -32,12 +32,19 @@ protocol BenchmarkedOperation: Operation {
     var poolEndTimeInterval: () -> [String: TimeInterval]  { get }
 }
 
-class BaseOperation<Output: Any>: Operation, StartingOperation, EndingOperation, ThrowingOperation, LoggedOperation, BenchmarkedOperation {
+protocol EnvironmentedOperation: Operation {
+    var nodesEnvironment: [String: [String: String]] { get set }
+}
+
+class BaseOperation<Output: Any>: Operation, StartingOperation, EndingOperation, ThrowingOperation, LoggedOperation, BenchmarkedOperation, EnvironmentedOperation {
     typealias OutputType = Output
 
     var didStart: (() -> Void)?
     var didEnd: ((Output) -> Void)?
     var didThrow: ((Swift.Error) -> Void)?
+    
+    /// Per node address environmental variables
+    var nodesEnvironment = [String: [String: String]]()
 
     private(set) lazy var logger = ExecuterLogger(name: "\(type(of: self))", address: "operation")
     var loggers = Set<ExecuterLogger>()
@@ -86,7 +93,7 @@ class BaseOperation<Output: Any>: Operation, StartingOperation, EndingOperation,
             return ExecuterLogger(name: loggerName, address: node.address)
         }
 
-        let poolSources = sources.map { ConnectionPool<T>.Source(node: $0.node, value: $0.value, logger: logger($0.node)) }
+        let poolSources = sources.map { ConnectionPool<T>.Source(node: $0.node, value: $0.value, environment: nodesEnvironment[$0.node.address] ?? [:], logger: logger($0.node)) }
         let pool = ConnectionPool(sources: poolSources)
 
         let poolLoggers = Set(poolSources.compactMap(\.logger))
@@ -111,7 +118,8 @@ class BaseOperation<Output: Any>: Operation, StartingOperation, EndingOperation,
 
         let logger = ExecuterLogger(name: loggerName, address: address)
         let executerLogger = syncQueue.sync { loggers.update(with: logger) }
-        return LocalExecuter(currentDirectoryPath: currentDirectoryPath, logger: executerLogger ?? logger)
+
+        return LocalExecuter(currentDirectoryPath: currentDirectoryPath, logger: executerLogger ?? logger, environment: nodesEnvironment[address] ?? [:])
     }
 
     func makeRemoteExecuter(node: Node, currentDirectoryPath: String? = nil) -> RemoteExecuter {
@@ -123,7 +131,9 @@ class BaseOperation<Output: Any>: Operation, StartingOperation, EndingOperation,
 
         let logger = ExecuterLogger(name: loggerName, address: address)
         let executerLogger = syncQueue.sync { loggers.update(with: logger) }
-        return RemoteExecuter(node: node, currentDirectoryPath: currentDirectoryPath, logger: executerLogger ?? logger)
+
+        return RemoteExecuter(node: node, currentDirectoryPath: currentDirectoryPath, logger: executerLogger ?? logger, environment: nodesEnvironment[node.address] ?? [:])
+    }
     }
 }
 

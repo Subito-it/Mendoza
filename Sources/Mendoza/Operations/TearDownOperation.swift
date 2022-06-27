@@ -23,7 +23,7 @@ class TearDownOperation: BaseOperation<Void> {
         let destinationNode = configuration.resultDestination.node
 
         let logger = ExecuterLogger(name: "\(type(of: self))", address: destinationNode.address)
-        return try? destinationNode.makeExecuter(logger: logger)
+        return try? destinationNode.makeExecuter(logger: logger, environment: nodesEnvironment[destinationNode.address] ?? [:])
     }()
     private let autodeleteSlowDevices: Bool
     private let plugin: TearDownPlugin

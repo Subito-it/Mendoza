@@ -47,7 +47,7 @@ class ConfigurationValidator {
             guard let password = passwordBox else { return false }
 
             let logger = ExecuterLogger(name: "\(type(of: self))", address: node.address)
-            let executer = try node.makeExecuter(logger: logger)
+            let executer = try node.makeExecuter(logger: logger, environment: [:])
             loggers.insert(logger)
 
             executer.logger?.addIgnoreList(password)
@@ -85,7 +85,7 @@ class ConfigurationValidator {
 
         do {
             let logger: (Node) -> ExecuterLogger = { ExecuterLogger(name: "\(type(of: self))", address: $0.address) }
-            let poolSources = remoteNodes.map { ConnectionPool<Void>.Source(node: $0, logger: logger($0)) }
+            let poolSources = remoteNodes.map { ConnectionPool<Void>.Source(node: $0, logger: logger($0), environment: [:]) }
             let pool = ConnectionPool(sources: poolSources)
 
             let poolLoggers = Set(poolSources.compactMap(\.logger))
