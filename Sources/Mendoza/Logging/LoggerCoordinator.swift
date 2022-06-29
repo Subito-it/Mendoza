@@ -27,16 +27,6 @@ class LoggerCoordinator<T: Logger> {
 
         var content = ""
 
-        let failingLogFilenames = loggers.filter { $0.hasErrors }.map(\.filename).sorted()
-        if !failingLogFilenames.isEmpty {
-            content = "<h2>Failures</h2>\n"
-
-            content += failingLogFilenames
-                .map { "<a href='\($0)'>\(removeExtension($0))</a>" }
-                .joined(separator: "<br />\n")
-            content += "<br />\n"
-        }
-
         content += "<h2>Logs</h2>\n"
         let allFilenames = loggers.filter { !$0.isEmpty }.map(\.filename).sorted()
 
