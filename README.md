@@ -38,6 +38,12 @@ You'll need to install Mendoza on all nodes you'll use to distribute tests.
 brew install Subito-it/made/mendoza
 ```
 
+> **NOTE**
+> 
+> You'll get a warning that sshpass was removed for security reasons. You can still install a copy by running `brew install hudochenkov/sshpass/sshpass` see [repo](https://github.com/hudochenkov/homebrew-sshpass). Please consider that sshpass is used only if you choose to connect to remote nodes via username/password authentication which is not the recommended way. When possible you should use ssh key based authentication.
+
+
+
 Or you can build manually from sources
 
 ## Building from sources
