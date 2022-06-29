@@ -103,7 +103,6 @@ struct ConfigurationInitializer {
                                           nodes: nodes,
                                           compilation: Configuration.Compilation(),
                                           sdk: sdk.rawValue,
-                                          xcodeBuildNumber: nil,
                                           device: nil,
                                           xcresultBlobThresholdKB: nil)
 

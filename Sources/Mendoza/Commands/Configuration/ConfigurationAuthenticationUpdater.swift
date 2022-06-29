@@ -74,7 +74,7 @@ struct ConfigurationAuthenticationUpdater {
             updatedNodes.append(lastNode!) // swiftlint:disable:this force_unwrapping
         }
 
-        let updatedConfiguration = Configuration(projectPath: configuration.projectPath, workspacePath: configuration.workspacePath, buildBundleIdentifier: configuration.buildBundleIdentifier, testBundleIdentifier: configuration.testBundleIdentifier, scheme: configuration.scheme, buildConfiguration: configuration.buildConfiguration, storeAppleIdCredentials: configuration.storeAppleIdCredentials, resultDestination: configuration.resultDestination, nodes: updatedNodes, compilation: configuration.compilation, sdk: configuration.sdk, xcodeBuildNumber: configuration.xcodeBuildNumber, device: configuration.device, xcresultBlobThresholdKB: configuration.xcresultBlobThresholdKB)
+        let updatedConfiguration = Configuration(projectPath: configuration.projectPath, workspacePath: configuration.workspacePath, buildBundleIdentifier: configuration.buildBundleIdentifier, testBundleIdentifier: configuration.testBundleIdentifier, scheme: configuration.scheme, buildConfiguration: configuration.buildConfiguration, storeAppleIdCredentials: configuration.storeAppleIdCredentials, resultDestination: configuration.resultDestination, nodes: updatedNodes, compilation: configuration.compilation, sdk: configuration.sdk, device: configuration.device, xcresultBlobThresholdKB: configuration.xcresultBlobThresholdKB)
 
         let encoder = JSONEncoder()
         encoder.outputFormatting = .prettyPrinted

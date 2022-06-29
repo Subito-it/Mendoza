@@ -13,9 +13,11 @@ class InitialSetupOperation: BaseOperation<[String: [String: String]]?> {
         makeConnectionPool(sources: nodes)
     }()
     private let syncQueue = DispatchQueue(label: String(describing: InitialSetupOperation.self))
+    private let xcodeBuildNumber: String?
 
-    init(nodes: [Node]) {
+    init(nodes: [Node], xcodeBuildNumber: String?) {
         self.nodes = nodes
+        self.xcodeBuildNumber = xcodeBuildNumber
     }
 
     override func main() {
