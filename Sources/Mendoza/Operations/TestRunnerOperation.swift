@@ -159,7 +159,7 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                         }
 
                         if let testCaseResult = testCaseResult {
-                            result += [testCaseResult]
+                            self.syncQueue.sync { result += [testCaseResult] }
                         }
                     }
 
