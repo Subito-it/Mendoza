@@ -168,7 +168,10 @@ class TestCollectorOperation: BaseOperation<Void> {
             _ = try executer.execute(moveCommand)
         }
         
-        let cleanupCmd = "rm -rf " + (sourcePaths + partialMerges).uniqued().map { "'\($0)'" }.joined(separator: " ")
+        let pathsToDelete = (sourcePaths + partialMerges).uniqued().filter { !$0.isEmpty }
+        let cleanupCmd = "rm -rf " + pathsToDelete.map { "'\($0)'" }.joined(separator: " ")
         _ = try executer.execute(cleanupCmd)
     }
 }
+
+

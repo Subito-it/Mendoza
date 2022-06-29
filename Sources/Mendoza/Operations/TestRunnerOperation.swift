@@ -112,7 +112,10 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
 
                     try autoreleasepool {
                         let testResultsUrls = try self.findTestResultsUrl(executer: executer, testRunner: testRunner)
-                        try testResultsUrls.forEach { _ = try executer.execute("rm -rf '\($0.path)' || true") }
+                        for path in testResultsUrls.map(\.path) {
+                            guard !path.isEmpty else { continue }
+                            _ = try executer.execute("rm -rf '\(path)' || true")
+                        }
 
                         let testExecuter = self.testExecuterBuilder(executer, testCase, source.node, testRunner, runnerIndex)
                         var xcodebuildOutput = ""
@@ -179,7 +182,7 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                     groupExecuter.logger = ExecuterLogger(name: String(describing: executer.logger?.name) + "-async", address: String(describing: executer.logger?.address))
                     
                     self.postExecutionQueue.addOperation {
-                        guard let xcResultPath = testCaseResult?.xcResultPath else { return }
+                        guard let xcResultPath = testCaseResult?.xcResultPath, xcResultPath.count > 0 else { return }
                         
                         let runnerDestinationPath = "\(self.destinationPath)/\(testRunner.id)"
                         try? groupExecuter.rsync(sourcePath: xcResultPath, destinationPath: runnerDestinationPath, on: destinationNode)
