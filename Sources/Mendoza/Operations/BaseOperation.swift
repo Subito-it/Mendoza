@@ -74,7 +74,8 @@ class BaseOperation<Output: Any>: Operation, StartingOperation, EndingOperation,
                 print("🏁 `\(op.className.components(separatedBy: ".").last ?? op.className)` did complete in \(delta)s".bold)
             }
         }
-        _ = syncQueue.sync { loggers.insert(logger) }
+        
+        addLogger(logger)
     }
 
     deinit {
@@ -134,6 +135,16 @@ class BaseOperation<Output: Any>: Operation, StartingOperation, EndingOperation,
 
         return RemoteExecuter(node: node, currentDirectoryPath: currentDirectoryPath, logger: executerLogger ?? logger, environment: nodesEnvironment[node.address] ?? [:])
     }
+    
+    func addLogger(_ logger: ExecuterLogger) {
+        syncQueue.sync {
+            if let existingLogger = loggers.first(where: { $0 == logger }) {
+                loggers.remove(existingLogger)
+                logger.prefixLogs(from: existingLogger)
+            }
+
+            loggers.insert(logger)
+        }
     }
 }
 

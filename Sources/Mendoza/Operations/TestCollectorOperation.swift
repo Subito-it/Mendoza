@@ -18,7 +18,6 @@ class TestCollectorOperation: BaseOperation<Void> {
     private let mergeResults: Bool
     private let destinationPath: String
     private let productNames: [String]
-    private let loggersSyncQueue = DispatchQueue(label: String(describing: TestCollectorOperation.self))
 
     init(configuration: Configuration, mergeResults: Bool, destinationPath: String, productNames: [String]) {
         self.configuration = configuration
@@ -115,7 +114,7 @@ class TestCollectorOperation: BaseOperation<Void> {
 
     private func mergeResults(destinationNode: Node, destinationPath: String, destinationName: String) throws {
         let logger = ExecuterLogger(name: "TestCollectorOperation-Merge", address: destinationNode.address)
-        _ = loggersSyncQueue.sync { loggers.insert(logger) }
+        addLogger(logger)
 
         let mergedDestinationPath = "\(destinationPath)/\(destinationName)"
 

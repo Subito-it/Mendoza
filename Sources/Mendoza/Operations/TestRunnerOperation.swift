@@ -179,7 +179,10 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                     let destinationNode = self.configuration.resultDestination.node
 
                     let groupExecuter = try executer.clone()
-                    groupExecuter.logger = ExecuterLogger(name: String(describing: executer.logger?.name) + "-async", address: String(describing: executer.logger?.address))
+                    let logger = ExecuterLogger(name: (executer.logger?.name ?? "") + "-async", address: executer.logger?.address ?? "")
+                    groupExecuter.logger = logger
+
+                    self.addLogger(logger)
                     
                     self.postExecutionQueue.addOperation {
                         guard let xcResultPath = testCaseResult?.xcResultPath, xcResultPath.count > 0 else { return }
