@@ -28,10 +28,13 @@ final class RemoteExecuter: Executer {
     var connection: Shout.SSH?
     var sftp: Shout.SFTP?
     var logger: ExecuterLogger?
+    
+    let environment: [String: String]
 
-    init(node: Node, currentDirectoryPath: String? = nil, logger: ExecuterLogger? = nil) {
+    init(node: Node, currentDirectoryPath: String? = nil, logger: ExecuterLogger? = nil, environment: [String: String] = [:]) {
         self.node = node
         self.currentDirectoryPath = currentDirectoryPath
+        self.environment = environment
         self.logger = logger
     }
 
@@ -41,7 +44,7 @@ final class RemoteExecuter: Executer {
     }
 
     func clone() throws -> RemoteExecuter {
-        let executer = RemoteExecuter(node: node, currentDirectoryPath: currentDirectoryPath, logger: nil) // we cannot pass logger since it's not thread-safe
+        let executer = RemoteExecuter(node: node, currentDirectoryPath: currentDirectoryPath, logger: nil, environment: environment) // we cannot pass logger since it's not thread-safe
         do {
             try executer.connect()
             return executer
@@ -90,7 +93,8 @@ final class RemoteExecuter: Executer {
 
         var result = (status: Int32(-999), output: "")
         do {
-            result = try connection.capture("bash -c \"\(RemoteExecuter.executablePathExport()) \(cmd.replacingOccurrences(of: "\"", with: "\\\"")) 2>&1\"") { localProgress in
+            let exports = environment.map { k, v in "export \(k)=\(v);" }.joined(separator: " ")
+            result = try connection.capture("bash -c \"\(RemoteExecuter.executablePathExport()) \(exports) \(cmd.replacingOccurrences(of: "\"", with: "\\\"")) 2>&1\"") { localProgress in
                 progress?(localProgress)
             }
 

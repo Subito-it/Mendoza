@@ -20,7 +20,6 @@ struct Configuration: Codable {
     let nodes: [Node]
     let compilation: Compilation
     let sdk: String
-    let xcodeBuildNumber: String?
     let device: Device?
     let xcresultBlobThresholdKB: Int?
 }

@@ -68,7 +68,7 @@ class DistributeTestBundleOperation: BaseOperation<Void> {
                             print("🛫 `\(self.className)` \(source.address) -> \(destination.address)".bold)
 
                             let executer = try makeExecuter(node: source)
-                            executers.append(executer)
+                            syncQueue.sync { executers.append(executer) }
 
                             let buildPath = Path.testBundle.rawValue
                             try executer.rsync(sourcePath: "\(buildPath)/*", destinationPath: buildPath, on: destination)

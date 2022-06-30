@@ -112,7 +112,10 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
 
                     try autoreleasepool {
                         let testResultsUrls = try self.findTestResultsUrl(executer: executer, testRunner: testRunner)
-                        try testResultsUrls.forEach { _ = try executer.execute("rm -rf '\($0.path)' || true") }
+                        for path in testResultsUrls.map(\.path) {
+                            guard !path.isEmpty else { continue }
+                            _ = try executer.execute("rm -rf '\(path)' || true")
+                        }
 
                         let testExecuter = self.testExecuterBuilder(executer, testCase, source.node, testRunner, runnerIndex)
                         var xcodebuildOutput = ""
@@ -159,7 +162,7 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                         }
 
                         if let testCaseResult = testCaseResult {
-                            result += [testCaseResult]
+                            self.syncQueue.sync { result += [testCaseResult] }
                         }
                     }
 
@@ -176,10 +179,13 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                     let destinationNode = self.configuration.resultDestination.node
 
                     let groupExecuter = try executer.clone()
-                    groupExecuter.logger = ExecuterLogger(name: String(describing: executer.logger?.name) + "-async", address: String(describing: executer.logger?.address))
+                    let logger = ExecuterLogger(name: (executer.logger?.name ?? "") + "-async", address: executer.logger?.address ?? "")
+                    groupExecuter.logger = logger
+
+                    self.addLogger(logger)
                     
                     self.postExecutionQueue.addOperation {
-                        guard let xcResultPath = testCaseResult?.xcResultPath else { return }
+                        guard let xcResultPath = testCaseResult?.xcResultPath, xcResultPath.count > 0 else { return }
                         
                         let runnerDestinationPath = "\(self.destinationPath)/\(testRunner.id)"
                         try? groupExecuter.rsync(sourcePath: xcResultPath, destinationPath: runnerDestinationPath, on: destinationNode)

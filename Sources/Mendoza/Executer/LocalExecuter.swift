@@ -16,17 +16,20 @@ final class LocalExecuter: Executer {
     var address: String { "localhost" }
 
     var logger: ExecuterLogger?
+    
+    var environment: [String: String] = [:]
 
     private var running: Process?
     private let fileManager = FileManager.default
 
-    init(currentDirectoryPath: String? = nil, logger: ExecuterLogger? = nil) {
+    init(currentDirectoryPath: String? = nil, logger: ExecuterLogger? = nil, environment: [String: String] = [:]) {
         self.currentDirectoryPath = currentDirectoryPath
         self.logger = logger
+        self.environment = environment
     }
 
     func clone() throws -> LocalExecuter {
-        LocalExecuter(currentDirectoryPath: currentDirectoryPath, logger: nil) // we cannot pass logger since it's not thread-safe
+        LocalExecuter(currentDirectoryPath: currentDirectoryPath, logger: nil, environment: environment) // we cannot pass logger since it's not thread-safe
     }
 
     func execute(_ command: String, currentUrl: URL?, progress: ((String) -> Void)?, rethrow: (((status: Int32, output: String), Error) throws -> Void)?) throws -> String {
@@ -35,6 +38,7 @@ final class LocalExecuter: Executer {
 
     func capture(_ command: String, currentUrl: URL?, progress: ((String) -> Void)?, rethrow: (((status: Int32, output: String), Error) throws -> Void)?) throws -> (status: Int32, output: String) {
         let process = Process()
+        process.environment = environment
         defer { running = process }
 
         if let path = currentDirectoryPath {
@@ -100,9 +104,8 @@ private extension Process {
 
         logger?.log(command: cmd)
 
-        let exports = (environment ?? [:]).map { k, v in "; export \(k)=\(v)" }.joined(separator: "; ")
-
-        arguments = ["-c", "\(Shell.current().source) \(LocalExecuter.executablePathExport()) \(exports)\(cmd) 2>&1"]
+        let exports = (environment ?? [:]).map { k, v in "export \(k)=\(v); " }.joined(separator: " ")
+        arguments = ["-c", "\(Shell.current().source) \(LocalExecuter.executablePathExport()) \(exports) \(cmd) 2>&1"]
 
         let pipe = Pipe()
         standardOutput = pipe

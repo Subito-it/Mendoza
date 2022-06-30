@@ -14,7 +14,7 @@ class CleanupOperation: BaseOperation<Void> {
         let destinationNode = configuration.resultDestination.node
 
         let logger = ExecuterLogger(name: "\(type(of: self))", address: destinationNode.address)
-        return try? destinationNode.makeExecuter(logger: logger)
+        return try? destinationNode.makeExecuter(logger: logger, environment: nodesEnvironment[destinationNode.address] ?? [:])
     }()
 
     init(configuration: Configuration, timestamp: String) {

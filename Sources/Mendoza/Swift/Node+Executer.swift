@@ -8,12 +8,12 @@
 import Foundation
 
 extension Node {
-    func makeExecuter(logger: ExecuterLogger?) throws -> Executer {
+    func makeExecuter(logger: ExecuterLogger?, environment: [String: String]) throws -> Executer {
         switch AddressType(node: self) {
         case .local:
-            return LocalExecuter(logger: logger)
+            return LocalExecuter(logger: logger, environment: environment)
         case .remote:
-            let connection = RemoteExecuter(node: self, logger: logger)
+            let connection = RemoteExecuter(node: self, logger: logger, environment: environment)
             try connection.connect()
             return connection
         }

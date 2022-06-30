@@ -9,7 +9,6 @@ import Foundation
 
 class LocalSetupOperation: BaseOperation<Void> {
     private let fileManager: FileManager
-    private let xcodeBuildNumber: String?
     private let administratorPassword: String?
     private let clearDerivedDataOnCompilationFailure: Bool
     
@@ -21,10 +20,9 @@ class LocalSetupOperation: BaseOperation<Void> {
         makeLocalExecuter()
     }()
 
-    init(fileManager: FileManager = .default, clearDerivedDataOnCompilationFailure: Bool, xcodeBuildNumber: String? , administratorPassword: String?) {
+    init(fileManager: FileManager = .default, clearDerivedDataOnCompilationFailure: Bool, administratorPassword: String?) {
         self.fileManager = fileManager
         self.clearDerivedDataOnCompilationFailure = clearDerivedDataOnCompilationFailure
-        self.xcodeBuildNumber = xcodeBuildNumber
         self.administratorPassword = administratorPassword
     }
 
@@ -52,15 +50,6 @@ class LocalSetupOperation: BaseOperation<Void> {
                 _ = try executer.execute("mkdir -p '\(path.rawValue)' || true")
             }
             
-            if let xcodeBuildNumber = self.xcodeBuildNumber {
-                guard let administratorPassword = administratorPassword else {
-                    throw Error("You need to add administrator password for local node when specifying xcodeBuildNumber")
-                }
-                
-                let xcversion = XcodeVersion(executer: executer)
-                try xcversion.setCurrent(buildNumber: xcodeBuildNumber, administratorPassword: administratorPassword)
-            }
-
             didEnd?(())
         } catch {
             didThrow?(error)

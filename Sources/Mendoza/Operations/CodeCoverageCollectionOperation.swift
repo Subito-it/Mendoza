@@ -32,7 +32,7 @@ class CodeCoverageCollectionOperation: BaseOperation<Coverage?> {
             let destinationNode = configuration.resultDestination.node
             
             let logger = ExecuterLogger(name: "\(type(of: self))", address: destinationNode.address)
-            let destinationExecuter = try destinationNode.makeExecuter(logger: logger)
+            let destinationExecuter = try destinationNode.makeExecuter(logger: logger, environment: nodesEnvironment[destinationNode.address] ?? [:])
             
             let resultPath = "\(configuration.resultDestination.path)/\(timestamp)"
             

@@ -42,7 +42,7 @@ extension Executer {
                 rsyncCommand = #"rsync -ax \#(includes) \#(excludes) \#(escapeSpaces(sourcePath)) \#(escapeSpaces(destinationPath))"#
             }
 
-            let destinationExecuter = try destinationNode.makeExecuter(logger: logger)
+            let destinationExecuter = try destinationNode.makeExecuter(logger: logger, environment: [:])
             _ = try destinationExecuter.execute("mkdir -p \(escapeSpaces(destinationPath))")
             _ = try destinationExecuter.execute(rsyncCommand)
         } else {
@@ -69,7 +69,7 @@ extension Executer {
 
             rsyncCommand += "'\(username)@\(destinationNode.address):\(escapeSpaces(destinationPath))'"
 
-            let destinationExecuter = try destinationNode.makeExecuter(logger: logger)
+            let destinationExecuter = try destinationNode.makeExecuter(logger: logger, environment: [:])
             _ = try destinationExecuter.execute("mkdir -p \(escapeSpaces(destinationPath))")
             _ = try execute(rsyncCommand)
         }

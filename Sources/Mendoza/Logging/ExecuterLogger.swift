@@ -116,6 +116,12 @@ class ExecuterLogger: Logger, CustomDebugStringConvertible {
 
         return result
     }
+    
+    func prefixLogs(from logger: ExecuterLogger) {
+        let currentLogs = self.logs
+        let prefixLogs = logger.logs
+        syncQueue.sync { logs = prefixLogs + currentLogs }
+    }
 
     private func write(to: URL) throws {
         guard !logs.isEmpty else { return }

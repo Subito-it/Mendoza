@@ -12,6 +12,7 @@ class ConnectionPool<SourceValue> {
     struct Source<Value> {
         let node: Node
         let value: Value
+        let environment: [String: String]
         let logger: ExecuterLogger?
     }
     
@@ -38,7 +39,7 @@ class ConnectionPool<SourceValue> {
                 defer { self.syncQueue.sync { [unowned self] in self.endIntervals[source.node.address] = CFAbsoluteTimeGetCurrent() } }
 
                 do {
-                    let executer = try source.node.makeExecuter(logger: source.logger)
+                    let executer = try source.node.makeExecuter(logger: source.logger, environment: source.environment)
                     self.syncQueue.sync { [unowned self] in self.executers.append(executer) }
 
                     try block(executer, source)
@@ -61,9 +62,10 @@ class ConnectionPool<SourceValue> {
 }
 
 extension ConnectionPool.Source where Value == Void {
-    init(node: Node, logger: ExecuterLogger?) {
+    init(node: Node, logger: ExecuterLogger?, environment: [String: String]) {
         self.node = node
         value = ()
         self.logger = logger
+        self.environment = environment
     }
 }
