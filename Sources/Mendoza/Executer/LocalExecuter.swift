@@ -104,7 +104,7 @@ private extension Process {
 
         logger?.log(command: cmd)
 
-        let exports = (environment ?? [:]).map { k, v in "export \(k)=\(v); " }.joined(separator: " ")
+        let exports = (environment ?? [:]).map { k, v in "export \(k)=$'\(v.replacingOccurrences(of: "'", with: "\'"))';" }.joined(separator: " ")
         arguments = ["-c", "\(Shell.current().source) \(LocalExecuter.executablePathExport()) \(exports) \(cmd) 2>&1"]
 
         let pipe = Pipe()
