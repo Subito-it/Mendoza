@@ -32,11 +32,25 @@ class InitialSetupOperation: BaseOperation<[String: [String: String]]?> {
                 if let xcodeBuildNumber = self?.xcodeBuildNumber {
                     let xcversion = XcodeVersion(executer: executer)
                     if let path = try? xcversion.path(buildNumber: xcodeBuildNumber) {
-                        self?.syncQueue.sync { nodesEnvironment[address] = ["DEVELOPER_DIR": "\(path)/Contents/Developer"] }
+                        self?.syncQueue.sync { nodesEnvironment[address]?["DEVELOPER_DIR"] = "\(path)/Contents/Developer" }
                     }
                 }
             }
-            
+
+            let extractEnvironmentalVariables: (String, Executer) -> Void = { [weak self] address, executer in
+                guard let rawLines = try? executer.execute("env").components(separatedBy: "\n") else { return }
+
+                var currentEnvironment = [String: String]()
+                for line in rawLines {
+                    if let groups = try? line.capturedGroups(withRegexString: "(.+)=(.+)"), groups.count == 2 {
+                        currentEnvironment[groups[0]] = groups[1]
+                    }
+                }
+                self?.syncQueue.sync { nodesEnvironment[address] = currentEnvironment }
+
+                extractDeveloperDirEnvironmentalVariable(address, executer)
+            }
+
             try pool.execute { executer, source in
                 guard let maxUidProcessCountRaw = try executer.execute("sysctl kern.maxprocperuid").components(separatedBy: " ").last,
                       let maxUidProcessCount = Double(maxUidProcessCountRaw)
@@ -54,11 +68,11 @@ class InitialSetupOperation: BaseOperation<[String: [String: String]]?> {
                     try CommandLineProxy.Simulators(executer: executer, verbose: false).reset()
                 }
 
-                extractDeveloperDirEnvironmentalVariable(source.node.address, executer)
+                extractEnvironmentalVariables(source.node.address, executer)
             }
 
             let executer = LocalExecuter()
-            extractDeveloperDirEnvironmentalVariable(executer.address, executer)
+            extractEnvironmentalVariables(executer.address, executer)
 
             didEnd?(nodesEnvironment.count > 0 ? nodesEnvironment : nil)
         } catch {

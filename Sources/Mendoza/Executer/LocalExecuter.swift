@@ -22,7 +22,7 @@ final class LocalExecuter: Executer {
     private var running: Process?
     private let fileManager = FileManager.default
 
-    init(currentDirectoryPath: String? = nil, logger: ExecuterLogger? = nil, environment: [String: String] = [:]) {
+    init(currentDirectoryPath: String? = nil, logger: ExecuterLogger? = nil, environment: [String: String] = ProcessInfo.processInfo.environment) {
         self.currentDirectoryPath = currentDirectoryPath
         self.logger = logger
         self.environment = environment
