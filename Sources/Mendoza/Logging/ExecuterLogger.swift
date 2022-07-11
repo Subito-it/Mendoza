@@ -69,7 +69,11 @@ class ExecuterLogger: Logger, CustomDebugStringConvertible {
     var isEmpty: Bool { logs.isEmpty }
     var dumpToStandardOutput: Bool = false
 
-    private var logs = [LoggerEvent]()
+    private var _logs = [LoggerEvent]()
+    private var logs: [LoggerEvent] {
+        get { syncQueue.sync { _logs } }
+        set { syncQueue.sync { _logs = newValue } }
+    }
     private var ignoreList = [String]()
     private let syncQueue = DispatchQueue(label: String(describing: ExecuterLogger.self))
 
@@ -79,22 +83,16 @@ class ExecuterLogger: Logger, CustomDebugStringConvertible {
     }
 
     func log(command: String) {
-        syncQueue.sync {
-            self.logs.append(LoggerEvent(date: Date(), kind: .start(command: self.redact(command))))
-            if dumpToStandardOutput { print(self.redact(command)) }
-        }
+        logs.append(LoggerEvent(date: Date(), kind: .start(command: redact(command))))
+        if dumpToStandardOutput { print(redact(command)) }
     }
 
     func log(output: String, statusCode: Int32) {
-        syncQueue.sync {
-            self.logs.append(LoggerEvent(date: Date(), kind: .end(output: self.redact(output), statusCode: statusCode)))
-        }
+        logs.append(LoggerEvent(date: Date(), kind: .end(output: redact(output), statusCode: statusCode)))
     }
 
     func log(exception: String) {
-        syncQueue.sync {
-            self.logs.append(LoggerEvent(date: Date(), kind: .exception(error: self.redact(exception))))
-        }
+        logs.append(LoggerEvent(date: Date(), kind: .exception(error: redact(exception))))
     }
 
     func addIgnoreList(_ word: String) {
@@ -118,9 +116,9 @@ class ExecuterLogger: Logger, CustomDebugStringConvertible {
     }
     
     func prefixLogs(from logger: ExecuterLogger) {
-        let currentLogs = self.logs
+        let currentLogs = logs
         let prefixLogs = logger.logs
-        syncQueue.sync { logs = prefixLogs + currentLogs }
+        logs = prefixLogs + currentLogs
     }
 
     private func write(to: URL) throws {
