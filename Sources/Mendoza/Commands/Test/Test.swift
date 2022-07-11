@@ -277,10 +277,10 @@ class Test {
 
         switch sdk {
         case .macos:
-            testRunnerOperation.testRunners = uniqueNodes.map { (testRunner: $0, node: $0, idle: false) }
+            testRunnerOperation.testRunners = uniqueNodes.map { (testRunner: $0, node: $0, idle: true) }
         case .ios:
             simulatorSetupOperation.didEnd = { simulators in
-                testRunnerOperation.testRunners = simulators.map { (testRunner: $0.0, node: $0.1, idle: false) }
+                testRunnerOperation.testRunners = simulators.map { (testRunner: $0.0, node: $0.1, idle: true) }
             }
         }
 
