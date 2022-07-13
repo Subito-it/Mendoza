@@ -83,6 +83,8 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                 let testRunner = source.value
                 let runnerIndex = self.runnerIndex(for: testRunner)
 
+                defer { self.syncQueue.sync { self.testRunners?[runnerIndex].idle = true } }
+
                 while true {
                     var testCase: TestCase!
                     var allRunnersCompleted = false
