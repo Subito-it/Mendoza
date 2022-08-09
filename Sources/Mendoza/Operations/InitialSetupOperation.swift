@@ -28,16 +28,18 @@ class InitialSetupOperation: BaseOperation<[String: [String: String]]?> {
             
             var nodesEnvironment = [String: [String: String]]()
 
-            let extractDeveloperDirEnvironmentalVariable: (String, Executer) -> Void = { [weak self] address, executer in
+            let extractDeveloperDirEnvironmentalVariable: (String, Executer) throws -> Void = { [weak self] address, executer in
                 if let xcodeBuildNumber = self?.xcodeBuildNumber {
                     let xcversion = XcodeVersion(executer: executer)
                     if let path = try? xcversion.path(buildNumber: xcodeBuildNumber) {
                         self?.syncQueue.sync { nodesEnvironment[address]?["DEVELOPER_DIR"] = "\(path)/Contents/Developer" }
+                    } else {
+                        throw Error("Xcode with build number \(xcodeBuildNumber) not found on \(executer.address)!", logger: executer.logger)
                     }
                 }
             }
 
-            let extractEnvironmentalVariables: (String, Executer) -> Void = { [weak self] address, executer in
+            let extractEnvironmentalVariables: (String, Executer) throws -> Void = { [weak self] address, executer in
                 guard let rawLines = try? executer.execute("env").components(separatedBy: "\n") else { return }
 
                 var currentEnvironment = [String: String]()
@@ -48,7 +50,7 @@ class InitialSetupOperation: BaseOperation<[String: [String: String]]?> {
                 }
                 self?.syncQueue.sync { nodesEnvironment[address] = currentEnvironment }
 
-                extractDeveloperDirEnvironmentalVariable(address, executer)
+                try extractDeveloperDirEnvironmentalVariable(address, executer)
             }
 
             try pool.execute { executer, source in
@@ -68,11 +70,11 @@ class InitialSetupOperation: BaseOperation<[String: [String: String]]?> {
                     try CommandLineProxy.Simulators(executer: executer, verbose: false).reset()
                 }
 
-                extractEnvironmentalVariables(source.node.address, executer)
+                try extractEnvironmentalVariables(source.node.address, executer)
             }
 
             let executer = LocalExecuter()
-            extractEnvironmentalVariables(executer.address, executer)
+            try extractEnvironmentalVariables(executer.address, executer)
 
             didEnd?(nodesEnvironment.count > 0 ? nodesEnvironment : nil)
         } catch {
