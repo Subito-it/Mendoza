@@ -28,7 +28,7 @@ extension CommandLineProxy {
         func reset() throws {
             try gracefullyQuit()
 
-            let commands = ["osascript -e 'quit app \"$(xcode-select -p)/Applications/Simulator.app\"'",
+            let commands = ["osascript -e 'quit app \"Simulator.app\"'", // we don't prefix $(xcode-select -p) since another version of the simulator might be running
                             "sleep 3"]
             try commands.forEach { _ = try executer.execute("\($0) 2>/dev/null || true") }
         }
