@@ -109,7 +109,7 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                             continue
                         }
                     }
-                    
+
                     var testCaseResult: TestCaseResult?
 
                     try autoreleasepool {
@@ -187,7 +187,7 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                     self.addLogger(logger)
                     
                     self.postExecutionQueue.addOperation {
-                        guard let xcResultPath = testCaseResult?.xcResultPath, xcResultPath.count > 0 else { return }
+                        guard let xcResultPath = testCaseResult?.xcResultPath, xcResultPath.count > 3 else { return }
                         
                         let runnerDestinationPath = "\(self.destinationPath)/\(testRunner.id)"
                         try? groupExecuter.rsync(sourcePath: xcResultPath, destinationPath: runnerDestinationPath, on: destinationNode)

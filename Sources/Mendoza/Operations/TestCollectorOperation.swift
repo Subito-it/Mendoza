@@ -167,7 +167,7 @@ class TestCollectorOperation: BaseOperation<Void> {
             _ = try executer.execute(moveCommand)
         }
         
-        let pathsToDelete = (sourcePaths + partialMerges).uniqued().filter { !$0.isEmpty }
+        let pathsToDelete = (sourcePaths + partialMerges).uniqued().filter { $0.count > 3 }
         let cleanupCmd = "rm -rf " + pathsToDelete.map { "'\($0)'" }.joined(separator: " ")
         _ = try executer.execute(cleanupCmd)
     }
