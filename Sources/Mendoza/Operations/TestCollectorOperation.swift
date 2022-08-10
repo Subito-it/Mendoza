@@ -113,6 +113,8 @@ class TestCollectorOperation: BaseOperation<Void> {
     }
 
     private func mergeResults(destinationNode: Node, destinationPath: String, destinationName: String) throws {
+        guard !destinationPath.isEmpty else { return }
+
         let logger = ExecuterLogger(name: "TestCollectorOperation-Merge", address: destinationNode.address)
         addLogger(logger)
 
@@ -167,7 +169,7 @@ class TestCollectorOperation: BaseOperation<Void> {
             _ = try executer.execute(moveCommand)
         }
         
-        let pathsToDelete = (sourcePaths + partialMerges).uniqued().filter { $0.count > 3 }
+        let pathsToDelete = (sourcePaths + partialMerges).uniqued().filter { $0.hasPrefix(destinationPath) }
         let cleanupCmd = "rm -rf " + pathsToDelete.map { "'\($0)'" }.joined(separator: " ")
         _ = try executer.execute(cleanupCmd)
     }
