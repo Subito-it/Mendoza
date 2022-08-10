@@ -59,7 +59,7 @@ struct ConfigurationInitializer {
 
         let sdk = try project.getBuildSDK(for: selectedScheme.value.name)
 
-        var storeAppleIdCredentials = false
+        let storeAppleIdCredentials = false
 //        switch sdk {
 //        case .macos:
 //            break
