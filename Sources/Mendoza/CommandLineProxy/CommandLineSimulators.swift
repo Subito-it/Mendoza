@@ -79,7 +79,7 @@ extension CommandLineProxy {
             _ = try executer.execute("xcrun simctl terminate \(simulator.id) \(identifier)")
         }
 
-        func installRuntimeIfNeeded(_ runtime: String, nodeAddress: String, appleIdCredentials: Credentials?, administratorPassword: String?) throws {
+        func installRuntimeIfNeeded(_ runtime: String, nodeAddress: String, administratorPassword: String?) throws {
             let isRuntimeInstalled: () throws -> Bool = { [unowned self] in
                 let installedRuntimes = try self.executer.execute("xcrun simctl list runtimes 2>/dev/null")
                 let escapedRuntime = runtime.replacingOccurrences(of: ".", with: "-")
@@ -87,41 +87,6 @@ extension CommandLineProxy {
             }
 
             guard try !isRuntimeInstalled() else { return }
-            
-//            guard let appleIdCredentials = appleIdCredentials,
-//                  let password = administratorPassword
-//            else {
-//                throw Error("Could not install simulator runtime on node `\(nodeAddress)` because administrator credentials were not provided. Please install `\(runtime)` runtime manually")
-//            }
-//
-//            print("🦶 Installing runtime \(runtime) on node \(executer.address)".bold)
-//
-//            let keychain = Keychain(executer: executer)
-//            try keychain.unlock(password: password)
-//
-//            executer.logger?.addIgnoreList(password)
-//            executer.logger?.addIgnoreList(appleIdCredentials.username)
-//            executer.logger?.addIgnoreList(appleIdCredentials.password)
-//
-//            try reset()
-//
-//            let cmds = ["export FASTLANE_USER='\(appleIdCredentials.username)'",
-//                        "export FASTLANE_PASSWORD='\(appleIdCredentials.password)'",
-//                        "rm -f ~/Library/Caches/XcodeInstall/com.apple.pkg.iPhoneSimulatorSDK\(runtime.replacingOccurrences(of: ".", with: "_"))*.dmg",
-//                        "xcversion update",
-//                        "echo '\(password)' | sudo -S xcversion simulators --install='iOS \(runtime)'"]
-//
-//            let result = try executer.capture(cmds.joined(separator: "; "))
-//            guard result.status == 0 else {
-//                _ = try executer.execute("rm -rf '\(executer.homePath)/Library/Caches/XcodeInstall/*.dmg'")
-//                throw Error("Failed installing runtime!", logger: executer.logger)
-//            }
-//            guard !result.output.contains("specified Apple developer account credentials are incorrect") else {
-//                throw Error("The provided Apple developer account credentials are incorrect. Please run `\(ConfigurationRootCommand().name!) \(ConfigurationAuthententicationUpdateCommand().name!)` command", logger: executer.logger) // swiftlint:disable:this force_unwrapping
-//            }
-//            guard try isRuntimeInstalled() else {
-//                throw Error("Failed installing runtime, after install simulator runtime still not installed!", logger: executer.logger)
-//            }
             
             throw Error("You'll need to manually install \(runtime) on remote node \(nodeAddress)", logger: executer.logger)
         }

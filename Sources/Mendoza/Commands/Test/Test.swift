@@ -45,7 +45,6 @@ class Test {
                                                  testBundleIdentifier: configuration.testBundleIdentifier,
                                                  scheme: configuration.scheme,
                                                  buildConfiguration: configuration.buildConfiguration,
-                                                 storeAppleIdCredentials: configuration.storeAppleIdCredentials,
                                                  resultDestination: configuration.resultDestination,
                                                  nodes: configurationNodes,
                                                  compilation: configuration.compilation,

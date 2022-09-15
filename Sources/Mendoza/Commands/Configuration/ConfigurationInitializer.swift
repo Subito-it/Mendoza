@@ -59,22 +59,6 @@ struct ConfigurationInitializer {
 
         let sdk = try project.getBuildSDK(for: selectedScheme.value.name)
 
-        let storeAppleIdCredentials = false
-//        switch sdk {
-//        case .macos:
-//            break
-//        case .ios:
-//            let appleIdCredentials = Bariloche.ask(title: "Do you want required simulators to be installed automatically?", array: ["Yes, requires AppleID username/password (stored in Keychain)", "No"])
-//            storeAppleIdCredentials = appleIdCredentials.index == 0
-//            if storeAppleIdCredentials {
-//                let username: String = Bariloche.ask("\nAppleID username:".underline) { guard !$0.isEmpty else { throw Error("Invalid value") }; return $0 }
-//                let password: String = Bariloche.ask("\nAppleID password:".underline, secure: true) { guard !$0.isEmpty else { throw Error("Invalid value") }; return $0 }
-//
-//                let keychain = KeychainAccess.Keychain(service: Environment.bundle)
-//                try keychain.set(try JSONEncoder().encode(Credentials(username: username, password: password)), key: "appleID")
-//            }
-//        }
-
         let nodes = try askNodes(sdk: sdk)
 
         let destinationNode: Node
@@ -98,7 +82,6 @@ struct ConfigurationInitializer {
                                           testBundleIdentifier: bundleIdentifiers.test,
                                           scheme: selectedScheme.value.name,
                                           buildConfiguration: selectedBuildConfiguration.value,
-                                          storeAppleIdCredentials: storeAppleIdCredentials,
                                           resultDestination: resultDestination,
                                           nodes: nodes,
                                           compilation: Configuration.Compilation(),

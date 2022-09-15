@@ -41,7 +41,7 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
 
                 let proxy = CommandLineProxy.Simulators(executer: executer, verbose: self.verbose)
 
-                try proxy.installRuntimeIfNeeded(self.device.runtime, nodeAddress: node.address, appleIdCredentials: nil, administratorPassword: nil)
+                try proxy.installRuntimeIfNeeded(self.device.runtime, nodeAddress: node.address, administratorPassword: nil)
 
                 let concurrentTestRunners: Int
                 switch node.concurrentTestRunners {

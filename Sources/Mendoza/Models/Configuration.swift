@@ -15,7 +15,6 @@ struct Configuration: Codable {
     let testBundleIdentifier: String
     let scheme: String
     let buildConfiguration: String
-    let storeAppleIdCredentials: Bool
     let resultDestination: ResultDestination
     let nodes: [Node]
     let compilation: Compilation
@@ -42,19 +41,5 @@ extension Configuration {
     struct ResultDestination: Codable {
         let node: Node
         let path: String
-    }
-}
-
-extension Configuration {
-    func appleIdCredentials() -> Credentials? {
-        let keychain = KeychainAccess.Keychain(service: Environment.bundle)
-
-        guard let data = try? keychain.getData("appleID"),
-              let credentials = try? JSONDecoder().decode(Credentials.self, from: data)
-        else {
-            return nil
-        }
-
-        return credentials
     }
 }
