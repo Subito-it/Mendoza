@@ -83,6 +83,8 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                 let testRunner = source.value
                 let runnerIndex = self.runnerIndex(for: testRunner)
 
+                defer { self.syncQueue.sync { self.testRunners?[runnerIndex].idle = true } }
+
                 while true {
                     var testCase: TestCase!
                     var allRunnersCompleted = false
@@ -107,13 +109,13 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                             continue
                         }
                     }
-                    
+
                     var testCaseResult: TestCaseResult?
 
                     try autoreleasepool {
                         let testResultsUrls = try self.findTestResultsUrl(executer: executer, testRunner: testRunner)
                         for path in testResultsUrls.map(\.path) {
-                            guard !path.isEmpty else { continue }
+                            guard path.hasPrefix(Path.base.rawValue) else { continue }
                             _ = try executer.execute("rm -rf '\(path)' || true")
                         }
 
@@ -185,7 +187,7 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                     self.addLogger(logger)
                     
                     self.postExecutionQueue.addOperation {
-                        guard let xcResultPath = testCaseResult?.xcResultPath, xcResultPath.count > 0 else { return }
+                        guard let xcResultPath = testCaseResult?.xcResultPath, xcResultPath.hasPrefix(Path.base.rawValue) else { return }
                         
                         let runnerDestinationPath = "\(self.destinationPath)/\(testRunner.id)"
                         try? groupExecuter.rsync(sourcePath: xcResultPath, destinationPath: runnerDestinationPath, on: destinationNode)

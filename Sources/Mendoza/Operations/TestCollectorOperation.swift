@@ -113,6 +113,8 @@ class TestCollectorOperation: BaseOperation<Void> {
     }
 
     private func mergeResults(destinationNode: Node, destinationPath: String, destinationName: String) throws {
+        guard !destinationPath.isEmpty else { return }
+
         let logger = ExecuterLogger(name: "TestCollectorOperation-Merge", address: destinationNode.address)
         addLogger(logger)
 
@@ -121,7 +123,7 @@ class TestCollectorOperation: BaseOperation<Void> {
         let executer = try destinationNode.makeExecuter(logger: logger, environment: nodesEnvironment[destinationNode.address] ?? [:])
         let sourcePaths = try executer.execute("find \(destinationPath) -type d -name '*.xcresult'").components(separatedBy: "\n")
 
-        let mergeCmd: (_ sourcePaths: [String], _ destinationPath: String) -> String = { "xcrun xcresulttool merge " + $0.map { "'\($0)'" }.joined(separator: " ") + " --output-path '\($1)'" }
+        let mergeCmd: (_ sourcePaths: [String], _ destinationPath: String) -> String = { "xcrun xcresulttool merge " + $0.map { "'\($0)'" }.joined(separator: " ") + " --output-path '\($1)' 2>/dev/null" }
         
         // Merge in batch of ~ 50 results
             
@@ -167,7 +169,7 @@ class TestCollectorOperation: BaseOperation<Void> {
             _ = try executer.execute(moveCommand)
         }
         
-        let pathsToDelete = (sourcePaths + partialMerges).uniqued().filter { !$0.isEmpty }
+        let pathsToDelete = (sourcePaths + partialMerges).uniqued().filter { $0.hasPrefix(destinationPath) }
         let cleanupCmd = "rm -rf " + pathsToDelete.map { "'\($0)'" }.joined(separator: " ")
         _ = try executer.execute(cleanupCmd)
     }

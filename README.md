@@ -111,7 +111,6 @@ When setting up nodes you'll be asked:
 - ram disk: you can optionally specify if the node should use a ram disk. This has a significant benefit in performances on older machines that have no SSD disk. 
 
 *iOS projects only*
-- administator password: providing an administrator password will allow to automatically install new runtimes if needed
 - concurrent simulators: manually enter the number of concurrent simulators to use at once. The rule of thumb is that you can run 1 simulator per physical CPU core. Specifying more that one simulator per core will work but this will result in slower total execution time because the node will be over-utilized.
 
 #### Destination node

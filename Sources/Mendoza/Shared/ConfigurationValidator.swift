@@ -22,7 +22,6 @@ class ConfigurationValidator {
         try validateConnections()
         try validateAuthentication()
         try validateAdministratorPassword()
-        try validateAppleIdCredentials()
     }
 
     func validateNodes() throws {
@@ -97,17 +96,6 @@ class ConfigurationValidator {
         } catch {
             throw Error("Invalid credentials for connection. Configuration file needs to be updated! Please run `\(ConfigurationRootCommand().name!) \(ConfigurationAuthententicationUpdateCommand().name!)` command. Got \(error)".red) // swiftlint:disable:this force_unwrapping
         }
-    }
-
-    private func validateAppleIdCredentials() throws {
-        guard configuration.storeAppleIdCredentials else { return }
-
-        guard let credentials = configuration.appleIdCredentials() else {
-            throw Error("Missing apple ID credentials. Configuration file needs to be updated! Please run `\(ConfigurationRootCommand().name!) \(ConfigurationAuthententicationUpdateCommand().name!)` command".red) // swiftlint:disable:this force_unwrapping
-        }
-
-        // TBD: validate that apple credentials are valid
-        _ = credentials
     }
 
     private func validateAuthentication() throws {

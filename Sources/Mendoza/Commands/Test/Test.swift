@@ -45,7 +45,6 @@ class Test {
                                                  testBundleIdentifier: configuration.testBundleIdentifier,
                                                  scheme: configuration.scheme,
                                                  buildConfiguration: configuration.buildConfiguration,
-                                                 storeAppleIdCredentials: configuration.storeAppleIdCredentials,
                                                  resultDestination: configuration.resultDestination,
                                                  nodes: configurationNodes,
                                                  compilation: configuration.compilation,
@@ -113,8 +112,8 @@ class Test {
 
     private func makeOperations(gitStatus: GitStatus, testSessionResult: TestSessionResult, sdk: XcodeProject.SDK) throws -> [RunOperation] {
         let configuration = userOptions.configuration
-        let resultDestinationPath = "\(configuration.resultDestination.path)/\(timestamp)/\(Environment.resultFoldername)"
-        
+        let resultDestinationPath = "\(configuration.resultDestination.path)/\(timestamp)/\(Environment.resultFoldername)".pathExpandingTilde()
+
         let filePatterns = userOptions.filePatterns
         let codeCoveragePathEquivalence = userOptions.codeCoveragePathEquivalence
         let clearDerivedDataOnCompilationFailure = userOptions.clearDerivedDataOnCompilationFailure
@@ -462,5 +461,11 @@ private extension TestSessionResult {
     func copy() -> TestSessionResult? {
         guard let data = try? JSONEncoder().encode(self) else { return nil }
         return try? JSONDecoder().decode(TestSessionResult.self, from: data)
+    }
+}
+
+private extension String {
+    func pathExpandingTilde() -> String {
+        replacingOccurrences(of: "~", with: FileManager.default.homeDirectoryForCurrentUser.path)
     }
 }
