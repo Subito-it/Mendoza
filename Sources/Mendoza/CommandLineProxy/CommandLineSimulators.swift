@@ -81,7 +81,7 @@ extension CommandLineProxy {
 
         func installRuntimeIfNeeded(_ runtime: String, nodeAddress: String, appleIdCredentials: Credentials?, administratorPassword: String?) throws {
             let isRuntimeInstalled: () throws -> Bool = { [unowned self] in
-                let installedRuntimes = try self.executer.execute("xcrun simctl list runtimes")
+                let installedRuntimes = try self.executer.execute("xcrun simctl list runtimes 2>/dev/null")
                 let escapedRuntime = runtime.replacingOccurrences(of: ".", with: "-")
                 return installedRuntimes.contains("com.apple.CoreSimulator.SimRuntime.iOS-\(escapedRuntime)")
             }
@@ -210,7 +210,7 @@ extension CommandLineProxy {
         }
 
         func rawSimulatorStatus() throws -> String {
-            try executer.execute("xcrun xctrace list devices")
+            try executer.execute("xcrun xctrace list devices 2>/dev/null")
         }
 
         /// This method instantiates a Simulator given a name.
@@ -260,7 +260,7 @@ extension CommandLineProxy {
 
             // Simulator not found
 
-            let devicesType = try executer.execute("xcrun simctl list devicetypes")
+            let devicesType = try executer.execute("xcrun simctl list devicetypes 2>/dev/null")
 
             let deviceRegex = try NSRegularExpression(pattern: #"\#(device.name) \(com.apple.CoreSimulator.SimDeviceType.(.*)\)$"#)
             for deviceType in devicesType.components(separatedBy: "\n") {
@@ -271,7 +271,7 @@ extension CommandLineProxy {
                 let deviceIdentifier = "com.apple.CoreSimulator.SimDeviceType." + captureGroups[0]
                 let runtimeIdentifier = "com.apple.CoreSimulator.SimRuntime.iOS-" + device.runtime.replacingOccurrences(of: ".", with: "-")
 
-                let simulatorIdentifier = try executer.execute("xcrun simctl create '\(name)' \(deviceIdentifier) \(runtimeIdentifier)")
+                let simulatorIdentifier = try executer.execute("xcrun simctl create '\(name)' \(deviceIdentifier) \(runtimeIdentifier) 2>/dev/null")
 
                 return Simulator(id: simulatorIdentifier, name: name, device: device)
             }
@@ -298,7 +298,7 @@ extension CommandLineProxy {
             let installed = try installedSimulators()
 
             var simulators = [Simulator]()
-            let availableStatuses = try executer.execute("xcrun simctl list devices")
+            let availableStatuses = try executer.execute("xcrun simctl list devices 2>/dev/null")
             for status in availableStatuses.components(separatedBy: "\n") {
                 let capture = try status.capturedGroups(withRegexString: #"(.*) \((.*)\) \((.*)\)"#)
 
