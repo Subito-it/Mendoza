@@ -289,7 +289,7 @@ class TearDownOperation: BaseOperation<Void> {
         }
 
         // If the last test initial test in a node took longer than a threshold to start we need to reset that device
-        let threshold = 12.0
+        let threshold = 30.0
         let performReset = maxStartTimeByNode.filter { $0.value - minStartTime > threshold }.map { $0.key }
 
         if !performReset.isEmpty {
