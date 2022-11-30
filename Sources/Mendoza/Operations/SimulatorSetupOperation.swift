@@ -39,6 +39,13 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
             try pool.execute { executer, source in
                 let node = source.node
 
+                let systemPath = try executer.execute("xcode-select -p")
+                let path = (self.nodesEnvironment[source.node.address]?["DEVELOPER_DIR"]) ?? systemPath
+                if !(try executer.execute("ps aux | grep Simulator.app").contains(path)) {
+                    // Launched Simulator is from a different Xcode version
+                    _ = try? executer.execute("killall Simulator")
+                }
+
                 let proxy = CommandLineProxy.Simulators(executer: executer, verbose: self.verbose)
 
                 try proxy.installRuntimeIfNeeded(self.device.runtime, nodeAddress: node.address, administratorPassword: nil)
