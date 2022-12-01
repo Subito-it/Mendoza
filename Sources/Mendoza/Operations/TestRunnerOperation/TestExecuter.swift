@@ -225,7 +225,7 @@ extension TestExecuter {
             maxAllowedTestExecutionTimeParameter = "-maximum-test-execution-time-allowance \(maximumTestExecutionTime)"
         }
 
-        return #"$(xcode-select -p)/usr/bin/xcodebuild -parallel-testing-enabled NO -disable-concurrent-destination-testing -xctestrun '\#(testRun)' -destination '\#(xcodebuildDestination)' -derivedDataPath '\#(destinationPath)' \#(onlyTesting) -enableCodeCoverage YES -destination-timeout 60 -test-timeouts-enabled YES \#(maxAllowedTestExecutionTimeParameter) test-without-building || true"#
+        return #"$(xcode-select -p)/usr/bin/xcodebuild -parallel-testing-enabled NO -disable-concurrent-destination-testing -xctestrun '\#(testRun)' -destination '\#(xcodebuildDestination)' -derivedDataPath '\#(destinationPath)' \#(onlyTesting) -enableCodeCoverage YES -destination-timeout 60 -test-timeouts-enabled YES \#(maxAllowedTestExecutionTimeParameter) test-without-building 2>&1 || true"#
     }
     
     private func parseXcodebuildOutput(line: String) -> XcodebuildLineEvent? {

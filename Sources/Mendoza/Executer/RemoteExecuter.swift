@@ -94,7 +94,7 @@ final class RemoteExecuter: Executer {
         var result = (status: Int32(-999), output: "")
         do {
             let exports = ExecuterEnvironment.exportsCommand(for: environment)
-            result = try connection.capture("\(RemoteExecuter.executablePathExport()) \(exports) bash -c \"\(cmd.replacingOccurrences(of: "\"", with: "\\\"")) 2>&1\"") { localProgress in
+            result = try connection.capture("\(RemoteExecuter.executablePathExport()) \(exports) bash -c \"\(cmd.replacingOccurrences(of: "\"", with: "\\\""))\"") { localProgress in
                 progress?(localProgress)
             }
 

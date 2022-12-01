@@ -124,7 +124,7 @@ extension CommandLineProxy {
 
             if deviceVersion >= 13.0 {
                 // These settings are hot loaded no reboot of the device is necessary
-                _ = try executer.execute("xcrun simctl spawn '\(simulator.id)' defaults write com.apple.Preferences DidShowContinuousPathIntroduction -bool true")
+                _ = try executer.execute("xcrun simctl spawn '\(simulator.id)' defaults write com.apple.keyboard.preferences DidShowContinuousPathIntroduction -bool true")
             }
         }
 

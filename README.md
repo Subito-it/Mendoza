@@ -95,12 +95,6 @@ Generates a new configuration file required to execute tests. you will be prompt
 
 ### Concepts
 
-#### AppleID (iOS projects only)
-
-During initialization you will be prompted for an Apple ID account that will be used to install new runtimes on testing nodes. Any low priviledge Apple ID account will work.
-
-It is not mandatory to provide one, but test dispatching will fail if the requested simulator runtime isn't properly installed.
-
 #### Nodes configuration
 
 When setting up nodes you'll be asked:
