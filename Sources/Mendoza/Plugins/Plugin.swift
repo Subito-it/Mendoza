@@ -37,6 +37,9 @@ class Plugin<Input: DefaultInitializable, Output: DefaultInitializable> {
     }
 
     func run(input: Input) throws -> Output {
+        let start = CFAbsoluteTimeGetCurrent()
+        defer { print("🔌 Plugin \(name) took \(CFAbsoluteTimeGetCurrent() - start)s".magenta) }
+        
         let pluginUrl = baseUrl.appendingPathComponent(filename)
         // We add a suffix to the pluginname that is based on so that swift-sh has a consistent name for its internal cache
 
