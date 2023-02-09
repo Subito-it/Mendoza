@@ -20,9 +20,11 @@ extension CommandLineProxy {
         }
         
         func deleteAll(synchronously: Bool = true) throws {
-            let asyncFlag = synchronously ? "" : "&"
-            let commands = ["xcrun simctl delete all \(asyncFlag)"]
-            try commands.forEach { _ = try executer.execute("\($0) 2>/dev/null || true") }
+            if synchronously {
+                _ = try executer.execute("xcrun simctl delete all 2>/dev/null || true")
+            } else {
+                _ = try executer.execute("xcrun simctl delete all 2>/dev/null &")
+            }
         }
 
         func reset() throws {
