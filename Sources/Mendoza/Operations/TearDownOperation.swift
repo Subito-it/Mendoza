@@ -47,6 +47,8 @@ class TearDownOperation: BaseOperation<Void> {
             didStart?()
 
             guard let executer = executer else { fatalError("💣 Failed making executer") }
+            
+            logTestsResult()
 
             try writeHtmlRepeatedTestResultSummary(executer: executer)
             try writeJsonRepeatedTestResultSummary(executer: executer)
@@ -89,6 +91,19 @@ class TearDownOperation: BaseOperation<Void> {
             pool.terminate()
         }
         super.cancel()
+    }
+    
+    private func logTestsResult() {
+        if let failedTestCases = testSessionResult?.failedTests, failedTestCases.isEmpty == false {
+            print("\nThe following tests failed:".red)
+            let failedTestNames = Array(Set(failedTestCases.map { "\($0.suite)/\($0.name)"} )).sorted()
+            for failedTestName in failedTestNames {
+                print("❌ \(failedTestName)")
+            }
+            print("")
+        } else {
+            print("\n✅ All tests passed!\n".green)
+        }
     }
 
     private func writeHtmlRepeatedTestResultSummary(executer: Executer) throws {

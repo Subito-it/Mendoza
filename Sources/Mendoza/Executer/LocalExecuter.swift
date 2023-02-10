@@ -39,15 +39,6 @@ final class LocalExecuter: Executer {
     func capture(_ command: String, currentUrl: URL?, progress: ((String) -> Void)?, rethrow: (((status: Int32, output: String), Error) throws -> Void)?) throws -> (status: Int32, output: String) {
         let process = Process()
         process.environment = environment
-        defer { running = process }
-
-        if let path = currentDirectoryPath {
-            if #available(OSX 10.13, *) {
-                process.currentDirectoryURL = URL(fileURLWithPath: path)
-            } else {
-                process.currentDirectoryPath = path
-            }
-        }
 
         return try process.capture(command, currentUrl: currentUrl, progress: progress, rethrow: rethrow, logger: logger)
     }

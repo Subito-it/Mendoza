@@ -16,7 +16,7 @@ class Plugin<Input: DefaultInitializable, Output: DefaultInitializable> {
     let logger: ExecuterLogger
     let plugin: (data: String?, debug: Bool)
 
-    private let executer: Executer
+    private let executer: LocalExecuter
     private let name: String
     private let baseUrl: URL
     private var filename: String { "\(name).swift" }
@@ -37,6 +37,9 @@ class Plugin<Input: DefaultInitializable, Output: DefaultInitializable> {
     }
 
     func run(input: Input) throws -> Output {
+        let start = CFAbsoluteTimeGetCurrent()
+        defer { print("🔌 Plugin \(name) took \(CFAbsoluteTimeGetCurrent() - start)s".magenta) }
+        
         let pluginUrl = baseUrl.appendingPathComponent(filename)
         // We add a suffix to the pluginname that is based on so that swift-sh has a consistent name for its internal cache
 
@@ -69,26 +72,33 @@ class Plugin<Input: DefaultInitializable, Output: DefaultInitializable> {
                 .replacingOccurrences(of: #"\\/"#, with: #"\/"#)
                 ?? ""
         }
-
+        
         let command = "chmod +x \(pluginRunUrl.path); \(pluginRunUrl.path) $'\(escape(inputString))' $'\(escape(plugin.data))'"
+
         if plugin.debug {
             let timestamp = Int(Date().timeIntervalSince1970)
             try command.data(using: .utf8)?.write(to: baseUrl.appendingPathComponent(filename + ".debug-\(timestamp)"))
         }
-
+        
         do {
-            let output = try executer.capture(command).output
-            guard let result = output.components(separatedBy: pluginOutputMarker).last,
-                  let resultData = result.data(using: .utf8), !resultData.isEmpty,
-                  let ret = try? JSONDecoder().decode(Output.self, from: resultData)
-            else {
-                throw Error("Failed running plugin `\(filename)`, got \(output)", logger: executer.logger)
-            }
-            if plugin.debug {
-                print("⚠️ plugin output:\n\(output)")
-            }
+            if Output.self == PluginVoid.self && !plugin.debug {
+                try executer.execute(command + " &")
+                
+                return Output.defaultInit()
+            } else {
+                let output = try executer.capture(command).output
+                guard let result = output.components(separatedBy: pluginOutputMarker).last,
+                      let resultData = result.data(using: .utf8), !resultData.isEmpty,
+                      let ret = try? JSONDecoder().decode(Output.self, from: resultData)
+                else {
+                    throw Error("Failed running plugin `\(filename)`, got \(output)", logger: executer.logger)
+                }
+                if plugin.debug {
+                    print("⚠️ plugin output:\n\(output)")
+                }
 
-            return ret
+                return ret
+            }
         } catch {
             print(error)
             throw Error(error.localizedDescription)
