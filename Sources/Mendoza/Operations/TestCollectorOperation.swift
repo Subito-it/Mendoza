@@ -7,7 +7,7 @@
 
 import Foundation
 
-class TestCollectorOperation: BaseOperation<Void> {
+class TestCollectorOperation: BaseOperation<[TestCaseResult]> {
     var testCaseResults: [TestCaseResult]?
 
     private let configuration: Configuration
@@ -86,7 +86,7 @@ class TestCollectorOperation: BaseOperation<Void> {
             
             try cleanupEmptyFolders(executer: executer, destinationPath: destinationPath)
 
-            didEnd?(())
+            didEnd?(testCaseResults)
         } catch {
             didThrow?(error)
         }

@@ -291,10 +291,22 @@ class Test {
             try? self.eventPlugin.run(event: Event(kind: .startTesting, info: [:]), device: device)
         }
         testRunnerOperation.didEnd = { [unowned self] testCaseResults in
+            testCollectorOperation.testCaseResults = testCaseResults
+
+            try? self.eventPlugin.run(event: Event(kind: .stopTesting, info: [:]), device: device)
+        }
+        
+        codeCoverageCollectionOperation.didEnd = { [unowned self] coverage in
+            self.syncQueue.sync {
+                testSessionResult.lineCoveragePercentage = coverage?.data.first?.totals.lines?.percent ?? 0.0
+            }
+        }
+
+        testCollectorOperation.didEnd = { [unowned self] testCaseResults in
             self.syncQueue.sync {
                 testSessionResult.passedTests = testCaseResults.filter { $0.status == .passed }
                 testSessionResult.failedTests = testCaseResults.filter { $0.status != .passed }
-                
+
                 let retriedTests = testSessionResult.failedTests.filter { failedTest in testSessionResult.passedTests.contains(where: { passedTest in failedTest.testCaseIdentifier == passedTest.testCaseIdentifier } )}
                 testSessionResult.retriedTests = retriedTests
 
@@ -303,17 +315,17 @@ class Test {
                     let isRetriedTestCase = testSessionResult.retriedTests.contains { $0.testCaseIdentifier == testCase.testCaseIdentifier }
                     return testCase.status == .failed && !isRetriedTestCase
                 }
-                
+
                 // Keep only one failure per testCaseIdentifier
                 var uniqueFailedSet = Set<String>()
                 let uniqueFailedTests = testSessionResult.failedTests.filter {
                     uniqueFailedSet.update(with: $0.testCaseIdentifier) == nil
                 }
-                                
+
                 let testCount = Double(testCaseResults.count)
                 let failureRate = Double(100 * uniqueFailedTests.count) / testCount
                 let retryRate = Double(100 * testSessionResult.retriedTests.count) / testCount
-                
+
                 testSessionResult.failureRate = failureRate
                 testSessionResult.retryRate = retryRate
                 testSessionResult.totalTestCount = Int(testCount)
@@ -330,16 +342,6 @@ class Test {
                     let executionTime = testCases.reduce(0.0) { $0 + $1.duration }
                     testSessionResult.nodes[node] = .init(executionTime: executionTime, totalTests: testCases.count)
                 }
-            }
-
-            testCollectorOperation.testCaseResults = testCaseResults
-
-            try? self.eventPlugin.run(event: Event(kind: .stopTesting, info: [:]), device: device)
-        }
-        
-        codeCoverageCollectionOperation.didEnd = { [unowned self] coverage in
-            self.syncQueue.sync {
-                testSessionResult.lineCoveragePercentage = coverage?.data.first?.totals.lines?.percent ?? 0.0
             }
         }
 
