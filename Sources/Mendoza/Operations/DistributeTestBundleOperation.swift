@@ -71,7 +71,7 @@ class DistributeTestBundleOperation: BaseOperation<Void> {
                             syncQueue.sync { executers.append(executer) }
 
                             let buildPath = Path.testBundle.rawValue
-                            try executer.rsync(sourcePath: "\(buildPath)/*", destinationPath: buildPath, on: destination)
+                            try executer.rsync(sourcePath: "\(buildPath)/*", destinationPath: buildPath, exclude: ["Intermediates.noindex", "XCFrameworkIntermediates"], on: destination)
 
                             print("🛬 `\(self.className)` \(source.address) -> \(destination.address)".bold)
                         } catch {
