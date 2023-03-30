@@ -47,7 +47,9 @@ class TestCollectorOperation: BaseOperation<[TestCaseResult]> {
                 try self.clearDiagnosticReports(executer: executer)
             }
             
-            let executer = try destinationNode.makeExecuter(logger: nil, environment: nodesEnvironment[destinationNode.address] ?? [:])
+            let logger = ExecuterLogger(name: "\(type(of: self))", address: destinationNode.address)
+            addLogger(logger)
+            let executer = try destinationNode.makeExecuter(logger: logger, environment: nodesEnvironment[destinationNode.address] ?? [:])
             
             let results = try executer.execute("find '\(destinationPath)' -type f -name '*.profdata'").components(separatedBy: "\n")
             
