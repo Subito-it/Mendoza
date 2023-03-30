@@ -9,7 +9,7 @@ import Foundation
 
 enum SSHAuthentication: Codable, Hashable {
     case credentials(username: String, password: String)
-    /// privateKey will default to `~/.ssh/id_rsa` when nil
+    /// privateKey will default to `~/.ssh/id_ed25519` when nil
     case key(username: String, privateKey: String, publicKey: String?, passphrase: String?)
     /// If you've already added the necessary private key to ssh-agent, you can authenticate using the agent:
     case agent(username: String)

@@ -215,12 +215,12 @@ struct ConfigurationInitializer {
             return .credentials(username: username, password: password)
         case 1:
             username = Bariloche.ask("\nUsername:".underline) { guard !$0.isEmpty else { throw Error("Invalid value") }; return $0 }
-            let privateKeyPath: String = Bariloche.ask("Private key path (`~/.ssh/id_rsa` if empty):".underline)
+            let privateKeyPath: String = Bariloche.ask("Private key path (`~/.ssh/id_ed25519` if empty):".underline)
             let publicKeyPath: String = Bariloche.ask("Public key path (not used if empty):".underline)
             let publicKeyPassphrase: String = Bariloche.ask("Public key passphrase (not used if empty):".underline)
 
             return .key(username: username,
-                        privateKey: privateKeyPath.isEmpty ? "~/.ssh/id_rsa" : privateKeyPath,
+                        privateKey: privateKeyPath.isEmpty ? "~/.ssh/id_ed25519" : privateKeyPath,
                         publicKey: publicKeyPath.isEmpty ? nil : publicKeyPath,
                         passphrase: publicKeyPassphrase.isEmpty ? nil : publicKeyPassphrase)
         case 2:
