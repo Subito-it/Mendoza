@@ -137,7 +137,7 @@ class Test {
         let testSortingPlugin = TestSortingPlugin(baseUrl: pluginUrl, plugin: plugin)
         let tearDownPlugin = TearDownPlugin(baseUrl: pluginUrl, plugin: plugin)
 
-        let initialSetupOperation = InitialSetupOperation(nodes: uniqueNodes, xcodeBuildNumber: userOptions.xcodeBuildNumber)
+        let initialSetupOperation = InitialSetupOperation(configuration: configuration, nodes: uniqueNodes, xcodeBuildNumber: userOptions.xcodeBuildNumber)
         let validationOperation = ValidationOperation(configuration: configuration)
         let macOsValidationOperation = MacOsValidationOperation(configuration: configuration)
         let localSetupOperation = LocalSetupOperation(clearDerivedDataOnCompilationFailure: clearDerivedDataOnCompilationFailure, administratorPassword: localNode?.administratorPassword ?? nil)
