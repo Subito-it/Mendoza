@@ -30,7 +30,6 @@ struct ConfigurationAuthenticationUpdater {
         var updatedNodes = [Node]()
         for node in configuration.nodes {
             var authentication = node.authentication
-            var password = node.administratorPassword
 
             if !validator.validAuthentication(node: node) {
                 print("\n* Authentication for `\(node.address)`".magenta)
@@ -42,7 +41,7 @@ struct ConfigurationAuthenticationUpdater {
                 case .remote:
                     if let lastNode = lastNode, AddressType(node: lastNode) == .remote {
                         if Bariloche.ask(title: "Use the same credentials provided for `\(lastNode.name)`?", array: ["Yes", "No"]).index == 0 {
-                            let updatedNode = Node(name: node.name, address: node.address, authentication: lastNode.authentication, administratorPassword: lastNode.administratorPassword, concurrentTestRunners: node.concurrentTestRunners, ramDiskSizeMB: node.ramDiskSizeMB)
+                            let updatedNode = Node(name: node.name, address: node.address, authentication: lastNode.authentication, concurrentTestRunners: node.concurrentTestRunners, ramDiskSizeMB: node.ramDiskSizeMB)
                             updatedNodes.append(updatedNode)
                             continue
                         }
@@ -54,13 +53,7 @@ struct ConfigurationAuthenticationUpdater {
                 modified = true
             }
 
-            if !validator.validAdministratorPassword(node: node), let username = authentication?.username {
-                print("\n* Password for user \(username) on `\(node.address)`".magenta)
-                password = initializer.askAdministratorPassword(username: username)
-                modified = true
-            }
-
-            lastNode = Node(name: node.name, address: node.address, authentication: authentication, administratorPassword: password, concurrentTestRunners: node.concurrentTestRunners, ramDiskSizeMB: node.ramDiskSizeMB)
+            lastNode = Node(name: node.name, address: node.address, authentication: authentication, concurrentTestRunners: node.concurrentTestRunners, ramDiskSizeMB: node.ramDiskSizeMB)
             updatedNodes.append(lastNode!) // swiftlint:disable:this force_unwrapping
         }
 

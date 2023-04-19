@@ -147,7 +147,7 @@ class Test {
         let initialSetupOperation = InitialSetupOperation(configuration: configuration, nodes: uniqueNodes, xcodeBuildNumber: userOptions.xcodeBuildNumber)
         let validationOperation = ValidationOperation(configuration: configuration)
         let macOsValidationOperation = MacOsValidationOperation(configuration: configuration)
-        let localSetupOperation = LocalSetupOperation(clearDerivedDataOnCompilationFailure: clearDerivedDataOnCompilationFailure, administratorPassword: localNode?.administratorPassword ?? nil)
+        let localSetupOperation = LocalSetupOperation(clearDerivedDataOnCompilationFailure: clearDerivedDataOnCompilationFailure)
         let remoteSetupOperation = RemoteSetupOperation(nodes: uniqueNodes)
         let compileOperation = CompileOperation(configuration: configuration, git: gitStatus, baseUrl: gitBaseUrl, project: project, scheme: configuration.scheme, preCompilationPlugin: preCompilationPlugin, postCompilationPlugin: postCompilationPlugin, sdk: sdk, clearDerivedDataOnCompilationFailure: clearDerivedDataOnCompilationFailure)
         let testExtractionOperation = TestExtractionOperation(configuration: configuration, baseUrl: gitBaseUrl, testTargetSourceFiles: testTargetSourceFiles, filePatterns: filePatterns, device: device, plugin: testExtractionPlugin)

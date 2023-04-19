@@ -21,7 +21,6 @@ class ConfigurationValidator {
         try validateReachability()
         try validateConnections()
         try validateAuthentication()
-        try validateAdministratorPassword()
     }
 
     func validateNodes() throws {
@@ -38,24 +37,6 @@ class ConfigurationValidator {
 
     func validAuthentication(node: Node) -> Bool {
         node.authentication != nil
-    }
-
-    func validAdministratorPassword(node: Node) -> Bool {
-        do {
-            guard let passwordBox = node.administratorPassword else { return true }
-            guard let password = passwordBox else { return false }
-
-            let logger = ExecuterLogger(name: "\(type(of: self))", address: node.address)
-            let executer = try node.makeExecuter(logger: logger, environment: [:])
-            loggers.insert(logger)
-
-            executer.logger?.addIgnoreList(password)
-            _ = try executer.execute("echo '\(password)' | sudo -S -v")
-        } catch {
-            return false
-        }
-
-        return true
     }
 
     private func validateReachability() throws {
@@ -101,12 +82,6 @@ class ConfigurationValidator {
     private func validateAuthentication() throws {
         guard configuration.nodes.allSatisfy({ validAuthentication(node: $0) }) else {
             throw Error("Invalid credentials found. Configuration file needs to be updated! Please run `\(ConfigurationRootCommand().name!) \(ConfigurationAuthententicationUpdateCommand().name!)` command".red) // swiftlint:disable:this force_unwrapping
-        }
-    }
-
-    private func validateAdministratorPassword() throws {
-        guard configuration.nodes.allSatisfy({ validAdministratorPassword(node: $0) }) else {
-            throw Error("Invalid administrator password found. Configuration file needs to be updated! Please run `\(ConfigurationRootCommand().name!) \(ConfigurationAuthententicationUpdateCommand().name!)` command".red) // swiftlint:disable:this force_unwrapping
         }
     }
 }

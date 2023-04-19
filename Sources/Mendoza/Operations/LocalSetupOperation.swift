@@ -9,7 +9,6 @@ import Foundation
 
 class LocalSetupOperation: BaseOperation<Void> {
     private let fileManager: FileManager
-    private let administratorPassword: String?
     private let clearDerivedDataOnCompilationFailure: Bool
     
     private lazy var git = {
@@ -20,10 +19,9 @@ class LocalSetupOperation: BaseOperation<Void> {
         makeLocalExecuter()
     }()
 
-    init(fileManager: FileManager = .default, clearDerivedDataOnCompilationFailure: Bool, administratorPassword: String?) {
+    init(fileManager: FileManager = .default, clearDerivedDataOnCompilationFailure: Bool) {
         self.fileManager = fileManager
         self.clearDerivedDataOnCompilationFailure = clearDerivedDataOnCompilationFailure
-        self.administratorPassword = administratorPassword
     }
 
     override func main() {
