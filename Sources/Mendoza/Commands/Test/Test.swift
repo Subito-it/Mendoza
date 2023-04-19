@@ -148,7 +148,6 @@ class Test {
         let validationOperation = ValidationOperation(configuration: configuration)
         let macOsValidationOperation = MacOsValidationOperation(configuration: configuration)
         let localSetupOperation = LocalSetupOperation(clearDerivedDataOnCompilationFailure: clearDerivedDataOnCompilationFailure, administratorPassword: localNode?.administratorPassword ?? nil)
-        let wakeupOperation = WakeupOperation(nodes: uniqueNodes)
         let remoteSetupOperation = RemoteSetupOperation(nodes: uniqueNodes)
         let compileOperation = CompileOperation(configuration: configuration, git: gitStatus, baseUrl: gitBaseUrl, project: project, scheme: configuration.scheme, preCompilationPlugin: preCompilationPlugin, postCompilationPlugin: postCompilationPlugin, sdk: sdk, clearDerivedDataOnCompilationFailure: clearDerivedDataOnCompilationFailure)
         let testExtractionOperation = TestExtractionOperation(configuration: configuration, baseUrl: gitBaseUrl, testTargetSourceFiles: testTargetSourceFiles, filePatterns: filePatterns, device: device, plugin: testExtractionPlugin)
@@ -170,7 +169,6 @@ class Test {
              macOsValidationOperation,
              localSetupOperation,
              remoteSetupOperation,
-             wakeupOperation,
              testExtractionOperation,
              testSortingOperation,
              simulatorSetupOperation,
@@ -198,11 +196,9 @@ class Test {
 
         remoteSetupOperation.addDependency(validationOperation)
 
-        wakeupOperation.addDependencies([localSetupOperation, remoteSetupOperation])
-
         testExtractionOperation.addDependency(localSetupOperation)
 
-        simulatorSetupOperation.addDependency(wakeupOperation)
+        simulatorSetupOperation.addDependencies([localSetupOperation, remoteSetupOperation])
 
         testSortingOperation.addDependency(testExtractionOperation)
 
