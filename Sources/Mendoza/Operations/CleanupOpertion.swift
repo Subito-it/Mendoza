@@ -10,7 +10,7 @@ import Foundation
 class CleanupOperation: BaseOperation<Void> {
     private let configuration: Configuration
     private let timestamp: String
-    private lazy var executer: Executer? = {
+    private lazy var destinationExecuter: Executer? = {
         let destinationNode = configuration.resultDestination.node
 
         let logger = ExecuterLogger(name: "\(type(of: self))", address: destinationNode.address)
@@ -30,7 +30,7 @@ class CleanupOperation: BaseOperation<Void> {
 
             let destinationPath = "\(configuration.resultDestination.path)/\(timestamp)"
 
-            guard let executer = executer else { fatalError("💣 Failed making executer") }
+            guard let executer = destinationExecuter else { fatalError("💣 Failed making executer") }
 
             // Remove device logs which contain no meaningful information
             _ = try executer.execute(#"find '\#(destinationPath)' -maxdepth 1 -name "*-*-*-*-*" -type d -exec rm -rf {} +"#)
@@ -43,7 +43,7 @@ class CleanupOperation: BaseOperation<Void> {
 
     override func cancel() {
         if isExecuting {
-            executer?.terminate()
+            destinationExecuter?.terminate()
         }
         super.cancel()
     }
