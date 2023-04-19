@@ -39,13 +39,20 @@ class Test {
             }
         }
         
+        let resultDestination: Configuration.ResultDestination
+        if AddressType(node: configuration.resultDestination.node) == .local {
+            resultDestination = .init(node: Node.localhost(), path: configuration.resultDestination.path)
+        } else {
+            resultDestination = configuration.resultDestination
+        }
+        
         let updatedConfiguration = Configuration(projectPath: configuration.projectPath,
                                                  workspacePath: configuration.workspacePath,
                                                  buildBundleIdentifier: configuration.buildBundleIdentifier,
                                                  testBundleIdentifier: configuration.testBundleIdentifier,
                                                  scheme: configuration.scheme,
                                                  buildConfiguration: configuration.buildConfiguration,
-                                                 resultDestination: configuration.resultDestination,
+                                                 resultDestination: resultDestination,
                                                  nodes: configurationNodes,
                                                  compilation: configuration.compilation,
                                                  sdk: configuration.sdk,
