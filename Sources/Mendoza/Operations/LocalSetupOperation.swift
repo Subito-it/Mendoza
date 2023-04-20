@@ -30,21 +30,22 @@ class LocalSetupOperation: BaseOperation<Void> {
         do {
             didStart?()
 
-            for path in Path.allCases {
-                switch path {
-                case .base, .build:
-                    break
-                case .testBundle:
-                    // Reuse derived data
-                    if !clearDerivedDataOnCompilationFailure {
-                        _ = try executer.execute("rm -rf '\(path.rawValue)' || true")
-                    } else {
+            if clearDerivedDataOnCompilationFailure {
+                for path in Path.allCases {
+                    switch path {
+                    case .base, .build:
+                        break
+                    case .testBundle:
                         _ = try executer.execute("rm -rf '\(path.rawValue)/'*.xctestrun || true")
+                    case .temp, .logs, .results:
+                        _ = try executer.execute("rm -rf '\(path.rawValue)' || true")
                     }
-                case .logs, .temp, .results:
-                    _ = try executer.execute("rm -rf '\(path.rawValue)' || true")
                 }
+            } else {
+                _ = try executer.execute("rm -rf '\(Path.base.rawValue)' || true")
+            }
 
+            for path in Path.allCases {
                 _ = try executer.execute("mkdir -p '\(path.rawValue)' || true")
             }
             
