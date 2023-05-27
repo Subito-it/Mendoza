@@ -38,6 +38,9 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
 
             try pool.execute { executer, source in
                 let node = source.node
+                
+                // Killing CoreSimulatorService will reset and shutdown all Simulators
+                _ = try? executer.execute("killall -9 com.apple.CoreSimulator.CoreSimulatorService;")
 
                 let systemPath = try executer.execute("xcode-select -p")
                 let path = (self.nodesEnvironment[source.node.address]?["DEVELOPER_DIR"]) ?? systemPath
@@ -91,7 +94,6 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
                     let queueProxy = CommandLineProxy.Simulators(executer: queueExecuter, verbose: self.verbose)
 
                     bootQueue.addOperation {
-                        try? queueProxy.shutdown(simulator: nodeSimulator)
                         try? queueProxy.bootSynchronously(simulator: nodeSimulator)
                         
                         do {
