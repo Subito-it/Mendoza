@@ -19,13 +19,9 @@ extension CommandLineProxy {
             self.verbose = verbose
         }
         
-        func deleteAll(synchronously: Bool = true) throws {
+        func deleteAll() throws {
+            _ = try? executer.execute("rm -rf ~/Library/Developer/CoreSimulator")
             _ = try? executer.execute("killall -9 com.apple.CoreSimulator.CoreSimulatorService")
-            if synchronously {
-                _ = try? executer.execute("xcrun simctl delete all 2>/dev/null; killall -9 com.apple.CoreSimulator.CoreSimulatorService")
-            } else {
-                _ = try executer.execute("(xcrun simctl delete all 2>/dev/null; killall -9 com.apple.CoreSimulator.CoreSimulatorService) &")
-            }
         }
 
         func reset() throws {
