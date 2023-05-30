@@ -99,6 +99,7 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
                         queueProxy.enableXcode11ReleaseNotesWorkarounds(on: nodeSimulator)
                         queueProxy.enableXcode13Workarounds(on: nodeSimulator)
                         queueProxy.disableSlideToType(on: nodeSimulator)
+                        queueProxy.disablePasswordAutofill(on: nodeSimulator)
                         
                         try? logger.dump()
                     }

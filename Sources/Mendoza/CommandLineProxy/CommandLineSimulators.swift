@@ -115,6 +115,12 @@ extension CommandLineProxy {
             let path = "\(simulatorSettingsPath(for: simulator))/com.apple.suggestions.plist"
             _ = try? executer.execute("plutil -replace SuggestionsAppLibraryEnabled -bool NO '\(path)'")
         }
+        
+        func disablePasswordAutofill(on simulator: Simulator) {
+            _ = try? executer.execute("plutil -replace restrictedBool.allowPasswordAutoFill.value -bool NO ~/Library/Developer/CoreSimulator/Devices/\(simulator.id)/data/Containers/Shared/SystemGroup/systemgroup.com.apple.configurationprofiles/Library/ConfigurationProfiles/UserSettings.plist")
+            _ = try? executer.execute("plutil -replace restrictedBool.allowPasswordAutoFill.value -bool NO ~/Library/Developer/CoreSimulator/Devices/\(simulator.id)/data/Library/UserConfigurationProfiles/EffectiveUserSettings.plist")
+            _ = try? executer.execute("plutil -replace restrictedBool.allowPasswordAutoFill.value -bool NO ~/Library/Developer/CoreSimulator/Devices/\(simulator.id)/data/Library/UserConfigurationProfiles/PublicInfo/PublicEffectiveUserSettings.plist")
+        }
 
         func disableSlideToType(on simulator: Simulator) {
             let numberFormatter = NumberFormatter()
