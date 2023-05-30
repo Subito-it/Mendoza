@@ -96,13 +96,9 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
                     bootQueue.addOperation {
                         try? queueProxy.bootSynchronously(simulator: nodeSimulator)
                         
-                        do {
-                            try queueProxy.enableXcode11ReleaseNotesWorkarounds(on: nodeSimulator)
-                            try queueProxy.enableXcode13Workarounds(on: nodeSimulator)
-                            try queueProxy.disableSlideToType(on: nodeSimulator)
-                        } catch {
-                            print("Failed booting simulators on \(node.address)")
-                        }
+                        queueProxy.enableXcode11ReleaseNotesWorkarounds(on: nodeSimulator)
+                        queueProxy.enableXcode13Workarounds(on: nodeSimulator)
+                        queueProxy.disableSlideToType(on: nodeSimulator)
                         
                         try? logger.dump()
                     }

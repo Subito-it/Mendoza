@@ -104,26 +104,26 @@ extension CommandLineProxy {
             _ = try executer.execute("defaults write com.apple.iphonesimulator GraphicsQualityOverride 10")
         }
 
-        func enableXcode11ReleaseNotesWorkarounds(on simulator: Simulator) throws {
+        func enableXcode11ReleaseNotesWorkarounds(on simulator: Simulator) {
             // See release notes workarounds: https://developer.apple.com/documentation/xcode_release_notes/xcode_11_release_notes?language=objc
             // These settings are hot loaded no reboot of the device is necessary
             _ = try? executer.execute("xcrun simctl spawn '\(simulator.id)' defaults write com.apple.springboard FBLaunchWatchdogScale 2")
         }
 
-        func enableXcode13Workarounds(on simulator: Simulator) throws {
+        func enableXcode13Workarounds(on simulator: Simulator) {
             // See https://developer.apple.com/forums/thread/683277?answerId=682047022#682047022
             let path = "\(simulatorSettingsPath(for: simulator))/com.apple.suggestions.plist"
             _ = try? executer.execute("plutil -replace SuggestionsAppLibraryEnabled -bool NO '\(path)'")
         }
 
-        func disableSlideToType(on simulator: Simulator) throws {
+        func disableSlideToType(on simulator: Simulator) {
             let numberFormatter = NumberFormatter()
             numberFormatter.decimalSeparator = "."
             let deviceVersion = numberFormatter.number(from: simulator.device.runtime)?.floatValue ?? 0.0
 
             if deviceVersion >= 13.0 {
                 // These settings are hot loaded no reboot of the device is necessary
-                _ = try executer.execute("xcrun simctl spawn '\(simulator.id)' defaults write com.apple.keyboard.preferences DidShowContinuousPathIntroduction -bool true")
+                _ = try? executer.execute("xcrun simctl spawn '\(simulator.id)' defaults write com.apple.keyboard.preferences DidShowContinuousPathIntroduction -bool true")
             }
         }
 
