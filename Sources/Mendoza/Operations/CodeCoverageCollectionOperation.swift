@@ -71,7 +71,7 @@ class CodeCoverageCollectionOperation: BaseOperation<Coverage?> {
         if let pathEquivalence = pathEquivalence,
            pathEquivalence.components(separatedBy: ",").count == 2 {
             var source = pathEquivalence.components(separatedBy: ",")[0]
-            source = source.replacingOccurrences(of: ".", with: #"\."#) // dots need to be escaped for sed which expectes regexes
+            source = source.replacingOccurrences(of: ".", with: #"\."#) // dots need to be escaped for sed which expects regexes
             let destination = pathEquivalence.components(separatedBy: ",")[1]
 
             replacePath = "| sed 's|\(source)|\(destination)|g'"
@@ -95,7 +95,7 @@ class CodeCoverageCollectionOperation: BaseOperation<Coverage?> {
         if let pathEquivalence = pathEquivalence,
            pathEquivalence.components(separatedBy: ",").count == 2 {
             var source = pathEquivalence.components(separatedBy: ",")[0]
-            source = source.replacingOccurrences(of: ".", with: #"\."#) // dots need to be escaped for sed which expectes regexes
+            source = source.replacingOccurrences(of: ".", with: #"\."#) // dots need to be escaped for sed which expects regexes
             let destination = pathEquivalence.components(separatedBy: ",")[1]
 
             cmd += " --path-equivalence=\(pathEquivalence) | sed 's|\(source)|\(destination)|g'"
