@@ -19,12 +19,9 @@ extension CommandLineProxy {
             self.verbose = verbose
         }
         
-        func deleteAll(synchronously: Bool = true) throws {
-            if synchronously {
-                _ = try executer.execute("xcrun simctl delete all 2>/dev/null || true")
-            } else {
-                _ = try executer.execute("xcrun simctl delete all 2>/dev/null &")
-            }
+        func deleteAll() throws {
+            _ = try? executer.execute("rm -rf ~/Library/Developer/CoreSimulator")
+            _ = try? executer.execute("killall -9 com.apple.CoreSimulator.CoreSimulatorService")
         }
 
         func reset() throws {
@@ -81,7 +78,7 @@ extension CommandLineProxy {
             _ = try executer.execute("xcrun simctl terminate \(simulator.id) \(identifier)")
         }
 
-        func installRuntimeIfNeeded(_ runtime: String, nodeAddress: String, administratorPassword: String?) throws {
+        func installRuntimeIfNeeded(_ runtime: String, nodeAddress: String) throws {
             let isRuntimeInstalled: () throws -> Bool = { [unowned self] in
                 let installedRuntimes = try self.executer.execute("xcrun simctl list runtimes 2>/dev/null")
                 let escapedRuntime = runtime.replacingOccurrences(of: ".", with: "-")
@@ -107,26 +104,32 @@ extension CommandLineProxy {
             _ = try executer.execute("defaults write com.apple.iphonesimulator GraphicsQualityOverride 10")
         }
 
-        func enableXcode11ReleaseNotesWorkarounds(on simulator: Simulator) throws {
+        func enableXcode11ReleaseNotesWorkarounds(on simulator: Simulator) {
             // See release notes workarounds: https://developer.apple.com/documentation/xcode_release_notes/xcode_11_release_notes?language=objc
             // These settings are hot loaded no reboot of the device is necessary
             _ = try? executer.execute("xcrun simctl spawn '\(simulator.id)' defaults write com.apple.springboard FBLaunchWatchdogScale 2")
         }
 
-        func enableXcode13Workarounds(on simulator: Simulator) throws {
+        func enableXcode13Workarounds(on simulator: Simulator) {
             // See https://developer.apple.com/forums/thread/683277?answerId=682047022#682047022
             let path = "\(simulatorSettingsPath(for: simulator))/com.apple.suggestions.plist"
             _ = try? executer.execute("plutil -replace SuggestionsAppLibraryEnabled -bool NO '\(path)'")
         }
+        
+        func disablePasswordAutofill(on simulator: Simulator) {
+            _ = try? executer.execute("plutil -replace restrictedBool.allowPasswordAutoFill.value -bool NO ~/Library/Developer/CoreSimulator/Devices/\(simulator.id)/data/Containers/Shared/SystemGroup/systemgroup.com.apple.configurationprofiles/Library/ConfigurationProfiles/UserSettings.plist")
+            _ = try? executer.execute("plutil -replace restrictedBool.allowPasswordAutoFill.value -bool NO ~/Library/Developer/CoreSimulator/Devices/\(simulator.id)/data/Library/UserConfigurationProfiles/EffectiveUserSettings.plist")
+            _ = try? executer.execute("plutil -replace restrictedBool.allowPasswordAutoFill.value -bool NO ~/Library/Developer/CoreSimulator/Devices/\(simulator.id)/data/Library/UserConfigurationProfiles/PublicInfo/PublicEffectiveUserSettings.plist")
+        }
 
-        func disableSlideToType(on simulator: Simulator) throws {
+        func disableSlideToType(on simulator: Simulator) {
             let numberFormatter = NumberFormatter()
             numberFormatter.decimalSeparator = "."
             let deviceVersion = numberFormatter.number(from: simulator.device.runtime)?.floatValue ?? 0.0
 
             if deviceVersion >= 13.0 {
                 // These settings are hot loaded no reboot of the device is necessary
-                _ = try executer.execute("xcrun simctl spawn '\(simulator.id)' defaults write com.apple.keyboard.preferences DidShowContinuousPathIntroduction -bool true")
+                _ = try? executer.execute("xcrun simctl spawn '\(simulator.id)' defaults write com.apple.keyboard.preferences DidShowContinuousPathIntroduction -bool true")
             }
         }
 

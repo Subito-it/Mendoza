@@ -119,7 +119,6 @@ struct ConfigurationInitializer {
     func askNode(sdk: XcodeProject.SDK) throws -> Node {
         let name: String = Bariloche.ask("\nName (identifier that will be used in logging):".underline) { guard !$0.isEmpty else { throw Error("Invalid value") }; return $0 }
 
-        let administratorPassword: String??
         let sshAuthentication: SSHAuthentication
         let concurrentTestRunners: Node.ConcurrentTestRunners
         var ramDiskSize: UInt?
@@ -131,10 +130,8 @@ struct ConfigurationInitializer {
 
             switch sdk {
             case .macos:
-                administratorPassword = nil
                 concurrentTestRunners = .manual(count: 1)
             case .ios:
-                administratorPassword = askAdministratorPassword(username: sshAuthentication.username)
                 concurrentTestRunners = askConcurrentSimulators()
             }
         } else {
@@ -143,16 +140,8 @@ struct ConfigurationInitializer {
             switch sdk {
             case .macos:
                 concurrentTestRunners = .manual(count: 1)
-                administratorPassword = nil
             case .ios:
                 concurrentTestRunners = askConcurrentSimulators()
-
-                switch sshAuthentication {
-                case let .credentials(_, password):
-                    administratorPassword = password
-                default:
-                    administratorPassword = askAdministratorPassword(username: sshAuthentication.username)
-                }
             }
 
             Bariloche.ask("\nRam disk size in MB (useful for nodes without SSDs). Suggested 1024MB, not used if empty".underline) { (answer: String) in
@@ -171,7 +160,6 @@ struct ConfigurationInitializer {
         return Node(name: name,
                     address: address,
                     authentication: sshAuthentication,
-                    administratorPassword: administratorPassword,
                     concurrentTestRunners: concurrentTestRunners,
                     ramDiskSizeMB: ramDiskSize)
     }
@@ -229,17 +217,6 @@ struct ConfigurationInitializer {
             return .agent(username: username)
         default:
             fatalError("Unexpected case \(authenticationType.index)")
-        }
-    }
-
-    func askAdministratorPassword(username: String) -> String?? {
-        let storePassword = Bariloche.ask(title: "Store administrator username password? Required to perform actions such as simulator installation (e.g. `xcversion simulators --install='iOS X.X'`) ", array: ["Yes", "No"])
-        switch storePassword.index {
-        case 0:
-            let password: String = Bariloche.ask("\nPassword for `\(username)`".underline, secure: true) { guard !$0.isEmpty else { throw Error("Invalid value") }; return $0 }
-            return .some(password)
-        default:
-            return nil
         }
     }
 }

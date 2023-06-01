@@ -17,7 +17,6 @@ struct Node: Codable, Equatable, Hashable {
     let name: String
     let address: String
     let authentication: SSHAuthentication?
-    let administratorPassword: String?? // Required to perform tasks such as simulator runtime installation (e.g. `xcversion simulators --install='iOS X.X'`)
     let concurrentTestRunners: ConcurrentTestRunners
     let ramDiskSizeMB: UInt?
 
@@ -34,9 +33,6 @@ extension Node: CustomStringConvertible {
         if let authentication = authentication {
             ret += ["authentication: \(authentication)"]
         }
-        if administratorPassword != nil {
-            ret += ["store password: yes"]
-        }
         if let ramDiskSizeMB = ramDiskSizeMB {
             ret += ["ram disk size: \(String(ramDiskSizeMB))"]
         }
@@ -49,7 +45,6 @@ extension Node: CustomStringConvertible {
 extension Node {
     private struct Authentication: Codable {
         let ssh: SSHAuthentication
-        let administratorPassword: String?
     }
 
     private enum CodingKeys: String, CodingKey {
@@ -57,7 +52,6 @@ extension Node {
         case address
         case concurrentTestRunners
         case ramDiskSizeMB
-        case storeAdministratorPassword
     }
 
     init(from decoder: Decoder) throws {
@@ -73,25 +67,13 @@ extension Node {
         if let authenticationData = try keychain.getData("\(name)_authentication") {
             let keychainAuthentication = try JSONDecoder().decode(Authentication.self, from: authenticationData)
             authentication = keychainAuthentication.ssh
-
-            if try container.decode(Bool.self, forKey: .storeAdministratorPassword) {
-                administratorPassword = .some(keychainAuthentication.administratorPassword)
-            } else {
-                administratorPassword = .none
-            }
         } else {
             authentication = nil
-
-            if try container.decode(Bool.self, forKey: .storeAdministratorPassword) {
-                administratorPassword = .some(nil)
-            } else {
-                administratorPassword = .none
-            }
         }
     }
 
     static func localhost() -> Node {
-        Node(name: "localhost", address: "localhost", authentication: .none, administratorPassword: nil, concurrentTestRunners: .autodetect, ramDiskSizeMB: nil)
+        Node(name: "localhost", address: "localhost", authentication: .none, concurrentTestRunners: .autodetect, ramDiskSizeMB: nil)
     }
 
     func encode(to encoder: Encoder) throws {
@@ -104,11 +86,9 @@ extension Node {
 
         if let authentication = authentication {
             let keychain = KeychainAccess.Keychain(service: Environment.bundle)
-            let keychainAuthentication = Authentication(ssh: authentication, administratorPassword: administratorPassword ?? nil) // swiftlint:disable:this redundant_nil_coalescing
+            let keychainAuthentication = Authentication(ssh: authentication) // swiftlint:disable:this redundant_nil_coalescing
             try keychain.set(try JSONEncoder().encode(keychainAuthentication), key: "\(name)_authentication")
         }
-
-        try container.encode(administratorPassword != nil, forKey: .storeAdministratorPassword)
     }
 }
 

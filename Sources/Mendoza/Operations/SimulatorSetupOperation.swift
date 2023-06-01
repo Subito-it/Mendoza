@@ -38,6 +38,9 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
 
             try pool.execute { executer, source in
                 let node = source.node
+                
+                // Killing CoreSimulatorService will reset and shutdown all Simulators
+                _ = try? executer.execute("killall -9 com.apple.CoreSimulator.CoreSimulatorService;")
 
                 let systemPath = try executer.execute("xcode-select -p")
                 let path = (self.nodesEnvironment[source.node.address]?["DEVELOPER_DIR"]) ?? systemPath
@@ -48,7 +51,7 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
 
                 let proxy = CommandLineProxy.Simulators(executer: executer, verbose: self.verbose)
 
-                try proxy.installRuntimeIfNeeded(self.device.runtime, nodeAddress: node.address, administratorPassword: nil)
+                try proxy.installRuntimeIfNeeded(self.device.runtime, nodeAddress: node.address)
 
                 let concurrentTestRunners: Int
                 switch node.concurrentTestRunners {
@@ -91,16 +94,12 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
                     let queueProxy = CommandLineProxy.Simulators(executer: queueExecuter, verbose: self.verbose)
 
                     bootQueue.addOperation {
-                        try? queueProxy.shutdown(simulator: nodeSimulator)
                         try? queueProxy.bootSynchronously(simulator: nodeSimulator)
                         
-                        do {
-                            try queueProxy.enableXcode11ReleaseNotesWorkarounds(on: nodeSimulator)
-                            try queueProxy.enableXcode13Workarounds(on: nodeSimulator)
-                            try queueProxy.disableSlideToType(on: nodeSimulator)
-                        } catch {
-                            print("Failed booting simulators on \(node.address)")
-                        }
+                        queueProxy.enableXcode11ReleaseNotesWorkarounds(on: nodeSimulator)
+                        queueProxy.enableXcode13Workarounds(on: nodeSimulator)
+                        queueProxy.disableSlideToType(on: nodeSimulator)
+                        queueProxy.disablePasswordAutofill(on: nodeSimulator)
                         
                         try? logger.dump()
                     }

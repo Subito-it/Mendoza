@@ -39,13 +39,20 @@ class Test {
             }
         }
         
+        let resultDestination: Configuration.ResultDestination
+        if AddressType(node: configuration.resultDestination.node) == .local {
+            resultDestination = .init(node: Node.localhost(), path: configuration.resultDestination.path)
+        } else {
+            resultDestination = configuration.resultDestination
+        }
+        
         let updatedConfiguration = Configuration(projectPath: configuration.projectPath,
                                                  workspacePath: configuration.workspacePath,
                                                  buildBundleIdentifier: configuration.buildBundleIdentifier,
                                                  testBundleIdentifier: configuration.testBundleIdentifier,
                                                  scheme: configuration.scheme,
                                                  buildConfiguration: configuration.buildConfiguration,
-                                                 resultDestination: configuration.resultDestination,
+                                                 resultDestination: resultDestination,
                                                  nodes: configurationNodes,
                                                  compilation: configuration.compilation,
                                                  sdk: configuration.sdk,
@@ -137,11 +144,10 @@ class Test {
         let testSortingPlugin = TestSortingPlugin(baseUrl: pluginUrl, plugin: plugin)
         let tearDownPlugin = TearDownPlugin(baseUrl: pluginUrl, plugin: plugin)
 
-        let initialSetupOperation = InitialSetupOperation(nodes: uniqueNodes, xcodeBuildNumber: userOptions.xcodeBuildNumber)
+        let initialSetupOperation = InitialSetupOperation(configuration: configuration, nodes: uniqueNodes, xcodeBuildNumber: userOptions.xcodeBuildNumber)
         let validationOperation = ValidationOperation(configuration: configuration)
         let macOsValidationOperation = MacOsValidationOperation(configuration: configuration)
-        let localSetupOperation = LocalSetupOperation(clearDerivedDataOnCompilationFailure: clearDerivedDataOnCompilationFailure, administratorPassword: localNode?.administratorPassword ?? nil)
-        let wakeupOperation = WakeupOperation(nodes: uniqueNodes)
+        let localSetupOperation = LocalSetupOperation(clearDerivedDataOnCompilationFailure: clearDerivedDataOnCompilationFailure)
         let remoteSetupOperation = RemoteSetupOperation(nodes: uniqueNodes)
         let compileOperation = CompileOperation(configuration: configuration, git: gitStatus, baseUrl: gitBaseUrl, project: project, scheme: configuration.scheme, preCompilationPlugin: preCompilationPlugin, postCompilationPlugin: postCompilationPlugin, sdk: sdk, clearDerivedDataOnCompilationFailure: clearDerivedDataOnCompilationFailure)
         let testExtractionOperation = TestExtractionOperation(configuration: configuration, baseUrl: gitBaseUrl, testTargetSourceFiles: testTargetSourceFiles, filePatterns: filePatterns, device: device, plugin: testExtractionPlugin)
@@ -163,7 +169,6 @@ class Test {
              macOsValidationOperation,
              localSetupOperation,
              remoteSetupOperation,
-             wakeupOperation,
              testExtractionOperation,
              testSortingOperation,
              simulatorSetupOperation,
@@ -191,11 +196,9 @@ class Test {
 
         remoteSetupOperation.addDependency(validationOperation)
 
-        wakeupOperation.addDependencies([localSetupOperation, remoteSetupOperation])
-
         testExtractionOperation.addDependency(localSetupOperation)
 
-        simulatorSetupOperation.addDependency(wakeupOperation)
+        simulatorSetupOperation.addDependencies([localSetupOperation, remoteSetupOperation])
 
         testSortingOperation.addDependency(testExtractionOperation)
 

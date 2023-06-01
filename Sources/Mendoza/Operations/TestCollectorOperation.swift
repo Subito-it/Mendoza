@@ -54,7 +54,7 @@ class TestCollectorOperation: BaseOperation<[TestCaseResult]> {
             let results = try executer.execute("find '\(destinationPath)' -type f -name '*.profdata'").components(separatedBy: "\n")
             
             var moveCommands = [String]()
-            for (index, result) in results.enumerated() {
+            for (index, result) in results.enumerated() where !result.isEmpty {
                 moveCommands.append("mv '\(result)' '\(destinationPath)/\(index).profdata'")
             }
             _ = try executer.execute(moveCommands.joined(separator: "; "))

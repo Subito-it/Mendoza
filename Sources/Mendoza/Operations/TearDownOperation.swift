@@ -315,7 +315,7 @@ class TearDownOperation: BaseOperation<Void> {
             try pool.execute { executer, source in
                 if performReset.contains(source.node.address) {
                     let proxy = CommandLineProxy.Simulators(executer: executer, verbose: false)
-                    try proxy.deleteAll(synchronously: false)
+                    try proxy.deleteAll()
                 }
             }
         }
