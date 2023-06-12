@@ -267,6 +267,8 @@ class TearDownOperation: BaseOperation<Void> {
         infoPlist["commitMessage"] = AnyCodable(git.commitMessage)
         infoPlist["commitHash"] = AnyCodable(git.commitHash)
         infoPlist["metadata"] = AnyCodable(plugin.plugin.data)
+        infoPlist["sourceBasePath"] = AnyCodable(git.url.path)
+
         if let startTime = testSessionResult?.startTime {
             infoPlist["startDate"] = AnyCodable(Date(timeIntervalSinceReferenceDate: startTime))
             infoPlist["endDate"] = AnyCodable(Date())
