@@ -1,21 +1,24 @@
-// swift-tools-version:5.0
+// swift-tools-version:5.8
 // The swift-tools-version declares the minimum version of Swift required to build this package.
 
 import PackageDescription
 
 let package = Package(
-    name: "Mendoza",
+    name: "mendoza",
+    platforms: [
+        .macOS(.v13)
+    ],
     dependencies: [
-        .package(url: "https://github.com/tcamin/KeychainAccess.git", .branch("master")),
-        .package(url: "https://github.com/Subito-it/Bariloche", .branch("master")),
-        .package(url: "https://github.com/tcamin/Shout.git", .branch("subito")),
-        .package(url: "https://github.com/tcamin/XcodeProj.git", .branch("Mendoza")),
-        .package(url: "https://github.com/jpsim/SourceKitten.git", from: "0.0.0"),
+        .package(url: "https://github.com/kishikawakatsumi/KeychainAccess", branch: "master"),
+        .package(url: "https://github.com/Subito-it/Bariloche", branch: "master"),
+        .package(url: "https://github.com/Subito-it/Shout.git", branch: "mendoza/stable"),
+        .package(url: "https://github.com/Subito-it/XcodeProj.git", branch: "mendoza/stable"),
+        .package(url: "https://github.com/jpsim/SourceKitten.git", branch: "main"),
     ],
     targets: [
-        .target(
-            name: "Mendoza",
-            dependencies: ["Bariloche", "Shout", "XcodeProj", "KeychainAccess", "SourceKittenFramework"]
+        .executableTarget(
+            name: "mendoza",
+            dependencies: ["Bariloche", "Shout", "XcodeProj", "KeychainAccess", .product(name: "SourceKittenFramework", package: "SourceKitten")]
         ),
     ]
 )
