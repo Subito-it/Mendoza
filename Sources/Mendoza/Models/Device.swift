@@ -29,6 +29,7 @@ extension Device {
         case "iPhone 6 Plus", "iPhone 6s Plus", "iPhone 7 Plus", "iPhone 8 Plus": return CGSize(width: 414, height: 736)
         case "iPhone X", "iPhone Xs", "iPhone 11 Pro": return CGSize(width: 375, height: 812)
         case "iPhone Xs Max", "iPhone Xʀ", "iPhone 11", "iPhone 11 Pro Max": return CGSize(width: 414, height: 896)
+        case "iPhone 12": return CGSize(width: 390, height: 844)
 
         case "iPad Air": return CGSize(width: 768, height: 1024)
         case "iPad Air (3rd generation)": return CGSize(width: 414, height: 896)
