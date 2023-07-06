@@ -34,7 +34,7 @@ class TestSortingOperation: BaseOperation<[TestCase]> {
 
             if plugin.isInstalled {
                 let input = TestOrderInput(tests: testCases, device: device)
-                didEnd?(try plugin.run(input: input))
+                try didEnd?(plugin.run(input: input))
             } else {
                 didEnd?(testCases)
             }

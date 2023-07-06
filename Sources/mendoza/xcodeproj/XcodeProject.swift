@@ -160,9 +160,9 @@ class XcodeProject: NSObject {
 
         return (build: buildBundleIdentifier, test: testBundleIdentifier)
     }
-    
-    func getProductNames() -> [String] {        
-        return project.pbxproj.rootObject?.targets.compactMap { $0.productName } ?? []
+
+    func getProductNames() -> [String] {
+        project.pbxproj.rootObject?.targets.compactMap(\.productName) ?? []
     }
 
     func getBuildSDK(for schemeName: String) throws -> SDK {

@@ -18,7 +18,7 @@ extension CommandLineProxy {
             self.executer = executer
             self.verbose = verbose
         }
-        
+
         func deleteAll() throws {
             _ = try? executer.execute("rm -rf ~/Library/Developer/CoreSimulator")
             _ = try? executer.execute("killall -9 com.apple.CoreSimulator.CoreSimulatorService")
@@ -65,7 +65,7 @@ extension CommandLineProxy {
         func shutdownAll() throws {
             _ = try executer.execute("xcrun simctl shutdown all")
         }
-        
+
         func shutdown(simulator: Simulator) throws {
             _ = try executer.execute("xcrun simctl shutdown \(simulator.id)")
         }
@@ -86,7 +86,7 @@ extension CommandLineProxy {
             }
 
             guard try !isRuntimeInstalled() else { return }
-            
+
             throw Error("You'll need to manually install \(runtime) on remote node \(nodeAddress)", logger: executer.logger)
         }
 
@@ -115,7 +115,7 @@ extension CommandLineProxy {
             let path = "\(simulatorSettingsPath(for: simulator))/com.apple.suggestions.plist"
             _ = try? executer.execute("plutil -replace SuggestionsAppLibraryEnabled -bool NO '\(path)'")
         }
-        
+
         func disablePasswordAutofill(on simulator: Simulator) {
             _ = try? executer.execute("plutil -replace restrictedBool.allowPasswordAutoFill.value -bool NO ~/Library/Developer/CoreSimulator/Devices/\(simulator.id)/data/Containers/Shared/SystemGroup/systemgroup.com.apple.configurationprofiles/Library/ConfigurationProfiles/UserSettings.plist")
             _ = try? executer.execute("plutil -replace restrictedBool.allowPasswordAutoFill.value -bool NO ~/Library/Developer/CoreSimulator/Devices/\(simulator.id)/data/Library/UserConfigurationProfiles/EffectiveUserSettings.plist")
@@ -135,10 +135,10 @@ extension CommandLineProxy {
 
         func updateLanguage(on simulator: Simulator, language: String?, locale: String?) throws -> Bool {
             let path = "\(simulatorSettingsPath(for: simulator))/.GlobalPreferences.plist"
-            
+
             if try executer.execute("ls '\(path)' 2>/dev/null | wc -l") == "0" {
                 let tmpPath = Path.temp.url.appendingPathComponent("\(UUID().uuidString).plist").path
-                
+
                 var json = [String]()
                 if let language = language {
                     guard language.components(separatedBy: "-").count == 2 else {
@@ -152,11 +152,11 @@ extension CommandLineProxy {
                     }
                     json.append("\"AppleLocale\": \"\(locale)\"")
                 }
-                
+
                 if json.count > 0 {
                     _ = try executer.execute("echo '{ \(json.joined(separator: ", ")) }' > \(tmpPath); plutil -convert binary1 \(tmpPath) -o \(path)")
                 }
-                
+
                 return json.count > 0
             } else {
                 let currentLanguage = try executer.execute(#"plutil -extract AppleLanguages xml1 -o - '\#(path)' | sed -n "s/.*<string>\(.*\)<\/string>.*/\1/p" | head -n 1"#)
@@ -193,10 +193,10 @@ extension CommandLineProxy {
         /// - Returns: an instance of Simulator
         func makeSimulatorIfNeeded(name: String, device: Device, cachedSimulatorStatus: String? = nil) throws -> Simulator {
             // We use 'instruments -s devices' instead of 'xcrun simctl list devices' because it gives more complete infos including simulator version
-            let simulatorsStatus = try cachedSimulatorStatus ?? (try rawSimulatorStatus())
+            let simulatorsStatus = try cachedSimulatorStatus ?? rawSimulatorStatus()
 
             let statusRegex = try NSRegularExpression(pattern: #"(.*?)\s(Simulator\s)?\((.*)\)\s\((.*)\)$"#)
-            
+
             let simulatorStatus: (String) -> (String, String, String)? = { rawStatus in
                 let captureGroups = rawStatus.capturedGroups(regex: statusRegex)
 
@@ -204,7 +204,7 @@ extension CommandLineProxy {
 
                 return (captureGroups[0], captureGroups[2], captureGroups[3])
             }
-            
+
             for rawStatus in simulatorsStatus.components(separatedBy: "\n") {
                 if let (simulatorName, simulatorRuntime, simulatorId) = simulatorStatus(rawStatus) {
                     if simulatorName == name, simulatorRuntime == device.runtime {
@@ -212,13 +212,13 @@ extension CommandLineProxy {
                     }
                 }
             }
-            
+
             // Some versions of Xcode add a minor to simulator version (e.g 14.0.1 instead of 14.0)
             for rawStatus in simulatorsStatus.components(separatedBy: "\n") {
                 if let (simulatorName, simulatorRuntime, simulatorId) = simulatorStatus(rawStatus) {
                     if simulatorName == name, simulatorRuntime.hasPrefix(device.runtime) {
                         print("📱  Simulator \(name) using version \(simulatorRuntime) instead of \(device.runtime)")
-                        
+
                         return Simulator(id: simulatorId, name: name, device: device)
                     }
                 }
@@ -250,7 +250,7 @@ extension CommandLineProxy {
         }
 
         func installedSimulators(cachedSimulatorStatus: String? = nil) throws -> [Simulator] {
-            let simulatorsStatus = try cachedSimulatorStatus ?? (try rawSimulatorStatus())
+            let simulatorsStatus = try cachedSimulatorStatus ?? rawSimulatorStatus()
 
             var simulators = [Simulator]()
             for status in simulatorsStatus.components(separatedBy: "\n") {
@@ -297,7 +297,7 @@ extension CommandLineProxy {
             // https://gist.github.com/keith/33d3e28de4217f3baecde15357bfe5f6
             // boot and synchronously wait for device to boot
             _ = try executer.execute("xcrun simctl bootstatus '\(simulator.id)' -b || true")
-            
+
             Thread.sleep(forTimeInterval: 5.0)
         }
 

@@ -42,7 +42,7 @@ class TestCommand: Command {
             if let deviceName = deviceNameField.value, let deviceRuntime = deviceRuntimeField.value {
                 device = Device(name: deviceName, runtime: deviceRuntime, language: deviceLanguage.value, locale: deviceLocale.value)
             }
-            
+
             let filePatterns = FilePatterns(commaSeparatedIncludePattern: includePatternField.value, commaSeparatedExcludePattern: excludePatternField.value)
 
             let test = try Test(configurationUrl: configurationPathField.value!, // swiftlint:disable:this force_unwrapping

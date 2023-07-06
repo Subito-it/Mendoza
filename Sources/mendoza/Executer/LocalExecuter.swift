@@ -9,14 +9,12 @@ import Foundation
 
 final class LocalExecuter: Executer {
     var currentDirectoryPath: String?
-    var homePath: String = {
-        NSHomeDirectory()
-    }()
+    var homePath: String = NSHomeDirectory()
 
     var address: String { "localhost" }
 
     var logger: ExecuterLogger?
-    
+
     var environment: [String: String] = [:]
 
     private var running: Process?

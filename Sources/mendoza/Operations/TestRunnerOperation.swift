@@ -25,6 +25,7 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
     private var retryCount: Int { // access only from syncQueue
         retryCountMap.reduce(0) { $0 + retryCountMap.count(for: $1) }
     }
+
     private let xcresultBlobThresholdKB: Int?
 
     private let configuration: Configuration
@@ -41,7 +42,7 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
     }()
 
     init(configuration: Configuration, destinationPath: String, testTarget: String, productNames: [String], sdk: XcodeProject.SDK, failingTestsRetryCount: Int, maximumStdOutIdleTime: Int?, maximumTestExecutionTime: Int?, xcresultBlobThresholdKB: Int?, verbose: Bool) {
-        self.testExecuterBuilder = { executer, testCase, node, testRunner, runnerIndex in
+        testExecuterBuilder = { executer, testCase, node, testRunner, runnerIndex in
             TestExecuter(executer: executer, testCase: testCase, testTarget: testTarget, configuration: configuration, sdk: sdk, maximumStdOutIdleTime: maximumStdOutIdleTime, maximumTestExecutionTime: maximumTestExecutionTime, node: node, testRunner: testRunner, runnerIndex: runnerIndex, verbose: verbose)
         }
 
@@ -185,10 +186,10 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                     groupExecuter.logger = logger
 
                     self.addLogger(logger)
-                    
+
                     self.postExecutionQueue.addOperation {
                         guard let xcResultPath = testCaseResult?.xcResultPath, xcResultPath.hasPrefix(Path.base.rawValue) else { return }
-                        
+
                         let runnerDestinationPath = "\(self.destinationPath)/\(testRunner.id)"
                         try? groupExecuter.rsync(sourcePath: xcResultPath, destinationPath: runnerDestinationPath, on: destinationNode)
 
@@ -248,11 +249,11 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
 
     private func nextTestCase() -> TestCase? {
         // This method should be called from syncQueue
-        guard let testCase = self.sortedTestCases?.first else {
+        guard let testCase = sortedTestCases?.first else {
             return nil
         }
 
-        self.sortedTestCases?.removeFirst()
+        sortedTestCases?.removeFirst()
 
         return testCase
     }
@@ -291,12 +292,12 @@ private extension TestRunnerOperation {
         }
     }
 
-    func reclaimDiskSpace(executer: Executer, testRunner: TestRunner, path: String) throws {
+    func reclaimDiskSpace(executer: Executer, testRunner _: TestRunner, path: String) throws {
         guard let xcresultBlobThresholdKB = xcresultBlobThresholdKB else { return }
 
         let minSizeParam = "-size +\(xcresultBlobThresholdKB)k"
 
-        let sourcePaths = try executer.execute(#"find \#(path) -type f -regex '.*/.*\.xcresult/.*' \#(minSizeParam)"#).components(separatedBy: "\n").filter { $0.isEmpty == false  }
+        let sourcePaths = try executer.execute(#"find \#(path) -type f -regex '.*/.*\.xcresult/.*' \#(minSizeParam)"#).components(separatedBy: "\n").filter { $0.isEmpty == false }
 
         for sourcePath in sourcePaths {
             _ = try executer.execute(#"echo "content replaced by mendoza because original file was larger than \#(xcresultBlobThresholdKB)KB" > '\#(sourcePath)'"#)

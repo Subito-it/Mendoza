@@ -11,7 +11,7 @@ struct TestCaseResult: Codable, CustomStringConvertible, Hashable {
     enum Status: Int, Codable {
         case passed, failed
     }
-    
+
     var duration: TimeInterval { endInterval - startInterval }
 
     var node: String

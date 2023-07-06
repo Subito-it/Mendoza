@@ -10,7 +10,7 @@ import Foundation
 extension String {
     private static var lock = NSLock()
     private static var regexCache = [String: NSRegularExpression]()
-    
+
     func capturedGroups(regex: NSRegularExpression) -> [String] {
         var results = [String]()
 
@@ -39,19 +39,19 @@ extension String {
 
     func capturedGroups(withRegexString pattern: String) throws -> [String] {
         var regex: NSRegularExpression!
-        
+
         Self.lock.lock()
         regex = Self.regexCache[pattern]
         Self.lock.unlock()
-        
+
         if regex == nil {
             regex = try NSRegularExpression(pattern: pattern, options: [])
-            
+
             Self.lock.lock()
             Self.regexCache[pattern] = regex
             Self.lock.unlock()
         }
-                
+
         return capturedGroups(regex: regex)
     }
 

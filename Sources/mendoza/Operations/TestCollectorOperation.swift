@@ -11,9 +11,7 @@ class TestCollectorOperation: BaseOperation<[TestCaseResult]> {
     var testCaseResults: [TestCaseResult]?
 
     private let configuration: Configuration
-    private lazy var pool: ConnectionPool = {
-        makeConnectionPool(sources: configuration.nodes)
-    }()
+    private lazy var pool: ConnectionPool = makeConnectionPool(sources: configuration.nodes)
 
     private let mergeResults: Bool
     private let destinationPath: String
@@ -46,35 +44,35 @@ class TestCollectorOperation: BaseOperation<[TestCaseResult]> {
 
                 try self.clearDiagnosticReports(executer: executer)
             }
-            
+
             let logger = ExecuterLogger(name: "\(type(of: self))", address: destinationNode.address)
             addLogger(logger)
             let executer = try destinationNode.makeExecuter(logger: logger, environment: nodesEnvironment[destinationNode.address] ?? [:])
-            
+
             let results = try executer.execute("find '\(destinationPath)' -type f -name '*.profdata'").components(separatedBy: "\n")
-            
+
             var moveCommands = [String]()
             for (index, result) in results.enumerated() where !result.isEmpty {
                 moveCommands.append("mv '\(result)' '\(destinationPath)/\(index).profdata'")
             }
             _ = try executer.execute(moveCommands.joined(separator: "; "))
 
-            if self.mergeResults {
+            if mergeResults {
                 try mergeResults(destinationNode: destinationNode, destinationPath: destinationPath, destinationName: Environment.xcresultFilename)
-                
+
                 let totalResults = testCaseResults.count
-                for index in 0..<totalResults {
+                for index in 0 ..< totalResults {
                     testCaseResults[index].xcResultPath = Environment.xcresultFilename
                 }
             } else {
                 let results = try executer.execute("find '\(destinationPath)' -type d -name '*.xcresult'").components(separatedBy: "\n")
-                
+
                 let lastTwoPathComponents: (String) -> String = { path in
                     let components = path.components(separatedBy: "/")
                     guard components.count > 2 else { return path }
                     return "\(components[components.count - 2])/\(components[components.count - 1])"
                 }
-                
+
                 var moveCommands = [String]()
                 for (index, result) in results.enumerated() {
                     let updatedResultPath = "\(destinationPath)/\(index).xcresult"
@@ -85,7 +83,7 @@ class TestCollectorOperation: BaseOperation<[TestCaseResult]> {
                 }
                 _ = try executer.execute(moveCommands.joined(separator: "; "))
             }
-            
+
             try cleanupEmptyFolders(executer: executer, destinationPath: destinationPath)
 
             didEnd?(testCaseResults)
@@ -100,10 +98,9 @@ class TestCollectorOperation: BaseOperation<[TestCaseResult]> {
         }
         super.cancel()
     }
-    
-    private func cleanupEmptyFolders(executer: Executer, destinationPath: String) throws {
-            _ = try executer.execute("find '\(destinationPath)' -type d -empty -delete")
 
+    private func cleanupEmptyFolders(executer: Executer, destinationPath: String) throws {
+        _ = try executer.execute("find '\(destinationPath)' -type d -empty -delete")
     }
 
     private func clearDiagnosticReports(executer: Executer) throws {
@@ -126,13 +123,13 @@ class TestCollectorOperation: BaseOperation<[TestCaseResult]> {
         let sourcePaths = try executer.execute("find \(destinationPath) -type d -name '*.xcresult'").components(separatedBy: "\n")
 
         let mergeCmd: (_ sourcePaths: [String], _ destinationPath: String) -> String = { "xcrun xcresulttool merge " + $0.map { "'\($0)'" }.joined(separator: " ") + " --output-path '\($1)' 2>/dev/null" }
-        
+
         // Merge in batch of ~ 50 results
-            
+
         let partsCount = sourcePaths.count / 50
         let sourcePathsParts = sourcePaths.split(in: partsCount)
         var partialMerges = [String]()
-        
+
         if partsCount > 1 {
             let queue = OperationQueue()
             let syncQueue = DispatchQueue(label: "com.subito.mendoza.collector.queue", qos: .userInitiated)
@@ -148,13 +145,13 @@ class TestCollectorOperation: BaseOperation<[TestCaseResult]> {
                     } catch {
                         syncQueue.sync { mergeFailed = true }
                     }
-                    
+
                     syncQueue.sync { partialMerges.append(partialMergeDestination) }
                 }
             }
-            
+
             queue.waitUntilAllOperationsAreFinished()
-            
+
             guard !mergeFailed else {
                 throw Error("Result merge failed")
             }
@@ -170,11 +167,9 @@ class TestCollectorOperation: BaseOperation<[TestCaseResult]> {
             let moveCommand = "mv '\(partialMerges[0])' '\(mergedDestinationPath)'"
             _ = try executer.execute(moveCommand)
         }
-        
+
         let pathsToDelete = (sourcePaths + partialMerges).uniqued().filter { $0.hasPrefix(destinationPath) }
         let cleanupCmd = "rm -rf " + pathsToDelete.map { "'\($0)'" }.joined(separator: " ")
         _ = try executer.execute(cleanupCmd)
     }
 }
-
-

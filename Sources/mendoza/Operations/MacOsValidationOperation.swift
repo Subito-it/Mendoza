@@ -9,9 +9,7 @@ import Foundation
 
 class MacOsValidationOperation: BaseOperation<Void> {
     private let configuration: Configuration
-    private lazy var pool: ConnectionPool = {
-        makeConnectionPool(sources: configuration.nodes)
-    }()
+    private lazy var pool: ConnectionPool = makeConnectionPool(sources: configuration.nodes)
 
     private let syncQueue = DispatchQueue(label: String(describing: MacOsValidationOperation.self))
 

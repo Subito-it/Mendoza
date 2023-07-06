@@ -21,7 +21,7 @@ enum Shell: String, CaseIterable {
     }
 
     var url: URL {
-        return URL(fileURLWithPath: rawValue)
+        URL(fileURLWithPath: rawValue)
     }
 
     static func current() -> Shell {

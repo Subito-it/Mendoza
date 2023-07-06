@@ -9,9 +9,7 @@ import Foundation
 
 class RemoteSetupOperation: BaseOperation<Void> {
     private let nodes: [Node]
-    private lazy var pool: ConnectionPool = {
-        makeConnectionPool(sources: nodes)
-    }()
+    private lazy var pool: ConnectionPool = makeConnectionPool(sources: nodes)
 
     init(nodes: [Node]) {
         self.nodes = nodes
@@ -25,10 +23,10 @@ class RemoteSetupOperation: BaseOperation<Void> {
 
             try pool.execute { executer, source in
                 _ = try executer.execute("mkdir -p '\(Path.base.rawValue)' || true")
-                
+
                 let ramDisks = CommandLineProxy.RamDisk(executer: executer)
                 try ramDisks.eject(name: Environment.ramDiskName, throwOnError: false)
-                
+
                 switch AddressType(node: source.node) {
                 case .remote:
                     if let ramDiskSize = source.node.ramDiskSizeMB {
@@ -51,7 +49,7 @@ class RemoteSetupOperation: BaseOperation<Void> {
 
                 _ = try executer.execute("touch '\(Path.base.url.appendingPathComponent(".metadata_never_index").path)'")
             }
-            
+
             didEnd?(())
         } catch {
             didThrow?(error)

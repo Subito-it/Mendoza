@@ -21,7 +21,7 @@ class Test {
     private let timestamp: String
     private var observers = [NSKeyValueObservation]()
 
-    init(configurationUrl: URL, device: Device?, skipResultMerge: Bool, clearDerivedDataOnCompilationFailure: Bool, filePatterns: FilePatterns, maximumStdOutIdleTime: Int?, maximumTestExecutionTime: Int?, failingTestsRetryCount: Int, codeCoveragePathEquivalence: String?, xcodeBuildNumber: String?, autodeleteSlowDevices: Bool, dispatchOnLocalHost: Bool, excludedNodes: String?, xcresultBlobThresholdKB: Int?, pluginData: String?, debugPlugins: Bool, verbose: Bool) throws {
+    init(configurationUrl: URL, device: Device?, skipResultMerge: Bool, clearDerivedDataOnCompilationFailure: Bool, filePatterns: FilePatterns, maximumStdOutIdleTime _: Int?, maximumTestExecutionTime: Int?, failingTestsRetryCount: Int, codeCoveragePathEquivalence: String?, xcodeBuildNumber: String?, autodeleteSlowDevices: Bool, dispatchOnLocalHost: Bool, excludedNodes: String?, xcresultBlobThresholdKB: Int?, pluginData: String?, debugPlugins: Bool, verbose: Bool) throws {
         plugin = (data: pluginData, debug: debugPlugins)
 
         let configurationData = try Data(contentsOf: configurationUrl)
@@ -38,14 +38,14 @@ class Test {
                 throw Error("No dispatch nodes left, double check that the --exclude_nodes parameter does not contain all nodes specified in the configuration files")
             }
         }
-        
+
         let resultDestination: Configuration.ResultDestination
         if AddressType(node: configuration.resultDestination.node) == .local {
             resultDestination = .init(node: Node.localhost(), path: configuration.resultDestination.path)
         } else {
             resultDestination = configuration.resultDestination
         }
-        
+
         let updatedConfiguration = Configuration(projectPath: configuration.projectPath,
                                                  workspacePath: configuration.workspacePath,
                                                  buildBundleIdentifier: configuration.buildBundleIdentifier,
@@ -85,13 +85,13 @@ class Test {
         case .macos:
             break
         }
-        
+
         if let codeCoveragePathEquivalence = userOptions.codeCoveragePathEquivalence {
             if codeCoveragePathEquivalence.components(separatedBy: ",").count % 2 != 0 {
                 throw Error("Invalid format for --llvm_cov_equivalence_path parameter, expecting --llvm_cov_equivalence_path=<from>,<to> with even number of pairs".red)
             }
         }
-        
+
         print("ℹ️  Dispatching on".magenta.bold)
         let nodes = Array(Set(userOptions.configuration.nodes.map(\.address) + (userOptions.dispatchOnLocalHost ? ["localhost"] : []))).sorted()
         print(nodes.joined(separator: "\n").magenta)
@@ -107,9 +107,9 @@ class Test {
                                     userOptions.filePatterns.include.sorted().joined(separator: ","),
                                     userOptions.filePatterns.exclude.sorted().joined(separator: ","),
                                     plugin.data]
-        
+
         testSessionResult.launchArguments = arguments.compactMap { $0 }.joined(separator: " ")
-        
+
         let operations = try makeOperations(gitStatus: gitStatus, testSessionResult: testSessionResult, sdk: sdk)
 
         queue.addOperations(operations, waitUntilFinished: true)
@@ -125,17 +125,17 @@ class Test {
         let codeCoveragePathEquivalence = userOptions.codeCoveragePathEquivalence
         let clearDerivedDataOnCompilationFailure = userOptions.clearDerivedDataOnCompilationFailure
         let xcresultBlobThresholdKB = userOptions.xcresultBlobThresholdKB
-        
+
         guard let device = userOptions.configuration.device else { throw Error("Unexpected missing device") }
 
         let gitBaseUrl = gitStatus.url
         let project = try localProject(baseUrl: gitBaseUrl, path: configuration.projectPath)
-        
+
         let localNode = (configuration.nodes + [configuration.resultDestination.node]).first(where: { AddressType(node: $0) == .local })
         let uniqueNodes = configuration.nodes.unique()
         let targets = try project.getTargetsInScheme(configuration.scheme)
         let testTargetSourceFiles = try project.testTargetSourceFilePaths(scheme: configuration.scheme)
-        
+
         let productNames = project.getProductNames()
 
         let preCompilationPlugin = PreCompilationPlugin(baseUrl: pluginUrl, plugin: plugin)
@@ -237,13 +237,14 @@ class Test {
                 self.tearDown(operations: operations, testSessionResult: testSessionResult, error: opError as? Error)
             }
         }
-        
+
         initialSetupOperation.didEnd = { nodesEnvironment in
             guard let nodesEnvironment = nodesEnvironment,
-                  let operations = operations as? [EnvironmentedOperation] else {
+                  let operations = operations as? [EnvironmentedOperation]
+            else {
                 return
             }
-            
+
             for (address, environment) in nodesEnvironment {
                 for (k, v) in environment {
                     for operation in operations {
@@ -298,7 +299,7 @@ class Test {
 
             try? self.eventPlugin.run(event: Event(kind: .stopTesting, info: [:]), device: device)
         }
-        
+
         codeCoverageCollectionOperation.didEnd = { [unowned self] coverage in
             self.syncQueue.sync {
                 testSessionResult.lineCoveragePercentage = coverage?.data.first?.totals.lines?.percent ?? 0.0
@@ -310,7 +311,7 @@ class Test {
                 testSessionResult.passedTests = testCaseResults.filter { $0.status == .passed }
                 testSessionResult.failedTests = testCaseResults.filter { $0.status != .passed }
 
-                let retriedTests = testSessionResult.failedTests.filter { failedTest in testSessionResult.passedTests.contains(where: { passedTest in failedTest.testCaseIdentifier == passedTest.testCaseIdentifier } )}
+                let retriedTests = testSessionResult.failedTests.filter { failedTest in testSessionResult.passedTests.contains(where: { passedTest in failedTest.testCaseIdentifier == passedTest.testCaseIdentifier }) }
                 testSessionResult.retriedTests = retriedTests
 
                 // Failed test results are those that failed even after retrying
@@ -351,7 +352,7 @@ class Test {
         tearDownOperation.didStart = { [unowned tearDownOperation] in
             tearDownOperation.testSessionResult = self.syncQueue.sync {
                 // Make it thread safe
-                return testSessionResult.copy()
+                testSessionResult.copy()
             }
         }
 
@@ -372,14 +373,14 @@ class Test {
 
         let totalExecutionTime = CFAbsoluteTimeGetCurrent() - testSessionResult.startTime
         print("\nℹ️  Total time: \(totalExecutionTime) seconds".bold.yellow)
-        
+
         let device = userOptions.configuration.device ?? Device.defaultInit()
 
         do {
             try dumpOperationLogs(operations)
 
             try syncLogs(destinationPath: logsDestinationPath, destination: destinationNode, timestamp: timestamp, logger: logger)
-            
+
             if let error = error {
                 try eventPlugin.run(event: Event(kind: .error, info: ["error": error.localizedDescription]), device: device)
                 didFail?(error)
@@ -404,7 +405,7 @@ class Test {
 
                 let dependingOperations = operations.filter { $0.dependencies.contains(operation) }
 
-                if dependingOperations.allSatisfy({ $0.isCancelled }) {
+                if dependingOperations.allSatisfy(\.isCancelled) {
                     operation.cancel()
                     completedOperations.insert(operation)
                     break
@@ -418,13 +419,13 @@ class Test {
         operations.forEach { op in
             let observer = op.observe(\Operation.isFinished) { [unowned self] op, _ in
                 guard let op = op as? BenchmarkedOperation else { return }
-                
+
                 let name = "\(type(of: op))"
 
                 self.syncQueue.sync {
                     testSessionResult.operationStartInterval[name] = op.startTimeInterval
                     testSessionResult.operationEndInterval[name] = op.endTimeInterval
-                    
+
                     testSessionResult.operationPoolStartInterval[name] = op.poolStartTimeInterval()
                     testSessionResult.operationPoolEndInterval[name] = op.poolEndTimeInterval()
                 }

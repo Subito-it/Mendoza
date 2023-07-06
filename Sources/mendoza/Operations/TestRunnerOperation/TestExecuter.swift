@@ -16,20 +16,20 @@ class TestExecuter {
     private let node: Node
     private let testRunner: TestRunner
     private let runnerIndex: Int
-    
+
     private let configuration: Configuration
     private let maximumStdOutIdleTime: Int?
     private let maximumTestExecutionTime: Int?
     private let xcodebuildDestination: String
-    
+
     private let verbose: Bool
-    
+
     private var timer: Timer?
     private var lastStdOutputUpdateTimeInterval: TimeInterval = 0
-    
+
     private var testCaseStartTimeInterval: TimeInterval = 0
     private var previewCompletionBlock: ((TestCaseResult) -> Void)?
-    
+
     init(executer: Executer,
          testCase: TestCase,
          testTarget: String,
@@ -40,7 +40,8 @@ class TestExecuter {
          node: Node,
          testRunner: TestRunner,
          runnerIndex: Int,
-         verbose: Bool) {
+         verbose: Bool)
+    {
         self.executer = executer
         self.testCase = testCase
         self.testTarget = testTarget
@@ -51,15 +52,15 @@ class TestExecuter {
         self.node = node
         self.runnerIndex = runnerIndex
         self.verbose = verbose
-        
+
         switch sdk {
         case .ios:
-            self.xcodebuildDestination = "platform=iOS Simulator,id=\(testRunner.id)"
+            xcodebuildDestination = "platform=iOS Simulator,id=\(testRunner.id)"
         case .macos:
-            self.xcodebuildDestination = "platform=OS X,arch=x86_64"
+            xcodebuildDestination = "platform=OS X,arch=x86_64"
         }
     }
-    
+
     /// Execute the test case by invoking xcodebuild with test-without-building
     ///
     /// It can take a significant amount of time, up to 30s, for xcodebuild to produce the .xcresult on failure.
@@ -79,36 +80,36 @@ class TestExecuter {
     /// - Returns: the console output and the full test case result
     func launch(previewCompletionBlock: @escaping (TestCaseResult) -> Void) throws -> (output: String, testResult: TestCaseResult) {
         self.previewCompletionBlock = previewCompletionBlock
-        
+
         var output = ""
         var testResult: TestCaseResult?
-        
+
         startStdOutTimeoutHandler()
         defer { timer?.invalidate() }
-        
-        let result = try? self.testWithoutBuilding(executer: executer)
+
+        let result = try? testWithoutBuilding(executer: executer)
         output = result?.output ?? ""
         testResult = result?.testCaseResult
 
         if testResult == nil {
-            if self.verbose {
+            if verbose {
                 print("🚨", "No test case result for \(testCase.suite)/\(testCase.name)!".red)
             }
-        
+
             let startInterval: TimeInterval = CFAbsoluteTimeGetCurrent()
             let endInterval: TimeInterval = startInterval
 
             testResult = TestCaseResult(node: node.address, runnerName: testRunner.name, runnerIdentifier: testRunner.id, xcResultPath: "", suite: testCase.suite, name: testCase.name, status: .failed, startInterval: startInterval, endInterval: endInterval)
             previewCompletionBlock(testResult!)
         }
-        
+
         return (output: output, testResult: testResult!)
     }
-    
+
     private func startStdOutTimeoutHandler() {
         if let maximumStdOutIdleTime = maximumStdOutIdleTime {
             lastStdOutputUpdateTimeInterval = CFAbsoluteTimeGetCurrent()
-            timer = Timer.scheduledTimer(withTimeInterval: 10, repeats: true) { [weak self] timer in
+            timer = Timer.scheduledTimer(withTimeInterval: 10, repeats: true) { [weak self] _ in
                 guard let self = self else { return }
                 if CFAbsoluteTimeGetCurrent() - self.lastStdOutputUpdateTimeInterval > TimeInterval(maximumStdOutIdleTime) {
                     if let simulator = self.testRunner as? Simulator, let localExecuter = try? self.executer.clone() {
@@ -126,12 +127,12 @@ class TestExecuter {
             }
         }
     }
-    
+
     private func print(_ prefix: String, _ txt: String, color: (String) -> String = { $0.magenta }) {
         let txt = "\(prefix) \(txt) {\(runnerIndex)}"
         Swift.print(color(txt))
     }
-    
+
     private func printIfVerbose(_ prefix: String, _ txt: String, color: (String) -> String = { $0.magenta }) {
         if verbose {
             print(prefix + "[\(Date().description)] Node \(node.address)", txt, color: color)
@@ -151,7 +152,6 @@ private enum XcodebuildLineEvent {
     var isTestCrashed: Bool { switch self { case .testCrashed: return true; default: return false } } // swiftlint:disable:this switch_case_alignment
 }
 
-
 extension TestExecuter {
     private func findTestRun(executer: Executer) throws -> String {
         let testBundlePath = Path.testBundle.rawValue
@@ -165,14 +165,14 @@ extension TestExecuter {
 
     private func testWithoutBuilding(executer: Executer) throws -> (output: String, testCaseResult: TestCaseResult?) {
         var testCaseResult: TestCaseResult?
-        
+
         let testWithoutBuilding = try xcodebuildCommand(executer: executer)
-        
+
         var parsedProgress = ""
         var partialProgress = ""
         let progressHandler: ((String) -> Void) = { [unowned self] progress in
             self.lastStdOutputUpdateTimeInterval = CFAbsoluteTimeGetCurrent()
-            
+
             parsedProgress += progress
             partialProgress += progress
             let lines = partialProgress.components(separatedBy: "\n")
@@ -187,12 +187,12 @@ extension TestExecuter {
                 case .testPassed:
                     let result = TestCaseResult(node: self.node.address, runnerName: self.testRunner.name, runnerIdentifier: self.testRunner.id, xcResultPath: "-", suite: self.testCase.suite, name: self.testCase.name, status: .passed, startInterval: testCaseStartTimeInterval, endInterval: CFAbsoluteTimeGetCurrent())
                     previewCompletionBlock?(result); previewCompletionBlock = nil // call preview at most once
-                    
+
                     testCaseResult = result
                 case .testFailed, .testCrashed, .testTimedOut:
-                    let result = TestCaseResult(node: self.node.address, runnerName: self.testRunner.name, runnerIdentifier: self.testRunner.id, xcResultPath: "-", suite: self.testCase.suite, name: self.testCase.name, status: .failed, startInterval: testCaseStartTimeInterval, endInterval: CFAbsoluteTimeGetCurrent())                    
+                    let result = TestCaseResult(node: self.node.address, runnerName: self.testRunner.name, runnerIdentifier: self.testRunner.id, xcResultPath: "-", suite: self.testCase.suite, name: self.testCase.name, status: .failed, startInterval: testCaseStartTimeInterval, endInterval: CFAbsoluteTimeGetCurrent())
                     previewCompletionBlock?(result); previewCompletionBlock = nil // call preview at most once
-                    
+
                     testCaseResult = result
                 case .noSpaceOnDevice:
                     fatalError("💣 No space left on \(executer.address). If you're using a RAM disk in Mendoza's configuration consider increasing size")
@@ -201,20 +201,20 @@ extension TestExecuter {
 
             partialProgress = lines.last ?? ""
         }
-                        
+
         var output = try executer.execute(testWithoutBuilding, progress: progressHandler) { _, originalError in
             if !self.shouldIgnoreTestExecutionError(originalError) {
                 throw originalError
             }
         }
-                        
+
         // It should be rare but it may happen that stdout content is not processed by the progressHandler
         output = (output.trimmingCharacters(in: .whitespacesAndNewlines)).replacingOccurrences(of: parsedProgress.trimmingCharacters(in: .whitespacesAndNewlines), with: "") + "\n"
         progressHandler(output)
-        
+
         return (output: output, testCaseResult: testCaseResult)
     }
-    
+
     private func xcodebuildCommand(executer: Executer) throws -> String {
         let testRun = try findTestRun(executer: executer)
         let onlyTesting = "-only-testing:'\(testTarget)/\(testCase.testIdentifier)'"
@@ -227,7 +227,7 @@ extension TestExecuter {
 
         return #"$(xcode-select -p)/usr/bin/xcodebuild -parallel-testing-enabled NO -disable-concurrent-destination-testing -xctestrun '\#(testRun)' -destination '\#(xcodebuildDestination)' -derivedDataPath '\#(destinationPath)' \#(onlyTesting) -enableCodeCoverage YES -destination-timeout 60 -test-timeouts-enabled YES \#(maxAllowedTestExecutionTimeParameter) test-without-building 2>&1 || true"#
     }
-    
+
     private func parseXcodebuildOutput(line: String) -> XcodebuildLineEvent? {
         let testResultCrashMarker1 = #"Restarting after unexpected exit or crash in (.*)/(.*)\(\)"#
         let testResultCrashMarker2 = #"\s+(.*)\(\) encountered an error \(Crash:"#
@@ -239,7 +239,7 @@ extension TestExecuter {
         let testTarget = self.testTarget.replacingOccurrences(of: " ", with: "_")
 
         let startRegex = #"Test Case '-\[\#(testTarget)\.(.*)\]' started"#
-        
+
         if line.contains(##"Code=28 "No space left on device""##) {
             return .noSpaceOnDevice
         }
@@ -249,7 +249,7 @@ extension TestExecuter {
             let testCaseSuite = tests[0].components(separatedBy: " ").first ?? ""
 
             let startedTestCase = TestCase(name: testCaseName, suite: testCaseSuite)
-            
+
             if startedTestCase.name != testCase.name || startedTestCase.suite != testCase.suite {
                 fatalError("Unexpected test case found! Got \(startedTestCase) expected \(testCase)")
             }
@@ -290,7 +290,7 @@ extension TestExecuter {
         if let tests = try? line.capturedGroups(withRegexString: testResultCrashMarker4), tests.count == 2 {
             return .testCrashed
         }
-        
+
         if let tests = try? line.capturedGroups(withRegexString: testResultTimeoutMarker1), tests.count == 1 {
             return .testFailed(duration: -1)
         }
@@ -301,16 +301,16 @@ extension TestExecuter {
 
         return nil
     }
-    
+
     private func shouldIgnoreTestExecutionError(_ error: Error) -> Bool {
         let ignoreErrors = ["Failed to require the PTY package", "Unable to send channel-open request"]
-        
+
         for ignoreError in ignoreErrors {
             if error.errorDescription?.contains(ignoreError) == true {
                 return true
             }
         }
-        
+
         return false
     }
 }

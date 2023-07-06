@@ -19,9 +19,7 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
     private let nodes: [Node]
     private let device: Device
     private let verbose: Bool
-    private lazy var pool: ConnectionPool = {
-        makeConnectionPool(sources: nodes)
-    }()
+    private lazy var pool: ConnectionPool = makeConnectionPool(sources: nodes)
 
     init(configuration: Configuration, nodes: [Node], device: Device, verbose: Bool) {
         self.nodes = nodes
@@ -38,13 +36,13 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
 
             try pool.execute { executer, source in
                 let node = source.node
-                
+
                 // Killing CoreSimulatorService will reset and shutdown all Simulators
                 _ = try? executer.execute("killall -9 com.apple.CoreSimulator.CoreSimulatorService;")
 
                 let systemPath = try executer.execute("xcode-select -p")
                 let path = (self.nodesEnvironment[source.node.address]?["DEVELOPER_DIR"]) ?? systemPath
-                if !(try executer.execute("ps aux | grep Simulator.app").contains(path)) {
+                if try !(executer.execute("ps aux | grep Simulator.app").contains(path)) {
                     // Launched Simulator is from a different Xcode version
                     _ = try? executer.execute("killall Simulator")
                 }
@@ -74,7 +72,7 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
 
                 try self.updateSimulatorsSettings(executer: executer, simulators: nodeSimulators, arrangeSimulators: true)
 
-                _ = !(try self.simulatorsProperlyArranged(executer: executer, simulators: nodeSimulators))
+                _ = try !(self.simulatorsProperlyArranged(executer: executer, simulators: nodeSimulators))
 
                 for nodeSimulator in nodeSimulators {
                     _ = try proxy.updateLanguage(on: nodeSimulator, language: self.device.language, locale: self.device.locale)
@@ -83,29 +81,29 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
                 try? proxy.shutdownAll() // Always shutting down simulators is the safest way to workaround unexpected Simulator.app hangs
 
                 try proxy.gracefullyQuit()
-                
+
                 let bootQueue = OperationQueue()
-                
+
                 for nodeSimulator in nodeSimulators {
                     let logger = ExecuterLogger(name: "\(type(of: self))-AsyncBoot", address: node.address)
                     self.addLogger(logger)
-                    
+
                     let queueExecuter = try source.node.makeExecuter(logger: logger, environment: self.nodesEnvironment[source.node.address] ?? [:])
                     let queueProxy = CommandLineProxy.Simulators(executer: queueExecuter, verbose: self.verbose)
 
                     bootQueue.addOperation {
                         try? queueProxy.bootSynchronously(simulator: nodeSimulator)
-                        
+
                         queueProxy.enableXcode11ReleaseNotesWorkarounds(on: nodeSimulator)
                         queueProxy.enableXcode13Workarounds(on: nodeSimulator)
                         queueProxy.disableSlideToType(on: nodeSimulator)
                         queueProxy.disablePasswordAutofill(on: nodeSimulator)
-                        
+
                         try? logger.dump()
                     }
                 }
                 bootQueue.waitUntilAllOperationsAreFinished()
-                
+
                 try proxy.launch()
 
                 self.syncQueue.sync { [unowned self] in
@@ -127,7 +125,7 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
     }
 
     private func physicalCPUs(executer: Executer, node _: Node) throws -> Int {
-        guard let concurrentTestRunners = Int(try executer.execute("sysctl -n hw.physicalcpu")) else {
+        guard let concurrentTestRunners = try Int(executer.execute("sysctl -n hw.physicalcpu")) else {
             throw Error("Failed getting concurrent simulators", logger: executer.logger)
         }
 

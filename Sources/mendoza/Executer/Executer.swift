@@ -16,7 +16,7 @@ protocol Executer: AnyObject {
     var currentDirectoryPath: String? { get set }
     var homePath: String { get }
     var address: String { get }
-        
+
     var environment: [String: String] { get }
 
     var logger: ExecuterLogger? { get set }

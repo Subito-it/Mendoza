@@ -26,7 +26,7 @@ struct Git {
     }
 
     func status() throws -> GitStatus {
-        GitStatus(url: try url(), branch: try branchName(), commitMessage: try commitMessage(), commitHash: try commitHash())
+        try GitStatus(url: url(), branch: branchName(), commitMessage: commitMessage(), commitHash: commitHash())
     }
 
     private func url() throws -> URL {

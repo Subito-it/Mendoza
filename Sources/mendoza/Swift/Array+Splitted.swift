@@ -17,5 +17,5 @@ extension Array {
             defer { processedSize += size }
             return Array(self[processedSize ..< processedSize + size])
         }
-    }    
+    }
 }

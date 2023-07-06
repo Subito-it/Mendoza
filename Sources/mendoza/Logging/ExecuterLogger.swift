@@ -54,7 +54,7 @@ class ExecuterLogger: Logger, CustomDebugStringConvertible {
                 return "[EXC] \(error)"
             }
         }
-        
+
         let date: Date
         let kind: Kind
     }
@@ -64,7 +64,7 @@ class ExecuterLogger: Logger, CustomDebugStringConvertible {
 
     var description: String { "\(address) - \(name)" }
     var debugDescription: String { "\(name), \(address), logs: \(logs.count)" }
-    var hasErrors: Bool { logs.contains(where: { $0.isError }) }
+    var hasErrors: Bool { logs.contains(where: \.isError) }
     var filename: String { "\(address)-\(name).html" }
     var isEmpty: Bool { logs.isEmpty }
     var dumpToStandardOutput: Bool = false
@@ -74,6 +74,7 @@ class ExecuterLogger: Logger, CustomDebugStringConvertible {
         get { syncQueue.sync { _logs } }
         set { syncQueue.sync { _logs = newValue } }
     }
+
     private var ignoreList = [String]()
     private let syncQueue = DispatchQueue(label: String(describing: ExecuterLogger.self))
 
@@ -114,7 +115,7 @@ class ExecuterLogger: Logger, CustomDebugStringConvertible {
 
         return result
     }
-    
+
     func prefixLogs(from logger: ExecuterLogger) {
         let currentLogs = logs
         let prefixLogs = logger.logs
@@ -126,7 +127,7 @@ class ExecuterLogger: Logger, CustomDebugStringConvertible {
 
         var pairs = [(start: LoggerEvent, end: LoggerEvent)]()
 
-        var lastLog: LoggerEvent = LoggerEvent(date: Date(), kind: .end(output: "", statusCode: 0))
+        var lastLog = LoggerEvent(date: Date(), kind: .end(output: "", statusCode: 0))
         for log in logs {
             defer { lastLog = log }
 
@@ -141,9 +142,9 @@ class ExecuterLogger: Logger, CustomDebugStringConvertible {
                 pairs.append((start: LoggerEvent(date: Date(), kind: .start(command: "EXCEPTION")), end: log))
             }
         }
-        
+
         let startupDate = logs.first?.date ?? Date()
-        
+
         var templateBody = [String]()
         templateBody.append("<p>Starting at \(startupDate.description)</p>")
         for (index, pair) in pairs.enumerated() {

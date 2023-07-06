@@ -10,9 +10,7 @@ import Foundation
 class TearDownOperation: BaseOperation<Void> {
     var testSessionResult: TestSessionResult?
 
-    private lazy var pool: ConnectionPool = {
-        makeConnectionPool(sources: configuration.nodes)
-    }()
+    private lazy var pool: ConnectionPool = makeConnectionPool(sources: configuration.nodes)
 
     private let configuration: Configuration
 
@@ -25,9 +23,9 @@ class TearDownOperation: BaseOperation<Void> {
         let logger = ExecuterLogger(name: "\(type(of: self))", address: destinationNode.address)
         return try? destinationNode.makeExecuter(logger: logger, environment: nodesEnvironment[destinationNode.address] ?? [:])
     }()
+
     private let autodeleteSlowDevices: Bool
     private let plugin: TearDownPlugin
-
 
     init(configuration: Configuration, git: GitStatus?, timestamp: String, mergeResults: Bool, autodeleteSlowDevices: Bool, plugin: TearDownPlugin) {
         self.configuration = configuration
@@ -47,7 +45,7 @@ class TearDownOperation: BaseOperation<Void> {
             didStart?()
 
             guard let executer = executer else { fatalError("💣 Failed making executer") }
-            
+
             logTestsResult()
 
             try writeHtmlRepeatedTestResultSummary(executer: executer)
@@ -70,7 +68,7 @@ class TearDownOperation: BaseOperation<Void> {
                     _ = try? executer.execute("rm -rf '\(Path.base.rawValue)'")
                 }
             }
-            
+
             if autodeleteSlowDevices {
                 try? deleteSlowDevices()
             }
@@ -92,11 +90,11 @@ class TearDownOperation: BaseOperation<Void> {
         }
         super.cancel()
     }
-    
+
     private func logTestsResult() {
         if let failedTestCases = testSessionResult?.failedTests, failedTestCases.isEmpty == false {
             print("\nThe following tests failed:".red)
-            let failedTestNames = Array(Set(failedTestCases.map { "\($0.suite)/\($0.name)"} )).sorted()
+            let failedTestNames = Array(Set(failedTestCases.map { "\($0.suite)/\($0.name)" })).sorted()
             for failedTestName in failedTestNames {
                 print("❌ \(failedTestName)")
             }
@@ -281,23 +279,23 @@ class TearDownOperation: BaseOperation<Void> {
         try contentData.write(to: uniqueUrl)
         try executer.upload(localUrl: uniqueUrl, remotePath: infoPlistPath)
     }
-    
+
     private func deleteSlowDevices() throws {
         // Here we check that there are no nodes that started executing its tests with a delay compared to the average of other nodes.
         // This can be clearly seen in the test_graph.html output where it can be seen how all tests require a significant amount of
         // time to start executing. This significantly impacts the total execution time of the test.
         // Once this starts happening in one session it will occur in all subsequent ones and the only way to fix this is to delete
         // the simulator and create a new one.
-        
+
         guard let testSessionResult = testSessionResult else { return }
-        
+
         let testsByNode = Dictionary(grouping: testSessionResult.tests, by: { $0.node }) as [String: [TestCaseResult]]
 
         var maxStartTimeByNode = [String: TimeInterval]()
         var minStartTime = Double.greatestFiniteMagnitude
-        for (node, tests) in testsByNode  {
+        for (node, tests) in testsByNode {
             let testsByRunner = Dictionary(grouping: tests, by: { $0.runnerName })
-            let startIntervals = testsByRunner.values.compactMap { $0.map { $0.startInterval }.min() }
+            let startIntervals = testsByRunner.values.compactMap { $0.map(\.startInterval).min() }
             if startIntervals.count > 0 {
                 let maxStartTime = startIntervals.max()!
                 maxStartTimeByNode[node] = maxStartTime
@@ -306,10 +304,10 @@ class TearDownOperation: BaseOperation<Void> {
         }
 
         // Nodes can end up in a state where they take very long time to start executing the first test.
-        // When this happens it has been empirically proven that deleting simulators fixes the problem on 
+        // When this happens it has been empirically proven that deleting simulators fixes the problem on
         // subsequent test executions
         let threshold = 30.0
-        let performReset = maxStartTimeByNode.filter { $0.value - minStartTime > threshold }.map { $0.key }
+        let performReset = maxStartTimeByNode.filter { $0.value - minStartTime > threshold }.map(\.key)
 
         if !performReset.isEmpty {
             print("\nℹ️ Slow devices found on \(performReset.joined(separator: ", ")). Deleting simulators...".bold.yellow)

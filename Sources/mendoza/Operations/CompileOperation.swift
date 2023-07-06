@@ -17,10 +17,8 @@ class CompileOperation: BaseOperation<AppInfo> {
     private let postCompilationPlugin: PostCompilationPlugin
     private let sdk: XcodeProject.SDK
     private let clearDerivedDataOnCompilationFailure: Bool
-    
-    private lazy var executer: Executer = {
-        self.makeLocalExecuter()
-    }()
+
+    private lazy var executer: Executer = self.makeLocalExecuter()
 
     init(configuration: Configuration, git: GitStatus?, baseUrl: URL, project: XcodeProject, scheme: String, preCompilationPlugin: PreCompilationPlugin, postCompilationPlugin: PostCompilationPlugin, sdk: XcodeProject.SDK, clearDerivedDataOnCompilationFailure: Bool) {
         self.configuration = configuration
@@ -32,9 +30,9 @@ class CompileOperation: BaseOperation<AppInfo> {
         self.postCompilationPlugin = postCompilationPlugin
         self.sdk = sdk
         self.clearDerivedDataOnCompilationFailure = clearDerivedDataOnCompilationFailure
-        
+
         super.init()
-        
+
         loggers = loggers.union([preCompilationPlugin.logger, postCompilationPlugin.logger])
     }
 
@@ -58,14 +56,14 @@ class CompileOperation: BaseOperation<AppInfo> {
             if preCompilationPlugin.isInstalled {
                 _ = try preCompilationPlugin.run(input: PluginVoid.defaultInit())
             }
-                        
+
             var compilationSucceeded = false
             defer {
                 if postCompilationPlugin.isInstalled {
                     _ = try? postCompilationPlugin.run(input:
-                                                        PostCompilationInput(compilationSucceeded: compilationSucceeded,
-                                                                             outputPath: "\(Path.build.rawValue)/Build/Products",
-                                                                             git: self.git))
+                        PostCompilationInput(compilationSucceeded: compilationSucceeded,
+                                             outputPath: "\(Path.build.rawValue)/Build/Products",
+                                             git: self.git))
                 }
 
                 var appSize: UInt64 = 0
@@ -89,15 +87,15 @@ class CompileOperation: BaseOperation<AppInfo> {
             case .macos:
                 command = "$(xcode-select -p)/usr/bin/xcodebuild \(projectFlag) -scheme '\(configuration.scheme)' -configuration \(configuration.buildConfiguration) -derivedDataPath '\(Path.build.rawValue)' -sdk 'macosx' COMPILER_INDEX_STORE_ENABLE=NO SWIFT_INDEX_STORE_ENABLE=NO MTL_ENABLE_INDEX_STORE=NO ONLY_ACTIVE_ARCH=\(configuration.compilation.onlyActiveArchitecture) VALID_ARCHS='\(configuration.compilation.architectures)' \(configuration.compilation.buildSettings) -enableCodeCoverage YES build-for-testing 2>&1"
             }
-            
-            for iteration in 0...1 {
+
+            for iteration in 0 ... 1 {
                 let shouldRetryCompilation = clearDerivedDataOnCompilationFailure && iteration == 0
-                
+
                 do {
                     let output = try executer.execute(command, currentUrl: baseUrl)
-                        
+
                     let compilationDidFail = output.contains("** TEST BUILD FAILED **")
-                    
+
                     if compilationDidFail && shouldRetryCompilation {
                         clearDerivedData(executer: executer)
                     } else if compilationDidFail {
@@ -114,7 +112,7 @@ class CompileOperation: BaseOperation<AppInfo> {
                     }
                 }
             }
-            
+
             throw Error("Compilation failed!")
         } catch {
             didThrow?(error)
@@ -129,23 +127,23 @@ class CompileOperation: BaseOperation<AppInfo> {
         }
         super.cancel()
     }
-    
+
     private func clearDerivedData(executer: Executer) {
         _ = try? executer.execute("rm -rf '\(Path.build.rawValue)'")
         print("💣 Compilation did fail, clearing derived data".red)
     }
-        
+
     private func folderSize(_ path: String) throws -> UInt64 {
         let contents = try FileManager.default.contentsOfDirectory(atPath: path)
-        
+
         var totalSize: UInt64 = 0
         for content in contents {
             do {
                 let fullContentPath = path + "/" + content
                 let attributes = try FileManager.default.attributesOfItem(atPath: fullContentPath)
-                
+
                 guard let contentType = attributes[.type] as? FileAttributeType else { continue }
-                
+
                 switch contentType {
                 case .typeRegular:
                     totalSize += attributes[.size] as? UInt64 ?? 0
@@ -158,7 +156,7 @@ class CompileOperation: BaseOperation<AppInfo> {
                 continue
             }
         }
-        
+
         return totalSize
     }
 }

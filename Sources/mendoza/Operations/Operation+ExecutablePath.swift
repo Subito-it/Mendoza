@@ -13,7 +13,7 @@ extension BaseOperation {
         for plistPath in plistPaths {
             guard let data = try? Data(contentsOf: URL(fileURLWithPath: plistPath)) else { continue }
             guard let plistInfo = try? PropertyListDecoder().decode(InfoPlist.self, from: data) else { continue }
-            
+
             if plistInfo.bundleIdentifier == configuration.buildBundleIdentifier {
                 let executablePath: String
                 if plistInfo.supportedPlatforms?.contains("MacOSX") == true {

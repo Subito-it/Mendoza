@@ -14,9 +14,7 @@ class TestExtractionOperation: BaseOperation<[TestCase]> {
     private let filePatterns: FilePatterns
     private let device: Device
     private let plugin: TestExtractionPlugin
-    private lazy var executer: Executer = {
-        makeLocalExecuter()
-    }()
+    private lazy var executer: Executer = makeLocalExecuter()
 
     init(configuration: Configuration, baseUrl: URL, testTargetSourceFiles: [String], filePatterns: FilePatterns, device: Device, plugin: TestExtractionPlugin) {
         self.configuration = configuration

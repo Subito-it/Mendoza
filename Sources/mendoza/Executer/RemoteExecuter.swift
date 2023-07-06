@@ -32,8 +32,8 @@ final class RemoteExecuter: Executer {
     var connection: SSH?
     var sftp: SFTP?
     var logger: ExecuterLogger?
-    
-    private(set)var environment: [String: String]
+
+    private(set) var environment: [String: String]
 
     init(node: Node, currentDirectoryPath: String? = nil, logger: ExecuterLogger? = nil, environment: [String: String] = [:]) {
         self.node = node
@@ -176,7 +176,7 @@ final class RemoteExecuter: Executer {
     func terminate() {
         try? connection?.terminate()
     }
-    
+
     private func terminateProcessOnDisconnect() throws {
         let shell = Shell.current()
         try connection?.execute("\(shell.rawValue) -c \"\(shell.source)\"")

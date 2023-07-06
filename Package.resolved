@@ -91,6 +91,15 @@
       }
     },
     {
+      "identity" : "swiftformat",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/nicklockwood/SwiftFormat",
+      "state" : {
+        "branch" : "master",
+        "revision" : "440db3030205e6d19bfb88e5d83b8aa87e15874a"
+      }
+    },
+    {
       "identity" : "swxmlhash",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/drmohundro/SWXMLHash.git",

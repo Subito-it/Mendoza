@@ -10,14 +10,10 @@ import Foundation
 class LocalSetupOperation: BaseOperation<Void> {
     private let fileManager: FileManager
     private let clearDerivedDataOnCompilationFailure: Bool
-    
-    private lazy var git = {
-        Git(executer: self.executer)
-    }()
 
-    private lazy var executer: Executer = {
-        makeLocalExecuter()
-    }()
+    private lazy var git = Git(executer: self.executer)
+
+    private lazy var executer: Executer = makeLocalExecuter()
 
     init(fileManager: FileManager = .default, clearDerivedDataOnCompilationFailure: Bool) {
         self.fileManager = fileManager
@@ -48,7 +44,7 @@ class LocalSetupOperation: BaseOperation<Void> {
             for path in Path.allCases {
                 _ = try executer.execute("mkdir -p '\(path.rawValue)' || true")
             }
-            
+
             didEnd?(())
         } catch {
             didThrow?(error)

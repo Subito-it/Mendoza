@@ -14,8 +14,10 @@ let package = Package(
         .package(url: "https://github.com/Subito-it/Shout.git", branch: "mendoza/stable"),
         .package(url: "https://github.com/Subito-it/XcodeProj.git", branch: "mendoza/stable"),
         .package(url: "https://github.com/jpsim/SourceKitten.git", branch: "main"),
+        .package(url: "https://github.com/nicklockwood/SwiftFormat", branch: "master"),
     ],
     targets: [
+        .target(name: "BuildTools", path: "BuildTools"),
         .executableTarget(
             name: "mendoza",
             dependencies: [

@@ -9,13 +9,9 @@ import Foundation
 
 class ValidationOperation: BaseOperation<Void> {
     private let configuration: Configuration
-    private lazy var executer: Executer = {
-        makeLocalExecuter()
-    }()
+    private lazy var executer: Executer = makeLocalExecuter()
 
-    private lazy var pool: ConnectionPool = {
-        makeConnectionPool(sources: configuration.nodes)
-    }()
+    private lazy var pool: ConnectionPool = makeConnectionPool(sources: configuration.nodes)
 
     init(configuration: Configuration) {
         self.configuration = configuration

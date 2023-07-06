@@ -20,7 +20,7 @@ protocol Logger: AnyObject, Hashable, CustomStringConvertible {
     func addIgnoreList(_ word: String)
 
     func redact(_ input: String) -> String
-    
+
     func prefixLogs(from logger: Self)
 
     func dump() throws

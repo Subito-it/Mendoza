@@ -28,8 +28,8 @@ protocol LoggedOperation: Operation {
 protocol BenchmarkedOperation: Operation {
     var startTimeInterval: TimeInterval { get }
     var endTimeInterval: TimeInterval { get }
-    var poolStartTimeInterval: () -> [String: TimeInterval]  { get }
-    var poolEndTimeInterval: () -> [String: TimeInterval]  { get }
+    var poolStartTimeInterval: () -> [String: TimeInterval] { get }
+    var poolEndTimeInterval: () -> [String: TimeInterval] { get }
 }
 
 protocol EnvironmentedOperation: Operation {
@@ -42,7 +42,7 @@ class BaseOperation<Output: Any>: Operation, StartingOperation, EndingOperation,
     var didStart: (() -> Void)?
     var didEnd: ((Output) -> Void)?
     var didThrow: ((Swift.Error) -> Void)?
-    
+
     /// Per node address environmental variables
     var nodesEnvironment = [String: [String: String]]()
 
@@ -51,10 +51,10 @@ class BaseOperation<Output: Any>: Operation, StartingOperation, EndingOperation,
 
     private(set) var startTimeInterval: TimeInterval = 0.0
     private(set) var endTimeInterval: TimeInterval = 0.0
-    
+
     private(set) var poolStartTimeInterval: () -> [String: TimeInterval] = { [:] }
     private(set) var poolEndTimeInterval: () -> [String: TimeInterval] = { [:] }
-    
+
     private var isExecutingObserver: NSKeyValueObservation?
 
     private let syncQueue = DispatchQueue(label: String(describing: BaseOperation.self))
@@ -74,7 +74,7 @@ class BaseOperation<Output: Any>: Operation, StartingOperation, EndingOperation,
                 print("🏁 `\(op.className.components(separatedBy: ".").last ?? op.className)` did complete in \(delta)s".bold)
             }
         }
-        
+
         addLogger(logger)
     }
 
@@ -99,10 +99,10 @@ class BaseOperation<Output: Any>: Operation, StartingOperation, EndingOperation,
 
         let poolLoggers = Set(poolSources.compactMap(\.logger))
         syncQueue.sync { loggers = loggers.union(poolLoggers) }
-        
+
         poolStartTimeInterval = { pool.startIntervals }
         poolEndTimeInterval = { pool.endIntervals }
-        
+
         return pool
     }
 
@@ -135,7 +135,7 @@ class BaseOperation<Output: Any>: Operation, StartingOperation, EndingOperation,
 
         return RemoteExecuter(node: node, currentDirectoryPath: currentDirectoryPath, logger: executerLogger ?? logger, environment: nodesEnvironment[node.address] ?? [:])
     }
-    
+
     func addLogger(_ logger: ExecuterLogger) {
         syncQueue.sync {
             if let existingLogger = loggers.first(where: { $0 == logger }) {

@@ -11,7 +11,7 @@ import Foundation
 
 class ThreadQueue {
     private let group = DispatchGroup()
-    
+
     func addOperation(block: @escaping () -> Void) {
         group.enter()
         Thread.detachNewThread { [weak self] in
@@ -19,7 +19,7 @@ class ThreadQueue {
             self?.group.leave()
         }
     }
-    
+
     func waitUntilAllOperationsAreFinished() {
         group.wait()
     }

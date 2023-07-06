@@ -11,9 +11,7 @@ class SimulatorTearDownOperation: BaseOperation<Void> {
     private let configuration: Configuration
     private let nodes: [Node]
     private let verbose: Bool
-    private lazy var pool: ConnectionPool = {
-        makeConnectionPool(sources: nodes)
-    }()
+    private lazy var pool: ConnectionPool = makeConnectionPool(sources: nodes)
 
     init(configuration: Configuration, nodes: [Node], verbose: Bool) {
         self.configuration = configuration
@@ -27,7 +25,7 @@ class SimulatorTearDownOperation: BaseOperation<Void> {
         do {
             didStart?()
 
-            try pool.execute { executer, _ in
+            try pool.execute { _, _ in
                 // Do nothing
             }
 

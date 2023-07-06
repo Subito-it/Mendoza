@@ -19,7 +19,7 @@ class ConnectionPool<SourceValue> {
         let environment: [String: String]
         let logger: ExecuterLogger?
     }
-    
+
     var startIntervals = [String: TimeInterval]()
     var endIntervals = [String: TimeInterval]()
 
@@ -38,7 +38,7 @@ class ConnectionPool<SourceValue> {
         for source in sources {
             operationQueue.addOperation { [weak self] in
                 guard let self = self else { return }
-                
+
                 self.syncQueue.sync { [unowned self] in self.startIntervals[source.node.address] = CFAbsoluteTimeGetCurrent() }
                 defer { self.syncQueue.sync { [unowned self] in self.endIntervals[source.node.address] = CFAbsoluteTimeGetCurrent() } }
 

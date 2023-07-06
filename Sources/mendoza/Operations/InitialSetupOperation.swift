@@ -9,9 +9,7 @@ import Foundation
 
 class InitialSetupOperation: BaseOperation<[String: [String: String]]?> {
     private let nodes: [Node]
-    private lazy var pool: ConnectionPool = {
-        makeConnectionPool(sources: nodes)
-    }()
+    private lazy var pool: ConnectionPool = makeConnectionPool(sources: nodes)
 
     private let syncQueue = DispatchQueue(label: String(describing: InitialSetupOperation.self))
     private let xcodeBuildNumber: String?
