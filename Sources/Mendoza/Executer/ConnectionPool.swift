@@ -6,7 +6,11 @@
 //
 
 import Foundation
-import Shout
+#if canImport(Shout_Static)
+    import Shout_Static
+#else
+    import Shout
+#endif
 
 class ConnectionPool<SourceValue> {
     struct Source<Value> {

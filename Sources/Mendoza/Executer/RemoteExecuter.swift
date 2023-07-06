@@ -6,7 +6,11 @@
 //
 
 import Foundation
-import Shout
+#if canImport(Shout_Static)
+    import Shout_Static
+#else
+    import Shout
+#endif
 
 final class RemoteExecuter: Executer {
     var currentDirectoryPath: String? {
@@ -25,8 +29,8 @@ final class RemoteExecuter: Executer {
     var address: String { node.address }
 
     let node: Node
-    var connection: Shout.SSH?
-    var sftp: Shout.SFTP?
+    var connection: SSH?
+    var sftp: SFTP?
     var logger: ExecuterLogger?
     
     private(set)var environment: [String: String]

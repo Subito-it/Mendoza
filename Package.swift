@@ -18,7 +18,14 @@ let package = Package(
     targets: [
         .executableTarget(
             name: "mendoza",
-            dependencies: ["Bariloche", "Shout", "XcodeProj", "KeychainAccess", .product(name: "SourceKittenFramework", package: "SourceKitten")]
+            dependencies: [
+                "Bariloche",
+                .product(name: "Shout", package: "Shout"),
+                // .product(name: "Shout-Static", package: "Shout"),
+                "XcodeProj",
+                "KeychainAccess",
+                .product(name: "SourceKittenFramework", package: "SourceKitten")
+            ]
         ),
     ]
 )

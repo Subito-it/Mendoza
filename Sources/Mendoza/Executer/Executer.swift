@@ -6,7 +6,11 @@
 //
 
 import Foundation
-import Shout
+#if canImport(Shout_Static)
+    import Shout_Static
+#else
+    import Shout
+#endif
 
 protocol Executer: AnyObject {
     var currentDirectoryPath: String? { get set }
