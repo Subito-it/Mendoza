@@ -253,6 +253,11 @@ Set `MaxSessions` to 100 in /etc/ssh/sshd_config
 
 `/usr/sbin/sysctl -w kern.tty.ptmx_max=999`
 
+# Building
+
+By default Mendoza will build dynamically linking to libssh2 and libssl@3, which can be installed by running `brew install openssl@3 libssh2`. You can however create multi arch libraries that can be then linked statically by running the `./build_libs.rb` script and then using the `Shout-Static` package (which is commented in the Package.swift) instead of the default one.
+
+
 # Contributions
 
 Contributions are welcome! If you have a bug to report, feel free to help out by opening a new issue or sending a pull request.
@@ -260,7 +265,6 @@ Contributions are welcome! If you have a bug to report, feel free to help out by
 # Authors
 
 [Tomas Camin](https://github.com/tcamin) ([@tomascamin](https://twitter.com/tomascamin))
-
 
 
 # License
