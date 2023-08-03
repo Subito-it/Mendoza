@@ -159,6 +159,8 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                         if let xcResultUrl = try self.findTestResultUrl(executer: executer, testRunner: testRunner) {
                             // We need to move results because xcodebuild test-without-building shows a weird behaviour not allowing more than 2 xcresults in the same folder.
                             // Repeatedly performing 'xcodebuild test-without-building' results in older xcresults being deleted
+                            try self.reclaimDiskSpace(executer: executer, testRunner: testRunner, path: xcResultUrl.path)
+
                             let resultUrl = Path.results.url.appendingPathComponent(testRunner.id)
                             _ = try executer.capture("mkdir -p '\(resultUrl.path)'; mv '\(xcResultUrl.path)' '\(resultUrl.path)'")
                             testCaseResult?.xcResultPath = resultUrl.appendingPathComponent(xcResultUrl.lastPathComponent).path
