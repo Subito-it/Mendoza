@@ -287,27 +287,27 @@ class TearDownOperation: BaseOperation<Void> {
         // Once this starts happening in one session it will occur in all subsequent ones and the only way to fix this is to delete
         // the simulator and create a new one.
 
-        guard let testSessionResult = testSessionResult else { return }
+        let runnerOperationKey = "\(TestRunnerOperation.self)"
+        guard let testSessionResult,
+              let testOperationStartTime = testSessionResult.operationStartInterval[runnerOperationKey]
+        else {
+            return
+        }
 
         let testsByNode = Dictionary(grouping: testSessionResult.tests, by: { $0.node }) as [String: [TestCaseResult]]
 
-        var maxStartTimeByNode = [String: TimeInterval]()
-        var minStartTime = Double.greatestFiniteMagnitude
+        var testStartTimeByNode = [String: TimeInterval]()
         for (node, tests) in testsByNode {
-            let testsByRunner = Dictionary(grouping: tests, by: { $0.runnerName })
-            let startIntervals = testsByRunner.values.compactMap { $0.map(\.startInterval).min() }
-            if startIntervals.count > 0 {
-                let maxStartTime = startIntervals.max()!
-                maxStartTimeByNode[node] = maxStartTime
-                minStartTime = min(maxStartTime, minStartTime)
+            if let nodeTestStartInterval = tests.map(\.startInterval).sorted().first(where: { $0 > 0 }) {
+                testStartTimeByNode[node] = nodeTestStartInterval
             }
         }
 
         // Nodes can end up in a state where they take very long time to start executing the first test.
         // When this happens it has been empirically proven that deleting simulators fixes the problem on
         // subsequent test executions
-        let threshold = 30.0
-        let performReset = maxStartTimeByNode.filter { $0.value - minStartTime > threshold }.map(\.key)
+        let threshold = 40.0
+        let performReset = testStartTimeByNode.filter { $0.value - testOperationStartTime > threshold }.map(\.key)
 
         if !performReset.isEmpty {
             print("\nℹ️ Slow devices found on \(performReset.joined(separator: ", ")). Deleting simulators...".bold.yellow)
