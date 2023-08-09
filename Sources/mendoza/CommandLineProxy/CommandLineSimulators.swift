@@ -20,6 +20,9 @@ extension CommandLineProxy {
         }
 
         func deleteAll() throws {
+            _ = try? executer.execute(#"for pid in $(lsof | grep -E "/Users/.*/Library/Developer/CoreSimulator" | awk '{print $2}'); do kill -9 $pid; done"#)
+            _ = try? executer.execute("killall -9 com.apple.CoreSimulator.CoreSimulatorService")
+            Thread.sleep(forTimeInterval: 5.0)
             _ = try? executer.execute("rm -rf ~/Library/Developer/CoreSimulator")
             _ = try? executer.execute("killall -9 com.apple.CoreSimulator.CoreSimulatorService")
         }
