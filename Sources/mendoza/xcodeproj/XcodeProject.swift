@@ -8,6 +8,7 @@
 import Foundation
 import PathKit
 import XcodeProj
+import AEXML
 
 struct Scheme: CustomStringConvertible {
     var description: String { name }
@@ -71,15 +72,22 @@ class XcodeProject: NSObject {
     }
 
     func disableDebugger(schemeName: String) throws {
-        guard let scheme = xcscheme(name: schemeName) else { throw Error("Scheme \(schemeName) not found") }
+        let schemePath = XcodeProj.schemePath(path, schemeName: schemeName)
 
-        scheme.testAction?.selectedDebuggerIdentifier = ""
-        scheme.testAction?.selectedLauncherIdentifier = "Xcode.IDEFoundation.Launcher.PosixSpawn"
+        guard schemePath.exists else { throw Error("Scheme \(schemeName) not found") }
+        let schemeUrl = schemePath.url
 
-        scheme.launchAction?.selectedDebuggerIdentifier = ""
-        scheme.launchAction?.selectedLauncherIdentifier = "Xcode.IDEFoundation.Launcher.PosixSpawn"
+        let data = try Data(contentsOf: schemeUrl)
 
-        try scheme.write(path: XcodeProj.schemePath(path, schemeName: scheme.name), override: true)
+        let schemeXml = try AEXMLDocument(xml: data)
+
+        schemeXml.root["TestAction"].attributes["selectedDebuggerIdentifier"] = ""
+        schemeXml.root["TestAction"].attributes["selectedLauncherIdentifier"] = "Xcode.IDEFoundation.Launcher.PosixSpawn"
+
+        schemeXml.root["LaunchAction"].attributes["selectedDebuggerIdentifier"] = ""
+        schemeXml.root["LaunchAction"].attributes["selectedLauncherIdentifier"] = "Xcode.IDEFoundation.Launcher.PosixSpawn"
+
+        try Data(schemeXml.xml.utf8).write(to: schemeUrl)
     }
 
     func schemeUrl(name: String) -> URL {
