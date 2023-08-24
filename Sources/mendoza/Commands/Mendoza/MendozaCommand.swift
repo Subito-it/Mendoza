@@ -15,14 +15,10 @@ class MendozaCommand: Command {
     let usage: String? = "Mendoza internally used commands"
     let help: String? = "Internal"
 
-    let commandName = Argument<[String]>(name: "command_name", kind: .variadic, optional: false)
+    let commandName = Argument<String>(name: "command_name", kind: .positional, optional: false)
 
     func run() -> Bool {
-        guard let customCommand = commandName.value?.dropFirst().first else {
-            return false
-        }
-
-        switch customCommand {
+        switch commandName.value {
         case "screen_point_size":
             let mainID = CGMainDisplayID()
             let maxDisplays: UInt32 = 16
