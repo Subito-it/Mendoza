@@ -110,7 +110,7 @@ struct XCTestFileParser {
             guard let structureData = structure.data(using: .utf8) else { fatalError("Failed parsing `\(url.path)` source file") }
             let parsed = try JSONDecoder().decode(KittenElement.self, from: structureData)
 
-            guard let types = parsed.subElements?.filter({ $0.isOpenClass }) else {
+            guard let types = parsed.subElements?.filter(\.isOpenClass) else {
                 return [] // no testing classes found
             }
 
@@ -118,7 +118,7 @@ struct XCTestFileParser {
 
             let testCases: [[ExtractionTestCase]] = testClasses.compactMap {
                 guard let suite = $0.name,
-                      let methods = $0.subElements?.filter({ $0.isTestMethod })
+                      let methods = $0.subElements?.filter(\.isTestMethod)
                 else {
                     return nil
                 }

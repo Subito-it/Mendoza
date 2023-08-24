@@ -5,10 +5,10 @@
 //  Created by Tomas Camin on 22/02/2019.
 //
 
+import AEXML
 import Foundation
 import PathKit
 import XcodeProj
-import AEXML
 
 struct Scheme: CustomStringConvertible {
     var description: String { name }

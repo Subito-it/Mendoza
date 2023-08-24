@@ -82,7 +82,7 @@ class Plugin<Input: DefaultInitializable, Output: DefaultInitializable> {
 
         do {
             if Output.self == PluginVoid.self && !plugin.debug {
-                try executer.execute(command + " &")
+                _ = try executer.execute(command + " &")
 
                 return Output.defaultInit()
             } else {

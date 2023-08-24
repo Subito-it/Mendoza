@@ -114,7 +114,7 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
                     // in turn causes at the end of tests execution the slowdevices logic to kick in that will again delete simulators. To avoid the
                     // loop we wait for the processes on the simulators to idle so that initial tests will begin earlier.
                     var didTimeout = true
-                    for _ in 0..<5 {
+                    for _ in 0 ..< 5 {
                         guard let psAux = try? executer.execute("ps aux | grep -E 'diagnosticd|healthappd|healthd|Calendar' | tr -s ' ' | cut -d ' ' -f3") else {
                             break
                         }
