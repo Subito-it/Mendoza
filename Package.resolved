@@ -28,6 +28,24 @@
       }
     },
     {
+      "identity" : "cachikit",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/Subito-it/CachiKit",
+      "state" : {
+        "branch" : "master",
+        "revision" : "9662b11157bb59558ca66923618a10f893048e09"
+      }
+    },
+    {
+      "identity" : "jjliso8601dateformatter",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/michaeleisel/JJLISO8601DateFormatter",
+      "state" : {
+        "revision" : "de422afd9a47b72703c30a81423c478337191390",
+        "version" : "0.1.6"
+      }
+    },
+    {
       "identity" : "keychainaccess",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/kishikawakatsumi/KeychainAccess",
@@ -52,6 +70,15 @@
       "state" : {
         "revision" : "626c3d4b6b55354b4af3aa309f998fae9b31a3d9",
         "version" : "3.2.0"
+      }
+    },
+    {
+      "identity" : "shellout",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/tcamin/ShellOut.git",
+      "state" : {
+        "branch" : "master",
+        "revision" : "17a96271bdeb491856453c20730d1dfe3b1545a4"
       }
     },
     {
@@ -124,6 +151,24 @@
       "state" : {
         "revision" : "0d9ee7ea8c4ebd4a489ad7a73d5c6cad55d6fed3",
         "version" : "5.0.6"
+      }
+    },
+    {
+      "identity" : "zippyjson",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/michaeleisel/ZippyJSON",
+      "state" : {
+        "branch" : "master",
+        "revision" : "3a80ab6a4bfdf36f3b87d732ece6f598c02262d0"
+      }
+    },
+    {
+      "identity" : "zippyjsoncfamily",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/michaeleisel/ZippyJSONCFamily",
+      "state" : {
+        "revision" : "8abdd7a5e943afe68e7b03fdaa63b21c042a3893",
+        "version" : "1.2.9"
       }
     }
   ],

@@ -159,7 +159,7 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                         if let xcResultUrl = try self.findTestResultUrl(executer: executer, testRunner: testRunner) {
                             // We need to move results because xcodebuild test-without-building shows a weird behaviour not allowing more than 2 xcresults in the same folder.
                             // Repeatedly performing 'xcodebuild test-without-building' results in older xcresults being deleted
-                            try self.reclaimDiskSpace(executer: executer, testRunner: testRunner, path: xcResultUrl.path)
+                            try self.reclaimDiskSpace(executer: executer, path: xcResultUrl.path)
 
                             let resultUrl = Path.results.url.appendingPathComponent(testRunner.id)
                             _ = try executer.capture("mkdir -p '\(resultUrl.path)'; mv '\(xcResultUrl.path)' '\(resultUrl.path)'")
@@ -294,16 +294,10 @@ private extension TestRunnerOperation {
         }
     }
 
-    func reclaimDiskSpace(executer: Executer, testRunner _: TestRunner, path: String) throws {
+    func reclaimDiskSpace(executer: Executer, path: String) throws {
         guard let xcresultBlobThresholdKB = xcresultBlobThresholdKB else { return }
 
-        let minSizeParam = "-size +\(xcresultBlobThresholdKB)k"
-
-        let sourcePaths = try executer.execute(#"find \#(path) -type f -regex '.*/.*\.xcresult/.*' \#(minSizeParam)"#).components(separatedBy: "\n").filter { $0.isEmpty == false }
-
-        for sourcePath in sourcePaths {
-            _ = try executer.execute(#"echo "content replaced by mendoza because original file was larger than \#(xcresultBlobThresholdKB)KB" > '\#(sourcePath)'"#)
-        }
+        _ = try? executer.execute(#"mendoza mendoza cleaunp_xcresult '\#(path)' \#(xcresultBlobThresholdKB)"#)
     }
 
     private func forceResetSimulator(executer: Executer, testRunner: TestRunner) {

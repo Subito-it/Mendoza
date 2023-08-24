@@ -6,7 +6,7 @@ import PackageDescription
 let package = Package(
     name: "mendoza",
     platforms: [
-        .macOS(.v13)
+        .macOS(.v13),
     ],
     dependencies: [
         .package(url: "https://github.com/kishikawakatsumi/KeychainAccess", branch: "master"),
@@ -15,6 +15,7 @@ let package = Package(
         .package(url: "https://github.com/Subito-it/XcodeProj.git", branch: "mendoza/stable"),
         .package(url: "https://github.com/jpsim/SourceKitten.git", branch: "main"),
         .package(url: "https://github.com/nicklockwood/SwiftFormat", branch: "master"),
+        .package(url: "https://github.com/Subito-it/CachiKit", branch: "master"),
     ],
     targets: [
         .target(name: "BuildTools", path: "BuildTools"),
@@ -22,11 +23,12 @@ let package = Package(
             name: "mendoza",
             dependencies: [
                 "Bariloche",
+                "CachiKit",
                 .product(name: "Shout", package: "Shout"),
                 // .product(name: "Shout-Static", package: "Shout"),
                 "XcodeProj",
                 "KeychainAccess",
-                .product(name: "SourceKittenFramework", package: "SourceKitten")
+                .product(name: "SourceKittenFramework", package: "SourceKitten"),
             ]
         ),
     ]
