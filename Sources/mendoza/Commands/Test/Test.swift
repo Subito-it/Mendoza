@@ -131,7 +131,6 @@ class Test {
         let gitBaseUrl = gitStatus.url
         let project = try localProject(baseUrl: gitBaseUrl, path: configuration.projectPath)
 
-        let localNode = (configuration.nodes + [configuration.resultDestination.node]).first(where: { AddressType(node: $0) == .local })
         let uniqueNodes = configuration.nodes.unique()
         let targets = try project.getTargetsInScheme(configuration.scheme)
         let testTargetSourceFiles = try project.testTargetSourceFilePaths(scheme: configuration.scheme)
