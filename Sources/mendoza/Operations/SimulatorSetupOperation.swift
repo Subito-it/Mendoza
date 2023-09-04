@@ -74,9 +74,6 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
                 try proxy.enableLowQualityGraphicOverrides()
                 try proxy.disableSimulatorBezel()
 
-
-                _ = try !(self.simulatorsProperlyArranged(executer: executer, simulators: nodeSimulators))
-
                 for nodeSimulator in nodeSimulators {
                     _ = try proxy.updateLanguage(on: nodeSimulator, language: self.device.language, locale: self.device.locale)
                 }
