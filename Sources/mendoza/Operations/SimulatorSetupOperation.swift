@@ -76,6 +76,7 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
 
                 for nodeSimulator in nodeSimulators {
                     _ = try proxy.updateLanguage(on: nodeSimulator, language: self.device.language, locale: self.device.locale)
+                    _ = try proxy.increaseWatchdogExceptionTimeout(on: nodeSimulator, appBundleIndentifier: self.configuration.buildBundleIdentifier, testBundleIdentifier: self.configuration.testBundleIdentifier)
                 }
 
                 try? proxy.shutdownAll() // Always shutting down simulators is the safest way to workaround unexpected Simulator.app hangs

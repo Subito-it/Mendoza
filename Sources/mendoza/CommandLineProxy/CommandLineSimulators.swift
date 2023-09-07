@@ -181,6 +181,12 @@ extension CommandLineProxy {
                 return currentLocale != (locale ?? currentLocale) || currentLanguage != (language ?? currentLanguage)
             }
         }
+        
+        func increaseWatchdogExceptionTimeout(on simulator: Simulator, appBundleIndentifier: String, testBundleIdentifier: String, timeout: Int = 120) throws {
+            let path = "\(simulatorSettingsPath(for: simulator))/com.apple.springboard.plist"
+            _ = try? executer.execute("plutil -replace FBLaunchWatchdogExceptions.\(appBundleIndentifier.replacingOccurrences(of: ".", with: #"\\"#)) -integer \(timeout) '\(path)'")
+            _ = try? executer.execute("plutil -replace FBLaunchWatchdogExceptions.\(testBundleIdentifier.replacingOccurrences(of: ".", with: #"\\"#)) -integer \(timeout) '\(path)'")
+        }
 
         func rawSimulatorStatus() throws -> String {
             try executer.execute("xcrun xctrace list devices 2>/dev/null")
