@@ -35,6 +35,7 @@ class TestCommand: Command {
     let clearDerivedDataOnCompilationFailure = Flag(short: nil, long: "clear_derived_data_on_failure", help: "On compilation failure derived data will be cleared and compilation will be retried once")
     let xcresultBlobThresholdKB = Argument<Int>(name: "size", kind: .named(short: nil, long: "xcresult_blob_threshold_kb"), optional: true, help: "Delete data blobs larger than the specified threshold")
     let excludeNodes = Argument<String>(name: "nodes", kind: .named(short: nil, long: "exclude_nodes"), optional: true, help: "Specify which nodes (by name or address) specified in the configuration should be excluded from the dispatch. Accepts comma separated values. Default: ''")
+    let killSimulatorProcesses = Flag(short: nil, long: "kill_sim_procs", help: "Automatically kill Simulator's CPU intensive processes")
 
     func run() -> Bool {
         do {
@@ -59,6 +60,7 @@ class TestCommand: Command {
                                 dispatchOnLocalHost: dispatchOnLocalHostFlag.value,
                                 excludedNodes: excludeNodes.value,
                                 xcresultBlobThresholdKB: xcresultBlobThresholdKB.value,
+                                killSimulatorProcesses: killSimulatorProcesses.value,
                                 pluginData: pluginCustomField.value,
                                 debugPlugins: debugPluginsFlag.value,
                                 verbose: verboseFlag.value)
