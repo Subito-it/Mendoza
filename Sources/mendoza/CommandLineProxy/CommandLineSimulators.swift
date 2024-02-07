@@ -241,7 +241,11 @@ extension CommandLineProxy {
 
             let devicesType = try executer.execute("xcrun simctl list devicetypes 2>/dev/null")
 
-            let deviceRegex = try NSRegularExpression(pattern: #"\#(device.name) \(com.apple.CoreSimulator.SimDeviceType.(.*)\)$"#)
+            // Escape parentheses in device name to avoid treating them as regex capture groups
+            let sanitizedDeviceName = device.name
+                .replacingOccurrences(of: "(", with: "\\(")
+                .replacingOccurrences(of: ")", with: "\\)")
+            let deviceRegex = try NSRegularExpression(pattern: #"\#(sanitizedDeviceName) \(com.apple.CoreSimulator.SimDeviceType.(.*)\)$"#)
             for deviceType in devicesType.components(separatedBy: "\n") {
                 let captureGroups = deviceType.capturedGroups(regex: deviceRegex)
 
