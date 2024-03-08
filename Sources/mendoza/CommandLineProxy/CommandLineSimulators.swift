@@ -204,7 +204,7 @@ extension CommandLineProxy {
             // We use 'instruments -s devices' instead of 'xcrun simctl list devices' because it gives more complete infos including simulator version
             let simulatorsStatus = try cachedSimulatorStatus ?? rawSimulatorStatus()
 
-            let statusRegex = try NSRegularExpression(pattern: #"(.*?)\s(Simulator\s)?\((.*)\)\s\((.*)\)$"#)
+            let statusRegex = try NSRegularExpression(pattern: #"(.*?)\s(Simulator\s)?\((\d+\.\d+(?:\.\d+)?)\)\s\(([0-9a-fA-F-]+)\)$"#)
 
             let simulatorStatus: (String) -> (String, String, String)? = { rawStatus in
                 let captureGroups = rawStatus.capturedGroups(regex: statusRegex)
