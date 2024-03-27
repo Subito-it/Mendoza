@@ -47,7 +47,7 @@ struct ConfigurationInitializer {
 
         let selectedBuildConfiguration = Bariloche.ask(title: "Select build configuration used to run UI Tests:", array: buildConfigurations)
 
-        var bundleIdentifiers = try project.getTargetsBundleIdentifiers(for: selectedScheme.value.name)
+        var bundleIdentifiers = try project.getTargetsBundleIdentifiers(scheme: selectedScheme.value.name)
         if bundleIdentifiers.build.hasPrefix("$(") {
             let identifier: String = Bariloche.ask("\nBundle identifier coulnd't be autodetected. Please specify the bundle identifier of the app to test:".underline) { guard !$0.isEmpty else { throw Error("Invalid value") }; return $0 }
             bundleIdentifiers.build = identifier
@@ -57,7 +57,7 @@ struct ConfigurationInitializer {
             bundleIdentifiers.test = identifier
         }
 
-        let sdk = try project.getBuildSDK(for: selectedScheme.value.name)
+        let sdk = try project.getBuildSDK(scheme: selectedScheme.value.name)
 
         let nodes = try askNodes(sdk: sdk)
 
