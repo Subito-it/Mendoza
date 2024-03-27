@@ -8,7 +8,7 @@
 import Foundation
 
 class TestSortingPlugin: Plugin<TestOrderInput, [TestCase]> {
-    init(baseUrl: URL, plugin: (data: String?, debug: Bool) = (nil, false)) {
+    init(baseUrl: URL?, plugin: ModernConfiguration.Plugins? = nil) {
         super.init(name: "TestSortingPlugin", baseUrl: baseUrl, plugin: plugin)
     }
 }

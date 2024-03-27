@@ -8,7 +8,7 @@
 import Foundation
 
 class TearDownPlugin: Plugin<TestSessionResult, PluginVoid> {
-    init(baseUrl: URL, plugin: (data: String?, debug: Bool) = (nil, false)) {
+    init(baseUrl: URL?, plugin: ModernConfiguration.Plugins? = nil) {
         super.init(name: "TearDownPlugin", baseUrl: baseUrl, plugin: plugin)
     }
 }
