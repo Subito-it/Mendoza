@@ -12,23 +12,20 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
     var sortedTestCases: [TestCase]?
     var testRunners: [(testRunner: TestRunner, node: Node, idle: Bool)]?
 
+    private let configuration: ModernConfiguration
+
     private var testCasesCount = 0
     private var testCasesCompletedCount = 0
 
     private let testExecuterBuilder: (Executer, TestCase, Node, TestRunner, Int) -> TestExecuter
 
     private let productNames: [String]
-    private let failingTestsRetryCount: Int
     private let syncQueue = DispatchQueue(label: String(describing: TestRunnerOperation.self))
-    private let verbose: Bool
     private var retryCountMap = NSCountedSet()
     private var retryCount: Int { // access only from syncQueue
         retryCountMap.reduce(0) { $0 + retryCountMap.count(for: $1) }
     }
 
-    private let xcresultBlobThresholdKB: Int?
-
-    private let configuration: Configuration
     private let destinationPath: String
 
     private let postExecutionQueue = ThreadQueue()
@@ -41,16 +38,14 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
         return makeConnectionPool(sources: input.map { (node: $0.0.node, value: $0.0.testRunner) })
     }()
 
-    init(configuration: Configuration, destinationPath: String, testTarget: String, productNames: [String], sdk: XcodeProject.SDK, failingTestsRetryCount: Int, maximumStdOutIdleTime: Int?, maximumTestExecutionTime: Int?, xcresultBlobThresholdKB: Int?, verbose: Bool) {
+    init(configuration: ModernConfiguration, destinationPath: String, testTarget: String, productNames: [String]) {
         testExecuterBuilder = { executer, testCase, node, testRunner, runnerIndex in
-            TestExecuter(executer: executer, testCase: testCase, testTarget: testTarget, configuration: configuration, sdk: sdk, maximumStdOutIdleTime: maximumStdOutIdleTime, maximumTestExecutionTime: maximumTestExecutionTime, node: node, testRunner: testRunner, runnerIndex: runnerIndex, verbose: verbose)
+            TestExecuter(executer: executer, testCase: testCase, testTarget: testTarget, building: configuration.building, testing: configuration.testing, node: node, testRunner: testRunner, runnerIndex: runnerIndex, verbose: configuration.verbose)
         }
 
-        self.productNames = productNames
-        self.failingTestsRetryCount = failingTestsRetryCount
-        self.verbose = verbose
-        self.xcresultBlobThresholdKB = xcresultBlobThresholdKB
         self.configuration = configuration
+
+        self.productNames = productNames
         self.destinationPath = destinationPath
     }
 
@@ -177,7 +172,7 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
 
                     let start = CFAbsoluteTimeGetCurrent()
                     _ = try? coverageMerger.merge()
-                    if self.verbose {
+                    if self.configuration.verbose {
                         print("🙈 [\(Date().description)] Node \(source.node.address) took \(CFAbsoluteTimeGetCurrent() - start)s for coverage merge {\(runnerIndex)}".magenta)
                     }
 
@@ -214,11 +209,11 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
         syncQueue.sync {
             switch testCaseResult.status {
             case .passed:
-                print("✅ \(self.verbose ? "[\(Date().description)] " : "")\(testCase.description) passed [\(self.testCasesCompletedCount + 1)/\(self.testCasesCount)]\(self.retryCount > 0 ? " (\(self.retryCount) retries)" : "") in \(Int(testCaseResult.duration.rounded(.up)))s {\(runnerIndex)}".green)
+                print("✅ \(self.configuration.verbose ? "[\(Date().description)] " : "")\(testCase.description) passed [\(self.testCasesCompletedCount + 1)/\(self.testCasesCount)]\(self.retryCount > 0 ? " (\(self.retryCount) retries)" : "") in \(Int(testCaseResult.duration.rounded(.up)))s {\(runnerIndex)}".green)
             case .failed:
-                print("❌ \(self.verbose ? "[\(Date().description)] " : "")\(testCase.description) failed [\(self.testCasesCompletedCount + 1)/\(self.testCasesCount)]\(self.retryCount > 0 ? " (\(self.retryCount) retries)" : "") in \(Int(testCaseResult.duration.rounded(.up)))s {\(runnerIndex)}".red)
+                print("❌ \(self.configuration.verbose ? "[\(Date().description)] " : "")\(testCase.description) failed [\(self.testCasesCompletedCount + 1)/\(self.testCasesCount)]\(self.retryCount > 0 ? " (\(self.retryCount) retries)" : "") in \(Int(testCaseResult.duration.rounded(.up)))s {\(runnerIndex)}".red)
 
-                let shouldRetryTest = retryCountMap.count(for: testCase) < failingTestsRetryCount
+                let shouldRetryTest = retryCountMap.count(for: testCase) < (configuration.testing.failingTestsRetryCount ?? 0)
                 if shouldRetryTest {
                     testCasesCount += 1
                     retryCountMap.add(testCase)
@@ -230,7 +225,7 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                         self.sortedTestCases?.insert(testCase, at: 1)
                     }
 
-                    if verbose {
+                    if configuration.verbose {
                         print("🔁  Renqueuing (no result) \(testCase), retry count: \(retryCountMap.count(for: testCase))".yellow)
                     }
                 }
@@ -295,7 +290,7 @@ private extension TestRunnerOperation {
     }
 
     func reclaimDiskSpace(executer: Executer, path: String) throws {
-        guard let xcresultBlobThresholdKB = xcresultBlobThresholdKB else { return }
+        guard let xcresultBlobThresholdKB = configuration.testing.xcresultBlobThresholdKB else { return }
 
         _ = try? executer.execute(#"mendoza mendoza cleaunp_xcresult '\#(path)' \#(xcresultBlobThresholdKB)"#)
     }

@@ -41,32 +41,15 @@ class TestCommand: Command {
     let projectPath = Argument<URL>(name: "path", kind: .named(short: nil, long: "project"), optional: false, help: "The path to the .xcworkspace or .xcodeproj to build")
     let scheme = Argument<String>(name: "name", kind: .named(short: nil, long: "scheme"), optional: false, help: "The scheme to build")
     let buildConfiguration = Argument<String>(name: "name", kind: .named(short: nil, long: "build_configuration"), optional: true, help: "Build configuration. Default: Debug")
+    let pluginsBasePath = Argument<URL>(name: "path", kind: .named(short: nil, long: "plugins_path"), optional: true, help: "The path to the folder containing Mendoza's plugins")
 
     func run() -> Bool {
         do {
-            let device = Device(name: deviceName.value!, runtime: deviceRuntime.value!, language: deviceLanguage.value, locale: deviceLocale.value)
-
-            let filePatterns = FilePatterns(commaSeparatedIncludePattern: includePattern.value, commaSeparatedExcludePattern: excludePattern.value)
-
-            let test = try Test(configurationUrl: URL(string: "TODO")!, // swiftlint:disable:this force_unwrapping
-                                device: device,
-                                skipResultMerge: skipResultMerge.value,
-                                clearDerivedDataOnCompilationFailure: clearDerivedDataOnCompilationFailure.value,
-                                filePatterns: filePatterns,
-                                maximumStdOutIdleTime: maximumStdOutIdleTime.value,
-                                maximumTestExecutionTime: maximumTestExecutionTime.value,
-                                failingTestsRetryCount: failingTestsRetryCount.value ?? 0,
-                                codeCoveragePathEquivalence: codeCoveragePathEquivalence.value,
-                                xcodeBuildNumber: xcodeBuildNumber.value,
-                                autodeleteSlowDevices: autodeleteSlowDevices.value,
-                                excludedNodes: excludeNodes.value,
-                                xcresultBlobThresholdKB: xcresultBlobThresholdKB.value,
-                                killSimulatorProcesses: killSimulatorProcesses.value,
-                                pluginData: pluginCustom.value,
-                                debugPlugins: debugPluginsFlag.value,
-                                verbose: verboseFlag.value)
             let configuration = try makeConfiguration()
 
+            let pluginUrl = pluginsBasePath.value ?? remoteNodesConfigurationPath.value?.deletingLastPathComponent()
+
+            let test = try Test(configuration: configuration, pluginUrl: pluginUrl)
 
             test.didFail = { [weak self] in self?.handleError($0) }
             try test.run()
@@ -117,13 +100,13 @@ class TestCommand: Command {
         let filePatterns = FilePatterns(commaSeparatedIncludePattern: includePattern.value, commaSeparatedExcludePattern: excludePattern.value)
 
         let building = ModernConfiguration.Building(projectPath: projectUrl.path, buildBundleIdentifier: bundleIdentifiers.build, testBundleIdentifier: bundleIdentifiers.test, scheme: scheme, buildConfiguration: buildConfiguration, sdk: sdk.rawValue, filePatterns: filePatterns, xcodeBuildNumber: xcodeBuildNumber)
-        
+
         if let codeCoveragePathEquivalenceValue = codeCoveragePathEquivalence.value {
             if codeCoveragePathEquivalenceValue.components(separatedBy: ",").count % 2 != 0 {
                 throw Error("Invalid format for \(codeCoveragePathEquivalence.longDescription) parameter, expecting \(codeCoveragePathEquivalence.longDescription)=<from>,<to> with even number of pairs".red)
             }
         }
-        
+
         let testing = ModernConfiguration.Testing(maximumStdOutIdleTime: maximumStdOutIdleTime.value,
                                                   maximumTestExecutionTime: maximumTestExecutionTime.value,
                                                   failingTestsRetryCount: failingTestsRetryCount.value,
@@ -140,7 +123,7 @@ class TestCommand: Command {
         } else {
             plugins = ModernConfiguration.Plugins(data: "", debug: false)
         }
-        
+
         let resultDestination: ModernConfiguration.ResultDestination
         var nodes: [Node]
 
@@ -156,14 +139,14 @@ class TestCommand: Command {
         } else {
             #warning("TODO")
             nodes = [Node]()
-            
+
             if let excludedNodes = excludeNodes.value?.components(separatedBy: ",") {
                 nodes = nodes.filter { node in !excludedNodes.contains(node.address) && !excludedNodes.contains(node.name) }
                 if nodes.isEmpty {
                     throw Error("No dispatch nodes left, double check that the `\(excludeNodes.longDescription)` parameter does not contain all nodes specified in the configuration files")
                 }
             }
-            
+
             #warning("TODO")
             resultDestination = .init(node: .localhost(), path: "/todo")
         }

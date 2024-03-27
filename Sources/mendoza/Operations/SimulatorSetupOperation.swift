@@ -15,16 +15,18 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
     private let windowMenubarHeight = 38
 
     private let syncQueue = DispatchQueue(label: String(describing: SimulatorSetupOperation.self))
-    private let configuration: Configuration
+    private let buildBundleIdentifier: String
+    private let testBundleIdentifier: String
     private let nodes: [Node]
     private let device: Device
     private let autodeleteSlowDevices: Bool
     private let verbose: Bool
     private lazy var pool: ConnectionPool = makeConnectionPool(sources: nodes)
 
-    init(configuration: Configuration, nodes: [Node], device: Device, autodeleteSlowDevices: Bool, verbose: Bool) {
+    init(buildBundleIdentifier: String, testBundleIdentifier: String, nodes: [Node], device: Device, autodeleteSlowDevices: Bool, verbose: Bool) {
+        self.buildBundleIdentifier = buildBundleIdentifier
+        self.testBundleIdentifier = testBundleIdentifier
         self.nodes = nodes
-        self.configuration = configuration
         self.device = device
         self.autodeleteSlowDevices = autodeleteSlowDevices
         self.verbose = verbose
@@ -76,7 +78,7 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
 
                 for nodeSimulator in nodeSimulators {
                     _ = try proxy.updateLanguage(on: nodeSimulator, language: self.device.language, locale: self.device.locale)
-                    _ = try proxy.increaseWatchdogExceptionTimeout(on: nodeSimulator, appBundleIndentifier: self.configuration.buildBundleIdentifier, testBundleIdentifier: self.configuration.testBundleIdentifier)
+                    _ = try proxy.increaseWatchdogExceptionTimeout(on: nodeSimulator, appBundleIndentifier: self.buildBundleIdentifier, testBundleIdentifier: self.testBundleIdentifier)
                 }
 
                 try? proxy.shutdownAll() // Always shutting down simulators is the safest way to workaround unexpected Simulator.app hangs

@@ -10,15 +10,17 @@ import Foundation
 class TestCollectorOperation: BaseOperation<[TestCaseResult]> {
     var testCaseResults: [TestCaseResult]?
 
-    private let configuration: Configuration
-    private lazy var pool: ConnectionPool = makeConnectionPool(sources: configuration.nodes)
+    private let resultDestination: ModernConfiguration.ResultDestination
+    private let nodes: [Node]
+    private lazy var pool: ConnectionPool = makeConnectionPool(sources: nodes)
 
     private let mergeResults: Bool
     private let destinationPath: String
     private let productNames: [String]
 
-    init(configuration: Configuration, mergeResults: Bool, destinationPath: String, productNames: [String]) {
-        self.configuration = configuration
+    init(resultDestination: ModernConfiguration.ResultDestination, nodes: [Node], mergeResults: Bool, destinationPath: String, productNames: [String]) {
+        self.resultDestination = resultDestination
+        self.nodes = nodes
         self.mergeResults = mergeResults
         self.destinationPath = destinationPath
         self.productNames = productNames
@@ -30,7 +32,7 @@ class TestCollectorOperation: BaseOperation<[TestCaseResult]> {
         do {
             didStart?()
 
-            let destinationNode = configuration.resultDestination.node
+            let destinationNode = resultDestination.node
 
             guard var testCaseResults = testCaseResults else { fatalError("💣 Required field `testCaseResults` not set") }
 

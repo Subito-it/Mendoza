@@ -8,13 +8,11 @@
 import Foundation
 
 class SimulatorTearDownOperation: BaseOperation<Void> {
-    private let configuration: Configuration
     private let nodes: [Node]
     private let verbose: Bool
     private lazy var pool: ConnectionPool = makeConnectionPool(sources: nodes)
 
-    init(configuration: Configuration, nodes: [Node], verbose: Bool) {
-        self.configuration = configuration
+    init(nodes: [Node], verbose: Bool) {
         self.nodes = nodes
         self.verbose = verbose
     }

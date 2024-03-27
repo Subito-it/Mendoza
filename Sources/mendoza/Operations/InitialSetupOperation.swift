@@ -11,12 +11,12 @@ class InitialSetupOperation: BaseOperation<[String: [String: String]]?> {
     private let nodes: [Node]
     private lazy var pool: ConnectionPool = makeConnectionPool(sources: nodes)
 
+    private let resultDestination: ModernConfiguration.ResultDestination
     private let syncQueue = DispatchQueue(label: String(describing: InitialSetupOperation.self))
     private let xcodeBuildNumber: String?
-    private let configuration: Configuration
 
-    init(configuration: Configuration, nodes: [Node], xcodeBuildNumber: String?) {
-        self.configuration = configuration
+    init(resultDestination: ModernConfiguration.ResultDestination, nodes: [Node], xcodeBuildNumber: String?) {
+        self.resultDestination = resultDestination
         self.nodes = nodes
         self.xcodeBuildNumber = xcodeBuildNumber
     }
@@ -77,7 +77,7 @@ class InitialSetupOperation: BaseOperation<[String: [String: String]]?> {
             let executer = LocalExecuter()
             try extractEnvironmentalVariables(executer.address, executer)
 
-            let destinationNode = configuration.resultDestination.node
+            let destinationNode = resultDestination.node
             let logger = ExecuterLogger(name: "\(type(of: self))", address: destinationNode.address)
             if let executer = try? destinationNode.makeExecuter(logger: logger, environment: nodesEnvironment[destinationNode.address] ?? [:]) {
                 try extractEnvironmentalVariables(destinationNode.address, executer)

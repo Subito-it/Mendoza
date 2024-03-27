@@ -8,7 +8,6 @@
 import Foundation
 
 class TestExtractionOperation: BaseOperation<[TestCase]> {
-    private let configuration: Configuration
     private let baseUrl: URL
     private let testTargetSourceFiles: [String]
     private let filePatterns: FilePatterns
@@ -16,8 +15,7 @@ class TestExtractionOperation: BaseOperation<[TestCase]> {
     private let plugin: TestExtractionPlugin
     private lazy var executer: Executer = makeLocalExecuter()
 
-    init(configuration: Configuration, baseUrl: URL, testTargetSourceFiles: [String], filePatterns: FilePatterns, device: Device, plugin: TestExtractionPlugin) {
-        self.configuration = configuration
+    init(baseUrl: URL, testTargetSourceFiles: [String], filePatterns: FilePatterns, device: Device, plugin: TestExtractionPlugin) {
         self.baseUrl = baseUrl
         self.testTargetSourceFiles = testTargetSourceFiles
         self.filePatterns = filePatterns

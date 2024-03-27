@@ -10,10 +10,10 @@ import Foundation
 class ConfigurationValidator {
     var loggers: Set<ExecuterLogger> = []
 
-    private let configuration: Configuration
+    private let nodes: [Node]
 
-    init(configuration: Configuration) {
-        self.configuration = configuration
+    init(nodes: [Node]) {
+        self.nodes = nodes
     }
 
     func validate() throws {
@@ -24,12 +24,12 @@ class ConfigurationValidator {
     }
 
     func validateNodes() throws {
-        for node in configuration.nodes {
-            guard configuration.nodes.filter({ $0.name == node.name }).count == 1 else {
+        for node in nodes {
+            guard nodes.filter({ $0.name == node.name }).count == 1 else {
                 throw Error("Node name `\(node.name)` repeated more than once in configuration")
             }
 
-            guard configuration.nodes.filter({ $0.address == node.address }).count == 1 else {
+            guard nodes.filter({ $0.address == node.address }).count == 1 else {
                 throw Error("Node address `\(node.address)` repeated more than once in configuration")
             }
         }
@@ -40,7 +40,7 @@ class ConfigurationValidator {
     }
 
     private func validateReachability() throws {
-        let remoteNodes = configuration.nodes.remote()
+        let remoteNodes = nodes.remote()
 
         let logger = ExecuterLogger(name: "\(type(of: self))", address: "localhost")
         let localExecuter = LocalExecuter(logger: logger)
@@ -61,7 +61,7 @@ class ConfigurationValidator {
     }
 
     private func validateConnections() throws {
-        let remoteNodes = configuration.nodes.remote()
+        let remoteNodes = nodes.remote()
 
         do {
             let logger: (Node) -> ExecuterLogger = { ExecuterLogger(name: "\(type(of: self))", address: $0.address) }
@@ -80,7 +80,7 @@ class ConfigurationValidator {
     }
 
     private func validateAuthentication() throws {
-        guard configuration.nodes.allSatisfy({ validAuthentication(node: $0) }) else {
+        guard nodes.allSatisfy({ validAuthentication(node: $0) }) else {
             throw Error("Invalid credentials found. Configuration file needs to be updated! Please run `\(ConfigurationRootCommand().name!) \(ConfigurationAuthententicationUpdateCommand().name!)` command".red) // swiftlint:disable:this force_unwrapping
         }
     }
