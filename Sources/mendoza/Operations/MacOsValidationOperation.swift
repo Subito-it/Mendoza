@@ -8,13 +8,13 @@
 import Foundation
 
 class MacOsValidationOperation: BaseOperation<Void> {
-    private let configuration: Configuration
-    private lazy var pool: ConnectionPool = makeConnectionPool(sources: configuration.nodes)
+    private let nodes: [Node]
+    private lazy var pool: ConnectionPool = makeConnectionPool(sources: nodes)
 
     private let syncQueue = DispatchQueue(label: String(describing: MacOsValidationOperation.self))
 
-    init(configuration: Configuration) {
-        self.configuration = configuration
+    init(nodes: [Node]) {
+        self.nodes = nodes
     }
 
     override func main() {

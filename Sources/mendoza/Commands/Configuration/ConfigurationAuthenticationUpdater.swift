@@ -20,7 +20,8 @@ struct ConfigurationAuthenticationUpdater {
     }
 
     func run() throws {
-        let validator = ConfigurationValidator(configuration: configuration)
+        #warning("TODO")
+        let validator = ConfigurationValidator(nodes: [])
         let initializer = ConfigurationInitializer()
 
         var modified = false

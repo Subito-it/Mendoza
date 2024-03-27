@@ -8,13 +8,13 @@
 import Foundation
 
 class ValidationOperation: BaseOperation<Void> {
-    private let configuration: Configuration
+    private let nodes: [Node]
     private lazy var executer: Executer = makeLocalExecuter()
 
-    private lazy var pool: ConnectionPool = makeConnectionPool(sources: configuration.nodes)
+    private lazy var pool: ConnectionPool = makeConnectionPool(sources: nodes)
 
-    init(configuration: Configuration) {
-        self.configuration = configuration
+    init(nodes: [Node]) {
+        self.nodes = nodes
     }
 
     override func main() {
@@ -23,7 +23,7 @@ class ValidationOperation: BaseOperation<Void> {
         do {
             didStart?()
 
-            let validator = ConfigurationValidator(configuration: configuration)
+            let validator = ConfigurationValidator(nodes: nodes)
             defer { loggers = loggers.union(validator.loggers) }
             try validator.validate()
 

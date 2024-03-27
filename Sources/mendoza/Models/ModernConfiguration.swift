@@ -52,7 +52,7 @@ extension ModernConfiguration {
     struct Plugins: Codable {
         let data: String
         let debug: Bool
-        
+
         init(data: String = "", debug: Bool = false) {
             self.data = data
             self.debug = debug

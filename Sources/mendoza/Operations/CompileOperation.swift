@@ -8,27 +8,25 @@
 import Foundation
 
 class CompileOperation: BaseOperation<AppInfo> {
-    private let configuration: Configuration
+    private let building: ModernConfiguration.Building
     private let git: GitStatus?
     private let baseUrl: URL
     private let project: XcodeProject
     private let scheme: String
     private let preCompilationPlugin: PreCompilationPlugin
     private let postCompilationPlugin: PostCompilationPlugin
-    private let sdk: XcodeProject.SDK
     private let clearDerivedDataOnCompilationFailure: Bool
 
     private lazy var executer: Executer = self.makeLocalExecuter()
 
-    init(configuration: Configuration, git: GitStatus?, baseUrl: URL, project: XcodeProject, scheme: String, preCompilationPlugin: PreCompilationPlugin, postCompilationPlugin: PostCompilationPlugin, sdk: XcodeProject.SDK, clearDerivedDataOnCompilationFailure: Bool) {
-        self.configuration = configuration
+    init(building: ModernConfiguration.Building, git: GitStatus?, baseUrl: URL, project: XcodeProject, scheme: String, preCompilationPlugin: PreCompilationPlugin, postCompilationPlugin: PostCompilationPlugin, clearDerivedDataOnCompilationFailure: Bool) {
+        self.building = building
         self.git = git
         self.baseUrl = baseUrl
         self.project = project
         self.scheme = scheme
         self.preCompilationPlugin = preCompilationPlugin
         self.postCompilationPlugin = postCompilationPlugin
-        self.sdk = sdk
         self.clearDerivedDataOnCompilationFailure = clearDerivedDataOnCompilationFailure
 
         super.init()
@@ -42,15 +40,15 @@ class CompileOperation: BaseOperation<AppInfo> {
         do {
             didStart?()
 
-            let schemeBackup = try project.backupScheme(name: configuration.scheme, baseUrl: baseUrl)
-            try project.disableDebugger(schemeName: configuration.scheme)
-            defer { try? project.restoreScheme(name: configuration.scheme, with: schemeBackup) }
+            let schemeBackup = try project.backupScheme(name: building.scheme, baseUrl: baseUrl)
+            try project.disableDebugger(schemeName: building.scheme)
+            defer { try? project.restoreScheme(name: building.scheme, with: schemeBackup) }
 
             let projectFlag: String
-            if let workspacePath = configuration.workspacePath {
-                projectFlag = "-workspace \(workspacePath)"
+            if building.projectPath.hasSuffix(".xcworkspace") {
+                projectFlag = "-workspace \(building.projectPath)"
             } else {
-                projectFlag = "-project \(configuration.projectPath)"
+                projectFlag = "-project \(building.projectPath)"
             }
 
             if preCompilationPlugin.isInstalled {
@@ -68,7 +66,7 @@ class CompileOperation: BaseOperation<AppInfo> {
 
                 var appSize: UInt64 = 0
                 var dynamicFrameworkCount = 0
-                if let executablePath = try? findExecutablePath(executer: executer, configuration: configuration) {
+                if let executablePath = try? findExecutablePath(executer: executer, buildBundleIdentifier: building.buildBundleIdentifier) {
                     let executableUrl = URL(fileURLWithPath: executablePath)
                     let appUrl = executableUrl.deletingLastPathComponent()
                     appSize = (try? folderSize(appUrl.path)) ?? 0
@@ -81,11 +79,11 @@ class CompileOperation: BaseOperation<AppInfo> {
             }
 
             let command: String
-            switch sdk {
+            switch XcodeProject.SDK(rawValue: building.sdk)! {
             case .ios:
-                command = "$(xcode-select -p)/usr/bin/xcodebuild \(projectFlag) -scheme '\(configuration.scheme)' -configuration \(configuration.buildConfiguration) -derivedDataPath '\(Path.build.rawValue)' -sdk 'iphonesimulator' COMPILER_INDEX_STORE_ENABLE=NO SWIFT_INDEX_STORE_ENABLE=NO MTL_ENABLE_INDEX_STORE=NO ONLY_ACTIVE_ARCH=\(configuration.compilation.onlyActiveArchitecture) VALID_ARCHS='\(configuration.compilation.architectures)' \(configuration.compilation.buildSettings) -enableCodeCoverage YES build-for-testing 2>&1"
+                command = "$(xcode-select -p)/usr/bin/xcodebuild \(projectFlag) -scheme '\(building.scheme)' -configuration \(building.buildConfiguration) -derivedDataPath '\(Path.build.rawValue)' -sdk 'iphonesimulator' COMPILER_INDEX_STORE_ENABLE=NO SWIFT_INDEX_STORE_ENABLE=NO MTL_ENABLE_INDEX_STORE=NO ONLY_ACTIVE_ARCH=\(building.settings.onlyActiveArchitecture) VALID_ARCHS='\(building.settings.architectures)' \(building.settings.buildSettings) -enableCodeCoverage YES build-for-testing 2>&1"
             case .macos:
-                command = "$(xcode-select -p)/usr/bin/xcodebuild \(projectFlag) -scheme '\(configuration.scheme)' -configuration \(configuration.buildConfiguration) -derivedDataPath '\(Path.build.rawValue)' -sdk 'macosx' COMPILER_INDEX_STORE_ENABLE=NO SWIFT_INDEX_STORE_ENABLE=NO MTL_ENABLE_INDEX_STORE=NO ONLY_ACTIVE_ARCH=\(configuration.compilation.onlyActiveArchitecture) VALID_ARCHS='\(configuration.compilation.architectures)' \(configuration.compilation.buildSettings) -enableCodeCoverage YES build-for-testing 2>&1"
+                command = "$(xcode-select -p)/usr/bin/xcodebuild \(projectFlag) -scheme '\(building.scheme)' -configuration \(building.buildConfiguration) -derivedDataPath '\(Path.build.rawValue)' -sdk 'macosx' COMPILER_INDEX_STORE_ENABLE=NO SWIFT_INDEX_STORE_ENABLE=NO MTL_ENABLE_INDEX_STORE=NO ONLY_ACTIVE_ARCH=\(building.settings.onlyActiveArchitecture) VALID_ARCHS='\(building.settings.architectures)' \(building.settings.buildSettings) -enableCodeCoverage YES build-for-testing 2>&1"
             }
 
             for iteration in 0 ... 1 {
