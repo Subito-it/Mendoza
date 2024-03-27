@@ -35,7 +35,7 @@ class XcodeProject: NSObject {
     private let project: XcodeProj
     private let path: PathKit.Path
 
-    static func projectUrl(from workspaceUrl: URL?) -> URL? {
+    private static func projectUrl(from workspaceUrl: URL?) -> URL? {
         guard let path = workspaceUrl?.path else { return nil }
 
         guard let got = try? XCWorkspace(pathString: path) else { return nil }
@@ -52,7 +52,12 @@ class XcodeProject: NSObject {
     }
 
     init(url: URL) throws {
-        path = PathKit.Path(url.path)
+        if url.pathExtension == "xcworkspace", let url = Self.projectUrl(from: url) {
+            path = PathKit.Path(url.path)
+        } else {
+            path = PathKit.Path(url.path)
+        }
+
         project = try XcodeProj(path: path)
     }
 

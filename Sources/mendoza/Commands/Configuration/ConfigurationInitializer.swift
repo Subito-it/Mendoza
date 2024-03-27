@@ -34,7 +34,7 @@ struct ConfigurationInitializer {
 
         guard workspaces.count < 2 else { throw Error("Too many .xcworkspace found in folder!") }
         guard workspaces.count == 1 || projects.count < 2 else { throw Error("Too many .xcodeproj found in folder!") }
-        guard let url = XcodeProject.projectUrl(from: workspaces.first) ?? projects.first else { throw Error("Failed to load .xcworkspace!") }
+        let url = workspaces.first!
         guard let project = (try? XcodeProject(url: url)) else { throw Error("Failed to load .xcodeproj!") }
 
         let testingSchemes = project.testingSchemes().sorted { $0.name > $1.name }
