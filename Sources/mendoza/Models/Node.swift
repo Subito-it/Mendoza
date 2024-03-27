@@ -67,8 +67,8 @@ extension Node {
         }
     }
 
-    static func localhost() -> Node {
-        Node(name: "localhost", address: "localhost", authentication: .none, concurrentTestRunners: .autodetect)
+    static func localhost(concurrentTestRunners: ConcurrentTestRunners = .autodetect) -> Node {
+        Node(name: "localhost", address: "localhost", authentication: .none, concurrentTestRunners: concurrentTestRunners)
     }
 
     func encode(to encoder: Encoder) throws {
