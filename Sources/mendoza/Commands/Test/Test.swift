@@ -13,7 +13,7 @@ class Test {
     var didFail: ((Swift.Error) -> Void)?
 
     // swiftlint:disable:next large_tuple
-    private let userOptions: (configuration: Configuration, skipResultMerge: Bool, filePatterns: FilePatterns, maximumStdOutIdleTime: Int?, maximumTestExecutionTime: Int?, failingTestsRetryCount: Int, codeCoveragePathEquivalence: String?, clearDerivedDataOnCompilationFailure: Bool, autodeleteSlowDevices: Bool, dispatchOnLocalHost: Bool, xcresultBlobThresholdKB: Int?, xcodeBuildNumber: String?, killSimulatorProcesses: Bool, verbose: Bool)
+    private let userOptions: (configuration: Configuration, skipResultMerge: Bool, filePatterns: FilePatterns, maximumStdOutIdleTime: Int?, maximumTestExecutionTime: Int?, failingTestsRetryCount: Int, codeCoveragePathEquivalence: String?, clearDerivedDataOnCompilationFailure: Bool, autodeleteSlowDevices: Bool, xcresultBlobThresholdKB: Int?, xcodeBuildNumber: String?, killSimulatorProcesses: Bool, verbose: Bool)
     private let plugin: (data: String?, debug: Bool)
     private let eventPlugin: EventPlugin
     private let pluginUrl: URL
@@ -21,17 +21,13 @@ class Test {
     private let timestamp: String
     private var observers = [NSKeyValueObservation]()
 
-    init(configurationUrl: URL, device: Device?, skipResultMerge: Bool, clearDerivedDataOnCompilationFailure: Bool, filePatterns: FilePatterns, maximumStdOutIdleTime _: Int?, maximumTestExecutionTime: Int?, failingTestsRetryCount: Int, codeCoveragePathEquivalence: String?, xcodeBuildNumber: String?, autodeleteSlowDevices: Bool, dispatchOnLocalHost: Bool, excludedNodes: String?, xcresultBlobThresholdKB: Int?, killSimulatorProcesses: Bool, pluginData: String?, debugPlugins: Bool, verbose: Bool) throws {
+    init(configurationUrl: URL, device: Device, skipResultMerge: Bool, clearDerivedDataOnCompilationFailure: Bool, filePatterns: FilePatterns, maximumStdOutIdleTime _: Int?, maximumTestExecutionTime: Int?, failingTestsRetryCount: Int, codeCoveragePathEquivalence: String?, xcodeBuildNumber: String?, autodeleteSlowDevices: Bool, excludedNodes: String?, xcresultBlobThresholdKB: Int?, killSimulatorProcesses: Bool, pluginData: String?, debugPlugins: Bool, verbose: Bool) throws {
         plugin = (data: pluginData, debug: debugPlugins)
 
         let configurationData = try Data(contentsOf: configurationUrl)
         var configuration = try JSONDecoder().decode(Configuration.self, from: configurationData)
 
         var configurationNodes = configuration.nodes
-        if dispatchOnLocalHost, !configuration.nodes.contains(where: { AddressType(node: $0) == .local }) { // add localhost
-            // This might be wrong since Node.localhost does not have an administrator password which might be needed for certain tasks
-            configurationNodes = configuration.nodes + [Node.localhost()]
-        }
         if let excludedNodes = excludedNodes?.components(separatedBy: ",") {
             configurationNodes = configurationNodes.filter { node in !excludedNodes.contains(node.address) && !excludedNodes.contains(node.name) }
             if configurationNodes.isEmpty {
@@ -60,7 +56,7 @@ class Test {
                                                  xcresultBlobThresholdKB: xcresultBlobThresholdKB ?? configuration.xcresultBlobThresholdKB)
         configuration = updatedConfiguration
 
-        userOptions = (configuration: configuration, skipResultMerge: skipResultMerge, filePatterns: filePatterns, maximumStdOutIdleTime: maximumTestExecutionTime, maximumTestExecutionTime: maximumTestExecutionTime, failingTestsRetryCount: failingTestsRetryCount, codeCoveragePathEquivalence: codeCoveragePathEquivalence, clearDerivedDataOnCompilationFailure: clearDerivedDataOnCompilationFailure, autodeleteSlowDevices: autodeleteSlowDevices, dispatchOnLocalHost: dispatchOnLocalHost, xcresultBlobThresholdKB: xcresultBlobThresholdKB, xcodeBuildNumber: xcodeBuildNumber, killSimulatorProcesses: killSimulatorProcesses, verbose: verbose)
+        userOptions = (configuration: configuration, skipResultMerge: skipResultMerge, filePatterns: filePatterns, maximumStdOutIdleTime: maximumTestExecutionTime, maximumTestExecutionTime: maximumTestExecutionTime, failingTestsRetryCount: failingTestsRetryCount, codeCoveragePathEquivalence: codeCoveragePathEquivalence, clearDerivedDataOnCompilationFailure: clearDerivedDataOnCompilationFailure, autodeleteSlowDevices: autodeleteSlowDevices, xcresultBlobThresholdKB: xcresultBlobThresholdKB, xcodeBuildNumber: xcodeBuildNumber, killSimulatorProcesses: killSimulatorProcesses, verbose: verbose)
 
         pluginUrl = configurationUrl.deletingLastPathComponent()
         eventPlugin = EventPlugin(baseUrl: pluginUrl, plugin: plugin)
@@ -93,7 +89,7 @@ class Test {
         }
 
         print("ℹ️  Dispatching on".magenta.bold)
-        let nodes = Array(Set(userOptions.configuration.nodes.map(\.address) + (userOptions.dispatchOnLocalHost ? ["localhost"] : []))).sorted()
+        let nodes = Array(Set(userOptions.configuration.nodes.map(\.address))).sorted()
         print(nodes.joined(separator: "\n").magenta)
 
         let git = Git(executer: LocalExecuter())
