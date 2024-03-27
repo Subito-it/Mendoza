@@ -41,7 +41,7 @@ struct ConfigurationAuthenticationUpdater {
                 case .remote:
                     if let lastNode = lastNode, AddressType(node: lastNode) == .remote {
                         if Bariloche.ask(title: "Use the same credentials provided for `\(lastNode.name)`?", array: ["Yes", "No"]).index == 0 {
-                            let updatedNode = Node(name: node.name, address: node.address, authentication: lastNode.authentication, concurrentTestRunners: node.concurrentTestRunners, ramDiskSizeMB: node.ramDiskSizeMB)
+                            let updatedNode = Node(name: node.name, address: node.address, authentication: lastNode.authentication, concurrentTestRunners: node.concurrentTestRunners)
                             updatedNodes.append(updatedNode)
                             continue
                         }
@@ -53,7 +53,7 @@ struct ConfigurationAuthenticationUpdater {
                 modified = true
             }
 
-            lastNode = Node(name: node.name, address: node.address, authentication: authentication, concurrentTestRunners: node.concurrentTestRunners, ramDiskSizeMB: node.ramDiskSizeMB)
+            lastNode = Node(name: node.name, address: node.address, authentication: authentication, concurrentTestRunners: node.concurrentTestRunners)
             updatedNodes.append(lastNode!) // swiftlint:disable:this force_unwrapping
         }
 

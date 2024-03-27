@@ -121,7 +121,6 @@ struct ConfigurationInitializer {
 
         let sshAuthentication: SSHAuthentication
         let concurrentTestRunners: Node.ConcurrentTestRunners
-        var ramDiskSize: UInt?
 
         let address = try askAddress()
         if ["127.0.0.1", "localhost"].contains(address) {
@@ -143,25 +142,12 @@ struct ConfigurationInitializer {
             case .ios:
                 concurrentTestRunners = askConcurrentSimulators()
             }
-
-            Bariloche.ask("\nRam disk size in MB (useful for nodes without SSDs). Suggested 1024MB, not used if empty".underline) { (answer: String) in
-                if answer.isEmpty {
-                    ramDiskSize = nil
-                } else if let size = UInt(answer) {
-                    ramDiskSize = size
-                } else {
-                    throw Error("Invalid value")
-                }
-
-                return ""
-            }
         }
 
         return Node(name: name,
                     address: address,
                     authentication: sshAuthentication,
-                    concurrentTestRunners: concurrentTestRunners,
-                    ramDiskSizeMB: ramDiskSize)
+                    concurrentTestRunners: concurrentTestRunners)
     }
 
     func askAddress() throws -> String {

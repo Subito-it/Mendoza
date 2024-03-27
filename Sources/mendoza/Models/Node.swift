@@ -18,7 +18,6 @@ struct Node: Codable, Equatable, Hashable {
     let address: String
     let authentication: SSHAuthentication?
     let concurrentTestRunners: ConcurrentTestRunners
-    let ramDiskSizeMB: UInt?
 
     static func == (lhs: Node, rhs: Node) -> Bool {
         lhs.address == rhs.address
@@ -33,9 +32,7 @@ extension Node: CustomStringConvertible {
         if let authentication = authentication {
             ret += ["authentication: \(authentication)"]
         }
-        if let ramDiskSizeMB = ramDiskSizeMB {
-            ret += ["ram disk size: \(String(ramDiskSizeMB))"]
-        }
+
         return ret.joined(separator: "\n")
     }
 }
@@ -51,7 +48,6 @@ extension Node {
         case name
         case address
         case concurrentTestRunners
-        case ramDiskSizeMB
     }
 
     init(from decoder: Decoder) throws {
@@ -60,7 +56,6 @@ extension Node {
         name = try container.decode(String.self, forKey: .name)
         address = try container.decode(String.self, forKey: .address)
         concurrentTestRunners = try container.decode(ConcurrentTestRunners.self, forKey: .concurrentTestRunners)
-        ramDiskSizeMB = try container.decodeIfPresent(UInt.self, forKey: .ramDiskSizeMB)
 
         let keychain = KeychainAccess.Keychain(service: Environment.bundle)
 
@@ -73,7 +68,7 @@ extension Node {
     }
 
     static func localhost() -> Node {
-        Node(name: "localhost", address: "localhost", authentication: .none, concurrentTestRunners: .autodetect, ramDiskSizeMB: nil)
+        Node(name: "localhost", address: "localhost", authentication: .none, concurrentTestRunners: .autodetect)
     }
 
     func encode(to encoder: Encoder) throws {
@@ -82,7 +77,6 @@ extension Node {
         try container.encode(name, forKey: .name)
         try container.encode(address, forKey: .address)
         try container.encode(concurrentTestRunners, forKey: .concurrentTestRunners)
-        try container.encodeIfPresent(ramDiskSizeMB, forKey: .ramDiskSizeMB)
 
         if let authentication = authentication {
             let keychain = KeychainAccess.Keychain(service: Environment.bundle)
