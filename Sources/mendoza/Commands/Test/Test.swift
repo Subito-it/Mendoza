@@ -8,7 +8,7 @@
 import Foundation
 
 class Test {
-    typealias RunOperation = LoggedOperation & BenchmarkedOperation
+    typealias RunOperation = BenchmarkedOperation & LoggedOperation
 
     var didFail: ((Swift.Error) -> Void)?
 

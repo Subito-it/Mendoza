@@ -1,5 +1,5 @@
 //
-//  Global.swift
+//  Environment.swift
 //  Mendoza
 //
 //  Created by Tomas Camin on 07/03/2019.

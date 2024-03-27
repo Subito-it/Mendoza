@@ -12,7 +12,7 @@ import Foundation
 class ProcessKillerOperation: BaseOperation<Void> {
     private let nodes: [Node]
     private lazy var pool: ConnectionPool = makeConnectionPool(sources: nodes)
-    
+
     private let processes = [
         "AegirPoster",
         "InfographPoster",
@@ -27,9 +27,9 @@ class ProcessKillerOperation: BaseOperation<Void> {
         "MonogramPosterExtension",
         "UnityPosterExtension",
         "PridePosterExtension",
-        "healthappd" // https://github.com/biscuitehh/yeetd/pull/4
+        "healthappd", // https://github.com/biscuitehh/yeetd/pull/4
     ]
-    
+
     private let killPeriodSeconds = 5.0
 
     init(nodes: [Node]) {
@@ -42,7 +42,7 @@ class ProcessKillerOperation: BaseOperation<Void> {
         do {
             didStart?()
 
-            try pool.execute { [unowned self] executer, source in
+            try pool.execute { [unowned self] executer, _ in
                 while !isCancelled {
                     _ = try? executer.execute("pkill \(processes.joined(separator: " "))")
                     Thread.sleep(forTimeInterval: killPeriodSeconds)

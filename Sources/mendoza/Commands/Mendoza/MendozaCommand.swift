@@ -173,7 +173,7 @@ class XcResultCleaner {
                 let subdirectories = try contents.filter { try $0.resourceValues(forKeys: [.isDirectoryKey]).isDirectory == true }
                 result += subdirectories.map { extractFiles(at: $0, recursively: recursively) }.flatMap { $0 }
             }
-            
+
             result += try contents.filter { try $0.resourceValues(forKeys: [.isDirectoryKey]).isDirectory == false }
         } catch {
             print("Error reading folder contents: \(error)")

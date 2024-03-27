@@ -69,7 +69,7 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
                 try proxy.rewriteSettingsIfNeeded()
 
                 try self.updateSimulatorsSettings(executer: executer, simulators: nodeSimulators, arrangeSimulators: true)
-                
+
                 try proxy.enablePasteboardWorkaround()
                 try proxy.enableLowQualityGraphicOverrides()
                 try proxy.disableSimulatorBezel()
