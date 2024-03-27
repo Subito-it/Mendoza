@@ -14,7 +14,6 @@ class TestCommand: Command {
     let help: String? = "Dispatch UI tests"
 
     let debugPluginsFlag = Flag(short: nil, long: "plugin_debug", help: "Dump plugin invocation commands")
-    let dispatchOnLocalHostFlag = Flag(short: "l", long: "use_localhost", help: "Use localhost to execute tests")
     let verboseFlag = Flag(short: nil, long: "verbose", help: "Dump debug messages")
 
     let configurationPathField = Argument<URL>(name: "configuration_file", kind: .positional, optional: false, help: "Mendoza's configuration file path", autocomplete: .files("json"))
@@ -57,7 +56,6 @@ class TestCommand: Command {
                                 codeCoveragePathEquivalence: codeCoveragePathEquivalence.value,
                                 xcodeBuildNumber: xcodeBuildNumber.value,
                                 autodeleteSlowDevices: autodeleteSlowDevices.value,
-                                dispatchOnLocalHost: dispatchOnLocalHostFlag.value,
                                 excludedNodes: excludeNodes.value,
                                 xcresultBlobThresholdKB: xcresultBlobThresholdKB.value,
                                 killSimulatorProcesses: killSimulatorProcesses.value,

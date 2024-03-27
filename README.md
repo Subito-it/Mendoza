@@ -141,8 +141,6 @@ Will launch tests as specified in the configuration files.
 - --exclude_files=[files]: specify which files should be skipped when extracting UI tests. Accepts wildcards and comma separated. e.g SBTA*.swift,SBTF*.swift. (default: '')
 - --plugin_data=[data]: a custom string that can be used to inject data to plugins
 - --plugin_debug: write log files for plugin development. Refer to the [plugins](#Plugins) paragraph
-- --nonHeadlessSimulatorsFlag: run simulators in non headless mode. This will make testing slightly slower because devices need to be booted an arranged properly
-- --use_localhost: 🔥 when passing these flag tests will be dispatched on the localhost as well even if it is not specified in the configuration file. This is useful when launching tests locally leveraging additional simulators of your own development machine
 - --xcode_buildnumber=[number]: when multiple xcode versions are installed on the dispatching nodes automatically switch to the specified Xcode build number version (e.g. 12E507 as shown in the About window)
 - --xcresult_blob_threshold_kb=[size]: to reduce the size of the final xcresult it is possible to specify the maximum blob size of the xcresult Data objects. Big blobs are usually trace files that are collected during test execution which might not be needed in all cases. A reasonable value is 1024
 - --llvm_cov_equivalence_path=[path]: the path equivalence that will be passed to 'llvm-cov show' when generating code coverage (<from>,<to>)
