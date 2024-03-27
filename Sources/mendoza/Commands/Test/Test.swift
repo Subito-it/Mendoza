@@ -14,15 +14,15 @@ class Test {
 
     // swiftlint:disable:next large_tuple
     private let userOptions: (configuration: Configuration, skipResultMerge: Bool, filePatterns: FilePatterns, maximumStdOutIdleTime: Int?, maximumTestExecutionTime: Int?, failingTestsRetryCount: Int, codeCoveragePathEquivalence: String?, clearDerivedDataOnCompilationFailure: Bool, autodeleteSlowDevices: Bool, xcresultBlobThresholdKB: Int?, xcodeBuildNumber: String?, killSimulatorProcesses: Bool, verbose: Bool)
-    private let plugin: (data: String?, debug: Bool)
+    private let plugin: ModernConfiguration.Plugins
     private let eventPlugin: EventPlugin
-    private let pluginUrl: URL
+    private let pluginUrl: URL?
     private let syncQueue = DispatchQueue(label: String(describing: Test.self))
     private let timestamp: String
     private var observers = [NSKeyValueObservation]()
 
     init(configurationUrl: URL, device: Device, skipResultMerge: Bool, clearDerivedDataOnCompilationFailure: Bool, filePatterns: FilePatterns, maximumStdOutIdleTime _: Int?, maximumTestExecutionTime: Int?, failingTestsRetryCount: Int, codeCoveragePathEquivalence: String?, xcodeBuildNumber: String?, autodeleteSlowDevices: Bool, excludedNodes: String?, xcresultBlobThresholdKB: Int?, killSimulatorProcesses: Bool, pluginData: String?, debugPlugins: Bool, verbose: Bool) throws {
-        plugin = (data: pluginData, debug: debugPlugins)
+        plugin = .init()
 
         let configurationData = try Data(contentsOf: configurationUrl)
         var configuration = try JSONDecoder().decode(Configuration.self, from: configurationData)
