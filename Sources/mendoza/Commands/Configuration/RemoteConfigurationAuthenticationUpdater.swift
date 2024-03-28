@@ -20,7 +20,6 @@ struct RemoteConfigurationAuthenticationUpdater {
     }
 
     func run() throws {
-        #warning("TODO")
         let validator = RemoteConfigurationValidator(nodes: [])
         let initializer = RemoteConfigurationInitializer()
 
@@ -58,7 +57,7 @@ struct RemoteConfigurationAuthenticationUpdater {
             updatedNodes.append(lastNode!) // swiftlint:disable:this force_unwrapping
         }
 
-        let updatedConfiguration = Configuration(projectPath: configuration.projectPath, workspacePath: configuration.workspacePath, buildBundleIdentifier: configuration.buildBundleIdentifier, testBundleIdentifier: configuration.testBundleIdentifier, scheme: configuration.scheme, buildConfiguration: configuration.buildConfiguration, resultDestination: configuration.resultDestination, nodes: updatedNodes, compilation: configuration.compilation, sdk: configuration.sdk, device: configuration.device, xcresultBlobThresholdKB: configuration.xcresultBlobThresholdKB)
+        let updatedConfiguration = RemoteConfiguration(resultDestination: configuration.resultDestination, nodes: updatedNodes)
 
         let encoder = JSONEncoder()
         encoder.outputFormatting = .prettyPrinted
