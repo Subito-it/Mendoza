@@ -10,13 +10,13 @@ import Foundation
 class CodeCoverageCollectionOperation: BaseOperation<Coverage?> {
     private lazy var executer: Executer = makeLocalExecuter()
 
-    private let resultDestination: ModernConfiguration.ResultDestination
+    private let resultDestination: ConfigurationResultDestination
     private let buildBundleIdentifier: String
     private let pathEquivalence: String?
     private let baseUrl: URL
     private let timestamp: String
 
-    init(resultDestination: ModernConfiguration.ResultDestination, buildBundleIdentifier: String, pathEquivalence: String?, baseUrl: URL, timestamp: String) {
+    init(resultDestination: ConfigurationResultDestination, buildBundleIdentifier: String, pathEquivalence: String?, baseUrl: URL, timestamp: String) {
         self.resultDestination = resultDestination
         self.buildBundleIdentifier = buildBundleIdentifier
         self.pathEquivalence = pathEquivalence

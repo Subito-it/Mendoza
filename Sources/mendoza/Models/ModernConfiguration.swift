@@ -13,7 +13,7 @@ struct ModernConfiguration: Codable {
     let device: Device?
     let plugins: Plugins?
 
-    let resultDestination: ResultDestination
+    let resultDestination: ConfigurationResultDestination
     let nodes: [Node]
 
     let verbose: Bool
@@ -42,11 +42,6 @@ extension ModernConfiguration {
             self.filePatterns = filePatterns
             self.xcodeBuildNumber = xcodeBuildNumber
         }
-    }
-
-    struct ResultDestination: Codable {
-        let node: Node
-        let path: String
     }
 
     struct Plugins: Codable {
@@ -85,4 +80,9 @@ extension ModernConfiguration.Building {
             self.architectures = architectures
         }
     }
+}
+
+struct ConfigurationResultDestination: Codable {
+    let node: Node
+    let path: String
 }

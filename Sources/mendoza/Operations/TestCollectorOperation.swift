@@ -10,7 +10,7 @@ import Foundation
 class TestCollectorOperation: BaseOperation<[TestCaseResult]> {
     var testCaseResults: [TestCaseResult]?
 
-    private let resultDestination: ModernConfiguration.ResultDestination
+    private let resultDestination: ConfigurationResultDestination
     private let nodes: [Node]
     private lazy var pool: ConnectionPool = makeConnectionPool(sources: nodes)
 
@@ -18,7 +18,7 @@ class TestCollectorOperation: BaseOperation<[TestCaseResult]> {
     private let destinationPath: String
     private let productNames: [String]
 
-    init(resultDestination: ModernConfiguration.ResultDestination, nodes: [Node], mergeResults: Bool, destinationPath: String, productNames: [String]) {
+    init(resultDestination: ConfigurationResultDestination, nodes: [Node], mergeResults: Bool, destinationPath: String, productNames: [String]) {
         self.resultDestination = resultDestination
         self.nodes = nodes
         self.mergeResults = mergeResults
