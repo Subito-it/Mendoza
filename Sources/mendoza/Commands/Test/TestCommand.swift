@@ -140,9 +140,9 @@ class TestCommand: Command {
             }
             resultDestination = .init(node: node, path: destinationPath)
             nodes = [node]
-        } else {
-            #warning("TODO")
-            nodes = [Node]()
+        } else if let remotePath = remoteNodesConfigurationPath.value {
+            let remoteConfiguration = try JSONDecoder().decode(RemoteNodesConfiguration.self, from: Data(contentsOf: remotePath))
+            nodes = remoteConfiguration.nodes
 
             if let excludedNodes = excludeNodes.value?.components(separatedBy: ",") {
                 nodes = nodes.filter { node in !excludedNodes.contains(node.address) && !excludedNodes.contains(node.name) }
@@ -151,8 +151,9 @@ class TestCommand: Command {
                 }
             }
 
-            #warning("TODO")
-            resultDestination = .init(node: .localhost(), path: "/todo")
+            resultDestination = remoteConfiguration.resultDestination
+        } else {
+            throw Error("Missing required arguments `\(deviceName.longDescription)=\(deviceName.name)`, `\(deviceRuntime.longDescription)=\(deviceRuntime.name)`".red)
         }
 
         return ModernConfiguration(building: building, testing: testing, device: device, plugins: plugins, resultDestination: resultDestination, nodes: nodes, verbose: verboseFlag.value)
