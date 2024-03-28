@@ -48,8 +48,8 @@ class TestCommand: Command {
         do {
             let configuration = try makeConfiguration()
 
-            let pluginUrl = pluginsBasePath.value ?? remoteNodesConfigurationPath.value?.deletingLastPathComponent()
-            
+            let pluginUrl = pluginsBasePath.value ?? remoteConfigurationUrl()
+
             FileManager.default.changeCurrentDirectoryPath(URL(filePath: configuration.building.projectPath).deletingLastPathComponent().path)
 
             let test = try Test(configuration: configuration, pluginUrl: pluginUrl)
@@ -157,6 +157,18 @@ class TestCommand: Command {
         }
 
         return ModernConfiguration(building: building, testing: testing, device: device, plugins: plugins, resultDestination: resultDestination, nodes: nodes, verbose: verboseFlag.value)
+    }
+
+    private func remoteConfigurationUrl() -> URL? {
+        guard let remoteConfigurationUrl = remoteNodesConfigurationPath.value?.deletingLastPathComponent() else {
+            return nil
+        }
+
+        if remoteConfigurationUrl.path().starts(with: "/") == true {
+            return remoteConfigurationUrl
+        } else {
+            return URL(filePath: FileManager.default.currentDirectoryPath).appending(path: remoteConfigurationUrl.path())
+        }
     }
 
     private func handleError(_ error: Swift.Error) {
