@@ -8,7 +8,7 @@
 import Bariloche
 import Foundation
 
-class ConfigurationAuthententicationUpdateCommand: Command {
+class RemoteConfigurationAuthententicationUpdateCommand: Command {
     let name: String? = "authentication"
     let usage: String? = "Update authentication data required by configuration file"
     let help: String? = "Update authentication information"
@@ -17,7 +17,7 @@ class ConfigurationAuthententicationUpdateCommand: Command {
 
     func run() -> Bool {
         do {
-            try ConfigurationAuthenticationUpdater(configurationUrl: configuration.value!).run() // swiftlint:disable:this force_unwrapping
+            try RemoteConfigurationAuthenticationUpdater(configurationUrl: configuration.value!).run() // swiftlint:disable:this force_unwrapping
         } catch {
             print(error.localizedDescription.red.bold)
             exit(-1)

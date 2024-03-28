@@ -9,20 +9,20 @@ import Bariloche
 import Foundation
 import KeychainAccess
 
-struct ConfigurationAuthenticationUpdater {
+struct RemoteConfigurationAuthenticationUpdater {
     private let configurationUrl: URL
-    private let configuration: Configuration
+    private let configuration: RemoteConfiguration
 
     init(configurationUrl: URL) throws {
         self.configurationUrl = configurationUrl
         let configurationData = try Data(contentsOf: configurationUrl)
-        configuration = try JSONDecoder().decode(Configuration.self, from: configurationData)
+        configuration = try JSONDecoder().decode(RemoteConfiguration.self, from: configurationData)
     }
 
     func run() throws {
         #warning("TODO")
-        let validator = ConfigurationValidator(nodes: [])
-        let initializer = ConfigurationInitializer()
+        let validator = RemoteConfigurationValidator(nodes: [])
+        let initializer = RemoteConfigurationInitializer()
 
         var modified = false
 

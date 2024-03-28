@@ -9,7 +9,7 @@ import Bariloche
 import Foundation
 import KeychainAccess
 
-struct ConfigurationInitializer {
+struct RemoteConfigurationInitializer {
     private let fileManager = FileManager.default
 
     func run() throws {
@@ -70,7 +70,7 @@ struct ConfigurationInitializer {
         }
 
         let resultDestinationPath: String = Bariloche.ask("\nPlease select at which path on `\(resultDestinationNodeName.value)` results should be saved".underline)
-        let resultDestination = Configuration.ResultDestination(node: destinationNode, path: resultDestinationPath)
+        let resultDestination = ConfigurationResultDestination(node: destinationNode, path: resultDestinationPath)
 
         let basePath = "\(baseUrl.path)/"
         let projectRelativePath = url.path.replacingOccurrences(of: basePath, with: "")

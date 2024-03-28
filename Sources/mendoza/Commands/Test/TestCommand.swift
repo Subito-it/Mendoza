@@ -141,7 +141,7 @@ class TestCommand: Command {
             resultDestination = .init(node: node, path: destinationPath)
             nodes = [node]
         } else if let remotePath = remoteNodesConfigurationPath.value {
-            let remoteConfiguration = try JSONDecoder().decode(RemoteNodesConfiguration.self, from: Data(contentsOf: remotePath))
+            let remoteConfiguration = try JSONDecoder().decode(RemoteConfiguration.self, from: Data(contentsOf: remotePath))
             nodes = remoteConfiguration.nodes
 
             if let excludedNodes = excludeNodes.value?.components(separatedBy: ",") {

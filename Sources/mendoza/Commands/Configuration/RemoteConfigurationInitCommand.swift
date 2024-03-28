@@ -8,14 +8,14 @@
 import Bariloche
 import Foundation
 
-class ConfigurationInitCommand: Command {
+class RemoteConfigurationInitCommand: Command {
     let name: String? = "init"
     let usage: String? = "Setup test dispatch configuration file"
     let help: String? = "Setup test dispatch configuration file"
 
     func run() -> Bool {
         do {
-            try ConfigurationInitializer().run()
+            try RemoteConfigurationInitializer().run()
         } catch {
             print(error.localizedDescription.red)
             exit(-1)
