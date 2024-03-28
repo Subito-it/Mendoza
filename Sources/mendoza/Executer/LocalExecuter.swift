@@ -94,7 +94,7 @@ private extension Process {
         logger?.log(command: cmd)
 
         let exports = ExecuterEnvironment.exportsCommand(for: environment)
-        arguments = ["-c", "\(Shell.current().source) \(LocalExecuter.executablePathExport()) \(exports) \(cmd)"]
+        arguments = ["-c", "\(Shell.current().source) \(exports) \(LocalExecuter.executablePathExport()) \(cmd)"]
 
         let pipe = Pipe()
         standardOutput = pipe
