@@ -128,7 +128,7 @@ class TestCommand: Command {
             plugins = ModernConfiguration.Plugins(data: "", debug: false)
         }
 
-        let resultDestination: ModernConfiguration.ResultDestination
+        let resultDestination: ConfigurationResultDestination
         var nodes: [Node]
 
         if let destinationPath = localDestinationPath.value?.path() {

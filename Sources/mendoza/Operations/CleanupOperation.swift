@@ -8,7 +8,7 @@
 import Foundation
 
 class CleanupOperation: BaseOperation<Void> {
-    private let resultDestination: ModernConfiguration.ResultDestination
+    private let resultDestination: ConfigurationResultDestination
     private let timestamp: String
     private lazy var destinationExecuter: Executer? = {
         let destinationNode = resultDestination.node
@@ -17,7 +17,7 @@ class CleanupOperation: BaseOperation<Void> {
         return try? destinationNode.makeExecuter(logger: logger, environment: nodesEnvironment[destinationNode.address] ?? [:])
     }()
 
-    init(resultDestination: ModernConfiguration.ResultDestination, timestamp: String) {
+    init(resultDestination: ConfigurationResultDestination, timestamp: String) {
         self.resultDestination = resultDestination
         self.timestamp = timestamp
     }

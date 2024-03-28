@@ -12,7 +12,7 @@ class TearDownOperation: BaseOperation<Void> {
 
     private lazy var pool: ConnectionPool = makeConnectionPool(sources: nodes)
 
-    private let resultDestination: ModernConfiguration.ResultDestination
+    private let resultDestination: ConfigurationResultDestination
     private let nodes: [Node]
 
     private let timestamp: String
@@ -28,7 +28,7 @@ class TearDownOperation: BaseOperation<Void> {
     private let autodeleteSlowDevices: Bool
     private let plugin: TearDownPlugin
 
-    init(resultDestination: ModernConfiguration.ResultDestination, nodes: [Node], git: GitStatus?, timestamp: String, mergeResults: Bool, autodeleteSlowDevices: Bool, plugin: TearDownPlugin) {
+    init(resultDestination: ConfigurationResultDestination, nodes: [Node], git: GitStatus?, timestamp: String, mergeResults: Bool, autodeleteSlowDevices: Bool, plugin: TearDownPlugin) {
         self.resultDestination = resultDestination
         self.nodes = nodes
         self.git = git

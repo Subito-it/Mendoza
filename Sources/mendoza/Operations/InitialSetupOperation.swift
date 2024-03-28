@@ -11,11 +11,11 @@ class InitialSetupOperation: BaseOperation<[String: [String: String]]?> {
     private let nodes: [Node]
     private lazy var pool: ConnectionPool = makeConnectionPool(sources: nodes)
 
-    private let resultDestination: ModernConfiguration.ResultDestination
+    private let resultDestination: ConfigurationResultDestination
     private let syncQueue = DispatchQueue(label: String(describing: InitialSetupOperation.self))
     private let xcodeBuildNumber: String?
 
-    init(resultDestination: ModernConfiguration.ResultDestination, nodes: [Node], xcodeBuildNumber: String?) {
+    init(resultDestination: ConfigurationResultDestination, nodes: [Node], xcodeBuildNumber: String?) {
         self.resultDestination = resultDestination
         self.nodes = nodes
         self.xcodeBuildNumber = xcodeBuildNumber
