@@ -15,6 +15,7 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
     private let windowMenubarHeight = 38
 
     private let syncQueue = DispatchQueue(label: String(describing: SimulatorSetupOperation.self))
+    private let skipSetup: Bool
     private let buildBundleIdentifier: String
     private let testBundleIdentifier: String
     private let nodes: [Node]
@@ -23,7 +24,8 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
     private let verbose: Bool
     private lazy var pool: ConnectionPool = makeConnectionPool(sources: nodes)
 
-    init(buildBundleIdentifier: String, testBundleIdentifier: String, nodes: [Node], device: Device, autodeleteSlowDevices: Bool, verbose: Bool) {
+    init(skipSetup: Bool, buildBundleIdentifier: String, testBundleIdentifier: String, nodes: [Node], device: Device, autodeleteSlowDevices: Bool, verbose: Bool) {
+        self.skipSetup = skipSetup
         self.buildBundleIdentifier = buildBundleIdentifier
         self.testBundleIdentifier = testBundleIdentifier
         self.nodes = nodes
@@ -39,7 +41,19 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
             didStart?()
 
             try pool.execute { executer, source in
-                let node = source.node
+                let proxy = CommandLineProxy.Simulators(executer: executer, verbose: self.verbose)
+
+                if self.skipSetup {
+                    let nodeSimulators = try self.makeSimulators(node: source.node, executer: executer)
+                    try self.bootSimulators(node: source.node, simulators: nodeSimulators)
+                    try proxy.launch()
+                    
+                    self.syncQueue.sync { [unowned self] in
+                        self.simulators += nodeSimulators.map { (simulator: $0, node: source.node) }
+                    }
+
+                    return
+                }
 
                 // Killing CoreSimulatorService will reset and shutdown all Simulators
                 _ = try? executer.execute("killall -9 com.apple.CoreSimulator.CoreSimulatorService;")
@@ -51,22 +65,9 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
                     _ = try? executer.execute("killall Simulator")
                 }
 
-                let proxy = CommandLineProxy.Simulators(executer: executer, verbose: self.verbose)
-
-                try proxy.installRuntimeIfNeeded(self.device.runtime, nodeAddress: node.address)
-
-                let concurrentTestRunners: Int
-                switch node.concurrentTestRunners {
-                case let .manual(count) where count > 0: // swiftlint:disable:this empty_count
-                    concurrentTestRunners = Int(count)
-                default:
-                    concurrentTestRunners = try self.physicalCPUs(executer: executer, node: node) / 2
-                }
-
-                let simulatorNames = (1 ... concurrentTestRunners).map { "\(self.device.name)-\($0)" }
-
-                let rawSimulatorStatus = try proxy.rawSimulatorStatus()
-                let nodeSimulators = try simulatorNames.compactMap { try proxy.makeSimulatorIfNeeded(name: $0, device: self.device, cachedSimulatorStatus: rawSimulatorStatus) }
+                try proxy.installRuntimeIfNeeded(self.device.runtime, nodeAddress: source.node.address)
+                
+                let nodeSimulators = try self.makeSimulators(node: source.node, executer: executer)
 
                 try proxy.rewriteSettingsIfNeeded()
 
@@ -85,28 +86,7 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
 
                 try proxy.gracefullyQuit()
 
-                let bootQueue = OperationQueue()
-
-                for nodeSimulator in nodeSimulators {
-                    let logger = ExecuterLogger(name: "\(type(of: self))-AsyncBoot", address: node.address)
-                    self.addLogger(logger)
-
-                    let queueExecuter = try source.node.makeExecuter(logger: logger, environment: self.nodesEnvironment[source.node.address] ?? [:])
-                    let queueProxy = CommandLineProxy.Simulators(executer: queueExecuter, verbose: self.verbose)
-
-                    bootQueue.addOperation {
-                        try? queueProxy.bootSynchronously(simulator: nodeSimulator)
-
-                        queueProxy.enableXcode11ReleaseNotesWorkarounds(on: nodeSimulator)
-                        queueProxy.enableXcode13Workarounds(on: nodeSimulator)
-                        queueProxy.disableSlideToType(on: nodeSimulator)
-                        queueProxy.disablePasswordAutofill(on: nodeSimulator)
-
-                        try? logger.dump()
-                    }
-                }
-                bootQueue.waitUntilAllOperationsAreFinished()
-
+                try self.bootSimulators(node: source.node, simulators: nodeSimulators)
                 try proxy.launch()
 
                 if self.autodeleteSlowDevices {
@@ -156,6 +136,49 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
         }
         super.cancel()
     }
+    
+    private func makeSimulators(node: Node, executer: Executer) throws -> [Simulator] {
+        let concurrentTestRunners: Int
+        switch node.concurrentTestRunners {
+        case let .manual(count) where count > 0: // swiftlint:disable:this empty_count
+            concurrentTestRunners = Int(count)
+        default:
+            concurrentTestRunners = try self.physicalCPUs(executer: executer, node: node) / 2
+        }
+        
+        let simulatorNames = (1 ... concurrentTestRunners).map { "\(self.device.name)-\($0)" }
+
+        let proxy = CommandLineProxy.Simulators(executer: executer, verbose: self.verbose)
+        let rawSimulatorStatus = try proxy.rawSimulatorStatus()
+        let simulators = try simulatorNames.compactMap { try proxy.makeSimulatorIfNeeded(name: $0, device: self.device, cachedSimulatorStatus: rawSimulatorStatus) }
+        
+        return simulators
+    }
+    
+    private func bootSimulators(node: Node, simulators: [Simulator]) throws {
+        let bootQueue = OperationQueue()
+
+        for simulator in simulators {
+            let logger = ExecuterLogger(name: "\(type(of: self))-AsyncBoot", address: node.address)
+            self.addLogger(logger)
+
+            let queueExecuter = try node.makeExecuter(logger: logger, environment: self.nodesEnvironment[node.address] ?? [:])
+            let queueProxy = CommandLineProxy.Simulators(executer: queueExecuter, verbose: self.verbose)
+
+            bootQueue.addOperation {
+                try? queueProxy.bootSynchronously(simulator: simulator)
+
+                queueProxy.enableXcode11ReleaseNotesWorkarounds(on: simulator)
+                queueProxy.enableXcode13Workarounds(on: simulator)
+                queueProxy.disableSlideToType(on: simulator)
+                queueProxy.disablePasswordAutofill(on: simulator)
+
+                try? logger.dump()
+            }
+        }
+        bootQueue.waitUntilAllOperationsAreFinished()
+    }
+    
 
     private func physicalCPUs(executer: Executer, node _: Node) throws -> Int {
         guard let concurrentTestRunners = try Int(executer.execute("sysctl -n hw.physicalcpu")) else {

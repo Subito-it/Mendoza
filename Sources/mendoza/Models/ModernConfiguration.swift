@@ -69,6 +69,7 @@ extension ModernConfiguration {
         let codeCoveragePathEquivalence: String?
         let clearDerivedDataOnCompilationFailure: Bool
         let skipResultMerge: Bool
+        let skipSimulatorsSetup: Bool
     }
 }
 
