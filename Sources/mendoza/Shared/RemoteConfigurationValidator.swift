@@ -7,7 +7,7 @@
 
 import Foundation
 
-class ConfigurationValidator {
+class RemoteConfigurationValidator {
     var loggers: Set<ExecuterLogger> = []
 
     private let nodes: [Node]
@@ -77,13 +77,13 @@ class ConfigurationValidator {
                 _ = try executer.execute("ls")
             }
         } catch {
-            throw Error("Invalid credentials for connection. Configuration file needs to be updated! Please run `\(ConfigurationRootCommand().name!) \(ConfigurationAuthententicationUpdateCommand().name!)` command. Got \(error)".red) // swiftlint:disable:this force_unwrapping
+            throw Error("Invalid credentials for connection. Configuration file needs to be updated! Please run `\(RemoteConfigurationRootCommand().name!) \(RemoteConfigurationAuthententicationUpdateCommand().name!)` command. Got \(error)".red) // swiftlint:disable:this force_unwrapping
         }
     }
 
     private func validateAuthentication() throws {
         guard nodes.allSatisfy({ validAuthentication(node: $0) }) else {
-            throw Error("Invalid credentials found. Configuration file needs to be updated! Please run `\(ConfigurationRootCommand().name!) \(ConfigurationAuthententicationUpdateCommand().name!)` command".red) // swiftlint:disable:this force_unwrapping
+            throw Error("Invalid credentials found. Configuration file needs to be updated! Please run `\(RemoteConfigurationRootCommand().name!) \(RemoteConfigurationAuthententicationUpdateCommand().name!)` command".red) // swiftlint:disable:this force_unwrapping
         }
     }
 }

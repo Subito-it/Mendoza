@@ -23,7 +23,7 @@ class ValidationOperation: BaseOperation<Void> {
         do {
             didStart?()
 
-            let validator = ConfigurationValidator(nodes: nodes)
+            let validator = RemoteConfigurationValidator(nodes: nodes)
             defer { loggers = loggers.union(validator.loggers) }
             try validator.validate()
 
