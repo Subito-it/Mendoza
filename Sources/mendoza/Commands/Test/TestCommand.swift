@@ -42,7 +42,8 @@ class TestCommand: Command {
     let scheme = Argument<String>(name: "name", kind: .named(short: nil, long: "scheme"), optional: false, help: "The scheme to build")
     let buildConfiguration = Argument<String>(name: "name", kind: .named(short: nil, long: "build_configuration"), optional: true, help: "Build configuration. Default: Debug")
     let pluginsBasePath = Argument<URL>(name: "path", kind: .named(short: nil, long: "plugins_path"), optional: true, help: "The path to the folder containing Mendoza's plugins")
-
+    let skipSimulatorsSetup = Flag(short: nil, long: "skip_sim_setup", help: "Use this flag to skip the simulator setup process. This is useful when you're certain that the simulators are already properly set up.")
+    
     func run() -> Bool {
         do {
             let configuration = try makeConfiguration()
@@ -117,7 +118,8 @@ class TestCommand: Command {
                                                   autodeleteSlowDevices: autodeleteSlowDevices.value,
                                                   codeCoveragePathEquivalence: codeCoveragePathEquivalence.value,
                                                   clearDerivedDataOnCompilationFailure: clearDerivedDataOnCompilationFailure.value,
-                                                  skipResultMerge: skipResultMerge.value)
+                                                  skipResultMerge: skipResultMerge.value,
+                                                  skipSimulatorsSetup: skipSimulatorsSetup.value)
 
         let plugins: ModernConfiguration.Plugins
         if let pluginsData = pluginCustom.value {
