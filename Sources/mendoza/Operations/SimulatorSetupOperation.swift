@@ -89,35 +89,7 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
                 try self.bootSimulators(node: source.node, simulators: nodeSimulators)
                 try proxy.launch()
 
-                if self.autodeleteSlowDevices {
-                    // Particularly on newly created devices it can happen that certain processes hug the simulators. For example healthappd seems
-                    // to take significant amount of cpu time on first device launch. This causes the initial tests to take longer to begin and this
-                    // in turn causes at the end of tests execution the slowdevices logic to kick in that will again delete simulators. To avoid the
-                    // loop we wait for the processes on the simulators to idle so that initial tests will begin earlier.
-                    var didTimeout = true
-                    for _ in 0 ..< 5 {
-                        guard let psAux = try? executer.execute("ps aux | grep -E 'diagnosticd|healthappd|healthd|Calendar' | tr -s ' ' | cut -d ' ' -f3") else {
-                            break
-                        }
-
-                        let cpuUsages = psAux.components(separatedBy: "\n").compactMap { Float($0) }
-                        let totalCpuUsage = cpuUsages.reduce(0, +)
-
-                        #if DEBUG
-                            print("[Boot-CPU] \(executer.address) total cpu: \(totalCpuUsage)")
-                        #endif
-
-                        if totalCpuUsage < 100.0 {
-                            didTimeout = false
-                            break
-                        }
-                        Thread.sleep(forTimeInterval: 10.0)
-                    }
-
-                    if didTimeout {
-                        print("⚠️ \(executer.address) process idle timeout!")
-                    }
-                }
+                self.waitForSimulatorProcessesToIdle(executer: executer)
 
                 self.syncQueue.sync { [unowned self] in
                     self.simulators += nodeSimulators.map { (simulator: $0, node: source.node) }
@@ -179,6 +151,37 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
         bootQueue.waitUntilAllOperationsAreFinished()
     }
     
+    private func waitForSimulatorProcessesToIdle(executer: Executer) {
+        if self.autodeleteSlowDevices {
+            // Particularly on newly created devices it can happen that certain processes hug the simulators. For example healthappd seems
+            // to take significant amount of cpu time on first device launch. This causes the initial tests to take longer to begin and this
+            // in turn causes at the end of tests execution the slowdevices logic to kick in that will again delete simulators. To avoid the
+            // loop we wait for the processes on the simulators to idle so that initial tests will begin earlier.
+            var didTimeout = true
+            for _ in 0 ..< 5 {
+                guard let psAux = try? executer.execute("ps aux | grep -E 'diagnosticd|healthappd|healthd|Calendar' | tr -s ' ' | cut -d ' ' -f3") else {
+                    break
+                }
+
+                let cpuUsages = psAux.components(separatedBy: "\n").compactMap { Float($0) }
+                let totalCpuUsage = cpuUsages.reduce(0, +)
+
+                #if DEBUG
+                    print("[Boot-CPU] \(executer.address) total cpu: \(totalCpuUsage)")
+                #endif
+
+                if totalCpuUsage < 100.0 {
+                    didTimeout = false
+                    break
+                }
+                Thread.sleep(forTimeInterval: 10.0)
+            }
+
+            if didTimeout {
+                print("⚠️ \(executer.address) process idle timeout!")
+            }
+        }
+    }
 
     private func physicalCPUs(executer: Executer, node _: Node) throws -> Int {
         guard let concurrentTestRunners = try Int(executer.execute("sysctl -n hw.physicalcpu")) else {
