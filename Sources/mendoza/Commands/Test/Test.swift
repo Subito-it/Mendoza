@@ -51,8 +51,6 @@ class Test {
         let operations = try makeOperations(gitStatus: gitStatus, testSessionResult: testSessionResult, sdk: configuration.building.sdk)
 
         queue.addOperations(operations, waitUntilFinished: true)
-
-        tearDown(operations: operations, testSessionResult: testSessionResult, error: nil)
     }
 
     private func makeOperations(gitStatus: GitStatus, testSessionResult: TestSessionResult, sdk: String) throws -> [RunOperation] {
@@ -297,6 +295,10 @@ class Test {
                 // Make it thread safe
                 testSessionResult.copy()
             }
+        }
+        
+        tearDownOperation.didEnd = { [unowned self] _ in
+            self.tearDown(operations: operations, testSessionResult: testSessionResult, error: nil)
         }
 
         monitorOperationsExecutionTime(operations, testSessionResult: testSessionResult)
