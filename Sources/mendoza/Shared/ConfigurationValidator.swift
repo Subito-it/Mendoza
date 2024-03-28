@@ -36,7 +36,9 @@ class ConfigurationValidator {
     }
 
     func validAuthentication(node: Node) -> Bool {
-        node.authentication != nil
+        guard AddressType(node: node) == .remote else { return true }
+        
+        return node.authentication != nil
     }
 
     private func validateReachability() throws {
