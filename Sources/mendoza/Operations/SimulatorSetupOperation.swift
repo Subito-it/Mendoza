@@ -275,7 +275,7 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
                     break
                 }
             }
-            Thread.sleep(forTimeInterval: 3.0)
+            Thread.sleep(forTimeInterval: 5.0)
         }
 
         guard let settings = loadSettings, let screenIdentifier = loadScreenIdentifier else {
