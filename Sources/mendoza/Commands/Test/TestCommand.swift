@@ -48,6 +48,8 @@ class TestCommand: Command {
             let configuration = try makeConfiguration()
 
             let pluginUrl = pluginsBasePath.value ?? remoteNodesConfigurationPath.value?.deletingLastPathComponent()
+            
+            FileManager.default.changeCurrentDirectoryPath(URL(filePath: configuration.building.projectPath).deletingLastPathComponent().path)
 
             let test = try Test(configuration: configuration, pluginUrl: pluginUrl)
 

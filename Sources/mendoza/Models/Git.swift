@@ -30,7 +30,7 @@ struct Git {
     }
 
     private func url() throws -> URL {
-        let url = try executer.execute("git rev-parse --show-toplevel")
+        let url = try executer.execute("cd '\(FileManager.default.currentDirectoryPath)'; git rev-parse --show-toplevel")
         return URL(fileURLWithPath: url)
     }
 
