@@ -11,8 +11,6 @@ class LocalSetupOperation: BaseOperation<Void> {
     private let fileManager: FileManager
     private let clearDerivedDataOnCompilationFailure: Bool
 
-    private lazy var git = Git(executer: self.executer)
-
     private lazy var executer: Executer = makeLocalExecuter()
 
     init(fileManager: FileManager = .default, clearDerivedDataOnCompilationFailure: Bool) {
