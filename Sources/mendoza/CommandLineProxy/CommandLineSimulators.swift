@@ -37,14 +37,13 @@ extension CommandLineProxy {
 
         func gracefullyQuit() throws {
             let commands = ["mendoza mendoza close_simulator_app",
-                            "sleep 3",
-                            "defaults read com.apple.iphonesimulator &>/dev/null"]
+                            "sleep 3"]
 
             try commands.forEach { _ = try executer.execute("\($0) 2>/dev/null || true") }
         }
 
         func launch() throws {
-            let commands = ["defaults read com.apple.iphonesimulator &>/dev/null",
+            let commands = ["defaults read com.apple.iphonesimulator &>/dev/null", // This (unexpectedly) ensures that settings in ~/Library/Preferences/com.apple.iphonesimulator.plist get reloaded
                             "open -a \"$(xcode-select -p)/Applications/Simulator.app\"",
                             "sleep 3"]
 
@@ -346,7 +345,6 @@ extension CommandLineProxy {
 
             // Force reload
             _ = try executer.execute("rm -rf '\(executer.homePath)/Library/Saved Application State/com.apple.iphonesimulator.savedState'")
-            _ = try executer.execute("defaults read com.apple.iphonesimulator &>/dev/null")
         }
 
         private func simulatorSettingsPath(for simulator: Simulator) -> String {
