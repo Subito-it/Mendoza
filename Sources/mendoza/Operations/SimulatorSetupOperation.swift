@@ -40,31 +40,37 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
 
             try pool.execute { executer, source in
                 let proxy = CommandLineProxy.Simulators(executer: executer, verbose: self.verbose)
+                
                 try proxy.checkIfRuntimeInstalled(self.device.runtime, nodeAddress: source.node.address)
 
+                var rebootRequired = [Bool]()
+                
+                rebootRequired.append(try self.shutdownSimulatorOnXcodeVersionMismatch(executer: executer, node: source.node))
+                
                 let nodeSimulators = try self.makeSimulators(node: source.node, executer: executer)
-
-                try proxy.rewriteSettingsIfNeeded()
-
-                try self.updateSimulatorsSettings(executer: executer, simulators: nodeSimulators, arrangeSimulators: true)
-
-                try proxy.enablePasteboardWorkaround()
-                try proxy.enableLowQualityGraphicOverrides()
-                try proxy.disableSimulatorBezel()
+                
+                rebootRequired.append(try proxy.deleteSettingsIfNeeded())
+                rebootRequired.append(try proxy.enablePasteboardWorkaround())
+                rebootRequired.append(try proxy.enableLowQualityGraphicOverrides())
+                rebootRequired.append(try proxy.disableSimulatorBezel())
+                rebootRequired.append(try self.updateSimulatorsSettings(executer: executer, simulators: nodeSimulators, arrangeSimulators: true))
 
                 for nodeSimulator in nodeSimulators {
-                    _ = try proxy.updateLanguage(on: nodeSimulator, language: self.device.language, locale: self.device.locale)
-                    _ = try proxy.increaseWatchdogExceptionTimeout(on: nodeSimulator, appBundleIndentifier: self.buildBundleIdentifier, testBundleIdentifier: self.testBundleIdentifier)
+                    rebootRequired.append(try proxy.updateLanguage(on: nodeSimulator, language: self.device.language, locale: self.device.locale))
+                    rebootRequired.append(try proxy.increaseWatchdogExceptionTimeout(on: nodeSimulator, appBundleIndentifier: self.buildBundleIdentifier, testBundleIdentifier: self.testBundleIdentifier))
                 }
-
-                try? proxy.shutdownAll() // Always shutting down simulators is the safest way to workaround unexpected Simulator.app hangs
-
-                try proxy.gracefullyQuit()
+                
+                if rebootRequired.contains(true) {
+                    try? proxy.shutdownAll() // Always shutting down simulators is the safest way to workaround unexpected Simulator.app hangs
+                    try proxy.gracefullyQuit()
+                }
 
                 try self.bootSimulators(node: source.node, simulators: nodeSimulators)
                 try proxy.launch()
-
-                self.waitForSimulatorProcessesToIdle(executer: executer)
+                
+                if rebootRequired.contains(true) {
+                    self.waitForSimulatorProcessesToIdle(executer: executer)
+                }
 
                 self.syncQueue.sync { [unowned self] in
                     self.simulators += nodeSimulators.map { (simulator: $0, node: source.node) }
@@ -116,9 +122,9 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
                 try? queueProxy.bootSynchronously(simulator: simulator)
 
                 queueProxy.enableXcode11ReleaseNotesWorkarounds(on: simulator)
-                queueProxy.enableXcode13Workarounds(on: simulator)
+                _ = try? queueProxy.enableXcode13Workarounds(on: simulator)
                 queueProxy.disableSlideToType(on: simulator)
-                queueProxy.disablePasswordAutofill(on: simulator)
+                _ = try? queueProxy.disablePasswordAutofill(on: simulator)
 
                 try? logger.dump()
             }
@@ -164,6 +170,21 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
         }
 
         return concurrentTestRunners
+    }
+    
+    private func shutdownSimulatorOnXcodeVersionMismatch(executer: Executer, node: Node) throws -> Bool {
+        let systemPath = try executer.execute("xcode-select -p")
+        let path = (self.nodesEnvironment[node.address]?["DEVELOPER_DIR"]) ?? systemPath
+        if try !(executer.execute("ps aux | grep Simulator.app").contains(path)) {
+            // Launched Simulator is from a different Xcode version
+            
+            _ = try? executer.execute("killall -9 com.apple.CoreSimulator.CoreSimulatorService;") // Killing CoreSimulatorService will reset and shutdown all Simulators
+            _ = try? executer.execute("killall Simulator")
+            
+            return true
+        }
+
+        return false
     }
 
     private func simulatorsProperlyArranged(executer: Executer, simulators: [Simulator]) throws -> Bool {
@@ -262,29 +283,29 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
     ///
     /// - Parameters:
     ///   - param1: simulators to arrange
-    private func updateSimulatorsSettings(executer: Executer, simulators: [Simulator], arrangeSimulators: Bool) throws {
+    private func updateSimulatorsSettings(executer: Executer, simulators: [Simulator], arrangeSimulators: Bool) throws -> Bool {
         let simulatorProxy = CommandLineProxy.Simulators(executer: executer, verbose: verbose)
 
         // Configuration file might not be ready yet
-        var loadSettings: CommandLineProxy.Simulators.Settings?
-        var loadScreenIdentifier: String?
-        for _ in 0 ..< 5 {
-            loadSettings = try simulatorProxy.loadSimulatorSettings()
-            if let keys = loadSettings?.ScreenConfigurations?.keys {
-                loadScreenIdentifier = Array(keys).last ?? ""
-                if loadScreenIdentifier?.isEmpty == false {
-                    break
-                }
-            }
-            Thread.sleep(forTimeInterval: 5.0)
+        var loadedSettings: CommandLineProxy.Simulators.Settings?
+        var loadedScreenIdentifier: String?
+        loadedSettings = try simulatorProxy.loadSimulatorSettings()
+        if loadedSettings?.ScreenConfigurations == nil {
+            _ = try? executer.execute("killall Simulator")
+            loadedSettings = try simulatorProxy.loadSimulatorSettings()
+        }
+        if let keys = loadedSettings?.ScreenConfigurations?.keys {
+            loadedScreenIdentifier = Array(keys).last ?? ""
         }
 
-        guard let settings = loadSettings, let screenIdentifier = loadScreenIdentifier else {
+        guard let settings = loadedSettings, let screenIdentifier = loadedScreenIdentifier else {
             fatalError("💣 Failed to get screenIdentifier from simulator plist on \(executer.address)")
         }
-
+        
+        var storeConfiguration = false
+        
         settings.CurrentDeviceUDID = nil
-
+                        
         let connectHardwareKeyboardFlag = false
 
         settings.AllowFullscreenMode = false
@@ -311,12 +332,15 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
                                                      totalSimulators: simulators.count,
                                                      maxSimulatorsPerRow: arrangeMaxSimulatorsPerRow)
             let windowCenter = "{\(center.x), \(center.y)}"
-
+            
             let devicePreferences = settings.DevicePreferences?[simulator.id] ?? .init()
-            devicePreferences.SimulatorExternalDisplay = nil
             devicePreferences.SimulatorWindowOrientation = "Portrait"
             devicePreferences.SimulatorWindowRotationAngle = 0
             devicePreferences.ConnectHardwareKeyboard = connectHardwareKeyboardFlag
+            if settings.DevicePreferences?[simulator.id] != devicePreferences {
+                storeConfiguration = true
+            }
+            devicePreferences.SimulatorExternalDisplay = nil
             settings.DevicePreferences?[simulator.id] = devicePreferences
 
             if settings.DevicePreferences?[simulator.id]?.SimulatorWindowGeometry == nil {
@@ -327,6 +351,9 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
                 let windowGeometry = settings.DevicePreferences?[simulator.id]?.SimulatorWindowGeometry?[screenIdentifier] ?? .init()
                 windowGeometry.WindowScale = Double(scaleFactor)
                 windowGeometry.WindowCenter = windowCenter
+                if settings.DevicePreferences?[simulator.id]?.SimulatorWindowGeometry?[screenIdentifier] != windowGeometry {
+                    storeConfiguration = true
+                }
                 settings.DevicePreferences?[simulator.id]?.SimulatorWindowGeometry?[screenIdentifier] = windowGeometry
 
                 executer.logger?.log(command: "Arranging simulator \(simulator.id) on \(executer.address) at location (\(center))")
@@ -337,8 +364,13 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
                 #endif
             }
         }
-
-        try simulatorProxy.storeSimulatorSettings(settings)
+        
+        if storeConfiguration {
+            try simulatorProxy.storeSimulatorSettings(settings)
+            return true
+        } else {
+            return false
+        }
     }
 
     private func arrangedSimulatorCenter(index: Int, executer: Executer, device: Device, displayMargin: Int, totalSimulators: Int, maxSimulatorsPerRow: Int) throws -> CGPoint {

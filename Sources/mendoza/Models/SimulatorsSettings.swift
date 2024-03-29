@@ -9,8 +9,20 @@ import Foundation
 
 extension CommandLineProxy.Simulators {
     class Settings: Codable {
-        class DevicePreferences: Codable {
-            class WindowGeometry: Codable {
+        class DevicePreferences: Codable, Equatable {
+            static func == (lhs: CommandLineProxy.Simulators.Settings.DevicePreferences, rhs: CommandLineProxy.Simulators.Settings.DevicePreferences) -> Bool {
+                lhs.SimulatorWindowGeometry == rhs.SimulatorWindowGeometry &&
+                lhs.SimulatorWindowOrientation == rhs.SimulatorWindowOrientation &&
+                lhs.ConnectHardwareKeyboard == rhs.ConnectHardwareKeyboard &&
+                lhs.SimulatorWindowRotationAngle == rhs.SimulatorWindowRotationAngle &&
+                lhs.SimulatorExternalDisplay == rhs.SimulatorExternalDisplay
+            }
+            
+            class WindowGeometry: Codable, Equatable {
+                static func == (lhs: CommandLineProxy.Simulators.Settings.DevicePreferences.WindowGeometry, rhs: CommandLineProxy.Simulators.Settings.DevicePreferences.WindowGeometry) -> Bool {
+                    lhs.WindowCenter == rhs.WindowCenter && lhs.WindowScale == rhs.WindowScale
+                }
+                
                 var WindowCenter: String?
                 var WindowScale: Double?
             }
