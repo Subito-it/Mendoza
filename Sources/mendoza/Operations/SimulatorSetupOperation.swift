@@ -47,7 +47,7 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
                     let nodeSimulators = try self.makeSimulators(node: source.node, executer: executer)
                     try self.bootSimulators(node: source.node, simulators: nodeSimulators)
                     try proxy.launch()
-                    
+
                     self.syncQueue.sync { [unowned self] in
                         self.simulators += nodeSimulators.map { (simulator: $0, node: source.node) }
                     }
@@ -66,13 +66,13 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
                 }
 
                 try proxy.installRuntimeIfNeeded(self.device.runtime, nodeAddress: source.node.address)
-                
+
                 let nodeSimulators = try self.makeSimulators(node: source.node, executer: executer)
 
                 try proxy.rewriteSettingsIfNeeded()
 
                 try self.updateSimulatorsSettings(executer: executer, simulators: nodeSimulators, arrangeSimulators: true)
-                
+
                 try proxy.enablePasteboardWorkaround()
                 try proxy.enableLowQualityGraphicOverrides()
                 try proxy.disableSimulatorBezel()
@@ -108,34 +108,34 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
         }
         super.cancel()
     }
-    
+
     private func makeSimulators(node: Node, executer: Executer) throws -> [Simulator] {
         let concurrentTestRunners: Int
         switch node.concurrentTestRunners {
         case let .manual(count) where count > 0: // swiftlint:disable:this empty_count
             concurrentTestRunners = Int(count)
         default:
-            concurrentTestRunners = try self.physicalCPUs(executer: executer, node: node) / 2
+            concurrentTestRunners = try physicalCPUs(executer: executer, node: node) / 2
         }
-        
+
         let simulatorNames = (1 ... concurrentTestRunners).map { "\(self.device.name)-\($0)" }
 
-        let proxy = CommandLineProxy.Simulators(executer: executer, verbose: self.verbose)
+        let proxy = CommandLineProxy.Simulators(executer: executer, verbose: verbose)
         let rawSimulatorStatus = try proxy.rawSimulatorStatus()
         let simulators = try simulatorNames.compactMap { try proxy.makeSimulatorIfNeeded(name: $0, device: self.device, cachedSimulatorStatus: rawSimulatorStatus) }
-        
+
         return simulators
     }
-    
+
     private func bootSimulators(node: Node, simulators: [Simulator]) throws {
         let bootQueue = OperationQueue()
 
         for simulator in simulators {
             let logger = ExecuterLogger(name: "\(type(of: self))-AsyncBoot", address: node.address)
-            self.addLogger(logger)
+            addLogger(logger)
 
-            let queueExecuter = try node.makeExecuter(logger: logger, environment: self.nodesEnvironment[node.address] ?? [:])
-            let queueProxy = CommandLineProxy.Simulators(executer: queueExecuter, verbose: self.verbose)
+            let queueExecuter = try node.makeExecuter(logger: logger, environment: nodesEnvironment[node.address] ?? [:])
+            let queueProxy = CommandLineProxy.Simulators(executer: queueExecuter, verbose: verbose)
 
             bootQueue.addOperation {
                 try? queueProxy.bootSynchronously(simulator: simulator)
@@ -150,9 +150,9 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
         }
         bootQueue.waitUntilAllOperationsAreFinished()
     }
-    
+
     private func waitForSimulatorProcessesToIdle(executer: Executer) {
-        if self.autodeleteSlowDevices {
+        if autodeleteSlowDevices {
             // Particularly on newly created devices it can happen that certain processes hug the simulators. For example healthappd seems
             // to take significant amount of cpu time on first device launch. This causes the initial tests to take longer to begin and this
             // in turn causes at the end of tests execution the slowdevices logic to kick in that will again delete simulators. To avoid the

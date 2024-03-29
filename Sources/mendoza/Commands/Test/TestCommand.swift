@@ -1,5 +1,5 @@
 //
-//  CommandTest.swift
+//  TestCommand.swift
 //  Mendoza
 //
 //  Created by Tomas Camin on 13/12/2018.
@@ -43,7 +43,7 @@ class TestCommand: Command {
     let buildConfiguration = Argument<String>(name: "name", kind: .named(short: nil, long: "build_configuration"), optional: true, help: "Build configuration. Default: Debug")
     let pluginsBasePath = Argument<URL>(name: "path", kind: .named(short: nil, long: "plugins_path"), optional: true, help: "The path to the folder containing Mendoza's plugins")
     let skipSimulatorsSetup = Flag(short: nil, long: "skip_sim_setup", help: "Use this flag to skip the simulator setup process. This is useful when you're certain that the simulators are already properly set up.")
-    
+
     func run() -> Bool {
         do {
             let configuration = try makeConfiguration()

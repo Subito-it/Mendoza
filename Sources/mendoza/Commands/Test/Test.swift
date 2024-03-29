@@ -8,7 +8,7 @@
 import Foundation
 
 class Test {
-    typealias RunOperation = LoggedOperation & BenchmarkedOperation
+    typealias RunOperation = BenchmarkedOperation & LoggedOperation
 
     var didFail: ((Swift.Error) -> Void)?
 
@@ -296,7 +296,7 @@ class Test {
                 testSessionResult.copy()
             }
         }
-        
+
         tearDownOperation.didEnd = { [unowned self] _ in
             self.tearDown(operations: operations, testSessionResult: testSessionResult, error: nil)
         }

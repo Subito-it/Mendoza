@@ -1,5 +1,5 @@
 //
-//  ConfigurationInitializer.swift
+//  RemoteConfigurationInitializer.swift
 //  Mendoza
 //
 //  Created by Tomas Camin on 08/01/2019.
@@ -16,7 +16,7 @@ struct RemoteConfigurationInitializer {
         let currentUrl = URL(fileURLWithPath: fileManager.currentDirectoryPath)
 
         let sdk = askProjectSdk()
-        
+
         let nodes = try askNodes(sdk: sdk)
 
         let destinationNode: Node
@@ -119,7 +119,7 @@ struct RemoteConfigurationInitializer {
             fatalError("Unexpected case \(result.index)")
         }
     }
-    
+
     func askProjectSdk() -> XcodeProject.SDK {
         let result = Bariloche.ask(title: "Will you run tests on macOS?", array: ["Yes", "No"])
         switch result.index {

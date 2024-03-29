@@ -1,5 +1,5 @@
 //
-//  ConfigurationValidator.swift
+//  RemoteConfigurationValidator.swift
 //  Mendoza
 //
 //  Created by Tomas Camin on 20/01/2019.
@@ -37,7 +37,7 @@ class RemoteConfigurationValidator {
 
     func validAuthentication(node: Node) -> Bool {
         guard AddressType(node: node) == .remote else { return true }
-        
+
         return node.authentication != nil
     }
 

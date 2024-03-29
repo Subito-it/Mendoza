@@ -1,5 +1,5 @@
 //
-//  ConfigurationInitCommand.swift
+//  RemoteConfigurationInitCommand.swift
 //  Mendoza
 //
 //  Created by Tomas Camin on 13/12/2018.

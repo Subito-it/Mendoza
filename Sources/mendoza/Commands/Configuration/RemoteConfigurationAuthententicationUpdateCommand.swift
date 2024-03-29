@@ -1,5 +1,5 @@
 //
-//  ConfigurationAuthententicationUpdateCommand.swift
+//  RemoteConfigurationAuthententicationUpdateCommand.swift
 //  Mendoza
 //
 //  Created by Tomas Camin on 30/01/2019.

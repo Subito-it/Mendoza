@@ -1,5 +1,5 @@
 //
-//  CleanupOpertion.swift
+//  CleanupOperation.swift
 //  Mendoza
 //
 //  Created by Tomas Camin on 05/03/2019.
