@@ -65,7 +65,7 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
                     _ = try? executer.execute("killall Simulator")
                 }
 
-                try proxy.installRuntimeIfNeeded(self.device.runtime, nodeAddress: source.node.address)
+                try proxy.checkIfRuntimeInstalled(self.device.runtime, nodeAddress: source.node.address)
 
                 let nodeSimulators = try self.makeSimulators(node: source.node, executer: executer)
 

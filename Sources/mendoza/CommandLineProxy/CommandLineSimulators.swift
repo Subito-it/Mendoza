@@ -81,7 +81,7 @@ extension CommandLineProxy {
             _ = try executer.execute("xcrun simctl terminate \(simulator.id) \(identifier)")
         }
 
-        func installRuntimeIfNeeded(_ runtime: String, nodeAddress: String) throws {
+        func checkIfRuntimeInstalled(_ runtime: String, nodeAddress: String) throws {
             let isRuntimeInstalled: () throws -> Bool = { [unowned self] in
                 let installedRuntimes = try self.executer.execute("xcrun simctl list runtimes 2>/dev/null")
                 let escapedRuntime = runtime.replacingOccurrences(of: ".", with: "-")
