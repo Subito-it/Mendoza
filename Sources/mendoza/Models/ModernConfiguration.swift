@@ -60,6 +60,7 @@ extension ModernConfiguration {
         let failingTestsRetryCount: Int?
         let xcresultBlobThresholdKB: Int?
         let killSimulatorProcesses: Bool
+        let alwaysRebootSimulators: Bool
         let autodeleteSlowDevices: Bool
         let codeCoveragePathEquivalence: String?
         let clearDerivedDataOnCompilationFailure: Bool

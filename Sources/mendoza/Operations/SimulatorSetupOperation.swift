@@ -19,16 +19,16 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
     private let testBundleIdentifier: String
     private let nodes: [Node]
     private let device: Device
-    private let autodeleteSlowDevices: Bool
+    private let alwaysRebootSimulators: Bool
     private let verbose: Bool
     private lazy var pool: ConnectionPool = makeConnectionPool(sources: nodes)
 
-    init(buildBundleIdentifier: String, testBundleIdentifier: String, nodes: [Node], device: Device, autodeleteSlowDevices: Bool, verbose: Bool) {
+    init(buildBundleIdentifier: String, testBundleIdentifier: String, nodes: [Node], device: Device, alwaysRebootSimulators: Bool, verbose: Bool) {
         self.buildBundleIdentifier = buildBundleIdentifier
         self.testBundleIdentifier = testBundleIdentifier
         self.nodes = nodes
         self.device = device
-        self.autodeleteSlowDevices = autodeleteSlowDevices
+        self.alwaysRebootSimulators = alwaysRebootSimulators
         self.verbose = verbose
     }
 
@@ -60,7 +60,7 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
                     rebootRequired.append(try proxy.increaseWatchdogExceptionTimeout(on: nodeSimulator, appBundleIndentifier: self.buildBundleIdentifier, testBundleIdentifier: self.testBundleIdentifier))
                 }
                 
-                if rebootRequired.contains(true) {
+                if rebootRequired.contains(true) || self.alwaysRebootSimulators {
                     try? proxy.shutdownAll() // Always shutting down simulators is the safest way to workaround unexpected Simulator.app hangs
                     try proxy.gracefullyQuit()
                 }
@@ -72,7 +72,7 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
                     try proxy.launch()
                 }
                 
-                if rebootRequired.contains(true) {
+                if rebootRequired.contains(true) || self.alwaysRebootSimulators {
                     self.waitForSimulatorProcessesToIdle(executer: executer)
                 }
 
