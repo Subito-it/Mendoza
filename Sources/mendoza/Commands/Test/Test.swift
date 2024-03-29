@@ -88,7 +88,7 @@ class Test {
         let compileOperation = CompileOperation(building: configuration.building, git: gitStatus, baseUrl: gitBaseUrl, project: project, scheme: configuration.building.scheme, preCompilationPlugin: preCompilationPlugin, postCompilationPlugin: postCompilationPlugin, clearDerivedDataOnCompilationFailure: clearDerivedDataOnCompilationFailure)
         let testExtractionOperation = TestExtractionOperation(baseUrl: gitBaseUrl, testTargetSourceFiles: testTargetSourceFiles, filePatterns: filePatterns, device: device, plugin: testExtractionPlugin)
         let testSortingOperation = TestSortingOperation(device: device, plugin: testSortingPlugin, verbose: configuration.verbose)
-        let simulatorSetupOperation = SimulatorSetupOperation(skipSetup: configuration.testing.skipSimulatorsSetup, buildBundleIdentifier: configuration.building.buildBundleIdentifier, testBundleIdentifier: configuration.building.testBundleIdentifier, nodes: uniqueNodes, device: device, autodeleteSlowDevices: configuration.testing.autodeleteSlowDevices, verbose: configuration.verbose)
+        let simulatorSetupOperation = SimulatorSetupOperation(buildBundleIdentifier: configuration.building.buildBundleIdentifier, testBundleIdentifier: configuration.building.testBundleIdentifier, nodes: uniqueNodes, device: device, autodeleteSlowDevices: configuration.testing.autodeleteSlowDevices, verbose: configuration.verbose)
         let processKillerOperation = ProcessKillerOperation(nodes: uniqueNodes)
         let distributeTestBundleOperation = DistributeTestBundleOperation(nodes: uniqueNodes)
         let testRunnerOperation = TestRunnerOperation(configuration: configuration, destinationPath: resultDestinationPath, testTarget: targets.test.name, productNames: productNames)

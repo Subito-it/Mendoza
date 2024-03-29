@@ -15,7 +15,6 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
     private let windowMenubarHeight = 38
 
     private let syncQueue = DispatchQueue(label: String(describing: SimulatorSetupOperation.self))
-    private let skipSetup: Bool
     private let buildBundleIdentifier: String
     private let testBundleIdentifier: String
     private let nodes: [Node]
@@ -24,8 +23,7 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
     private let verbose: Bool
     private lazy var pool: ConnectionPool = makeConnectionPool(sources: nodes)
 
-    init(skipSetup: Bool, buildBundleIdentifier: String, testBundleIdentifier: String, nodes: [Node], device: Device, autodeleteSlowDevices: Bool, verbose: Bool) {
-        self.skipSetup = skipSetup
+    init(buildBundleIdentifier: String, testBundleIdentifier: String, nodes: [Node], device: Device, autodeleteSlowDevices: Bool, verbose: Bool) {
         self.buildBundleIdentifier = buildBundleIdentifier
         self.testBundleIdentifier = testBundleIdentifier
         self.nodes = nodes
@@ -42,29 +40,6 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
 
             try pool.execute { executer, source in
                 let proxy = CommandLineProxy.Simulators(executer: executer, verbose: self.verbose)
-
-                if self.skipSetup {
-                    let nodeSimulators = try self.makeSimulators(node: source.node, executer: executer)
-                    try self.bootSimulators(node: source.node, simulators: nodeSimulators)
-                    try proxy.launch()
-
-                    self.syncQueue.sync { [unowned self] in
-                        self.simulators += nodeSimulators.map { (simulator: $0, node: source.node) }
-                    }
-
-                    return
-                }
-
-                // Killing CoreSimulatorService will reset and shutdown all Simulators
-                _ = try? executer.execute("killall -9 com.apple.CoreSimulator.CoreSimulatorService;")
-
-                let systemPath = try executer.execute("xcode-select -p")
-                let path = (self.nodesEnvironment[source.node.address]?["DEVELOPER_DIR"]) ?? systemPath
-                if try !(executer.execute("ps aux | grep Simulator.app").contains(path)) {
-                    // Launched Simulator is from a different Xcode version
-                    _ = try? executer.execute("killall Simulator")
-                }
-
                 try proxy.checkIfRuntimeInstalled(self.device.runtime, nodeAddress: source.node.address)
 
                 let nodeSimulators = try self.makeSimulators(node: source.node, executer: executer)
