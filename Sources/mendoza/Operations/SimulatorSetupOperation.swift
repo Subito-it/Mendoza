@@ -22,6 +22,7 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
     private let alwaysRebootSimulators: Bool
     private let verbose: Bool
     private lazy var pool: ConnectionPool = makeConnectionPool(sources: nodes)
+    private var cachedScreenResolution: ScreenResolution?
 
     init(buildBundleIdentifier: String, testBundleIdentifier: String, nodes: [Node], device: Device, alwaysRebootSimulators: Bool, verbose: Bool) {
         self.buildBundleIdentifier = buildBundleIdentifier
@@ -408,8 +409,12 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
     }
 
     private func screenResolution(executer: Executer) throws -> ScreenResolution {
+        if let cachedScreenResolution {
+            return cachedScreenResolution
+        }
         let rawResolution = try executer.execute(#"mendoza mendoza screen_point_size"#)
-        return try JSONDecoder().decode(ScreenResolution.self, from: Data(rawResolution.utf8))
+        cachedScreenResolution = try JSONDecoder().decode(ScreenResolution.self, from: Data(rawResolution.utf8))
+        return cachedScreenResolution!
     }
 
     private func simulatorsWindowLocation(executer: Executer) throws -> [SimulatorWindowLocation] {
