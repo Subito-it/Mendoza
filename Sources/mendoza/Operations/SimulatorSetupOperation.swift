@@ -64,9 +64,13 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
                     try? proxy.shutdownAll() // Always shutting down simulators is the safest way to workaround unexpected Simulator.app hangs
                     try proxy.gracefullyQuit()
                 }
+                
+                let bootedSimulators = try proxy.bootedSimulators()
 
-                try self.bootSimulators(node: source.node, simulators: nodeSimulators)
-                try proxy.launch()
+                try self.bootSimulators(node: source.node, simulators: nodeSimulators.filter { !bootedSimulators.contains($0) })
+                if nodeSimulators.count != bootedSimulators.count {
+                    try proxy.launch()
+                }
                 
                 if rebootRequired.contains(true) {
                     self.waitForSimulatorProcessesToIdle(executer: executer)
@@ -110,7 +114,7 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
 
     private func bootSimulators(node: Node, simulators: [Simulator]) throws {
         let bootQueue = OperationQueue()
-
+        
         for simulator in simulators {
             let logger = ExecuterLogger(name: "\(type(of: self))-AsyncBoot", address: node.address)
             addLogger(logger)
@@ -291,7 +295,9 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
         var loadedScreenIdentifier: String?
         loadedSettings = try simulatorProxy.loadSimulatorSettings()
         if loadedSettings?.ScreenConfigurations == nil {
-            _ = try? executer.execute("killall Simulator")
+            try simulatorProxy.launch()
+            Thread.sleep(forTimeInterval: 5.0)
+            
             loadedSettings = try simulatorProxy.loadSimulatorSettings()
         }
         if let keys = loadedSettings?.ScreenConfigurations?.keys {
@@ -365,12 +371,9 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
             }
         }
         
-        if storeConfiguration {
-            try simulatorProxy.storeSimulatorSettings(settings)
-            return true
-        } else {
-            return false
-        }
+        try simulatorProxy.storeSimulatorSettings(settings)
+        
+        return storeConfiguration
     }
 
     private func arrangedSimulatorCenter(index: Int, executer: Executer, device: Device, displayMargin: Int, totalSimulators: Int, maxSimulatorsPerRow: Int) throws -> CGPoint {
