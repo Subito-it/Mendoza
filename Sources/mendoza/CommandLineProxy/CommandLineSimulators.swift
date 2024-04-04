@@ -335,9 +335,9 @@ extension CommandLineProxy {
                 let uniqueUrl = Path.temp.url.appendingPathComponent("\(UUID().uuidString).plist")
                 try self.executer.download(remotePath: self.settingsPath, localUrl: uniqueUrl)
 
-                guard let data = try? Data(contentsOf: uniqueUrl) else { return nil }
+                let data = try Data(contentsOf: uniqueUrl)
 
-                return try? PropertyListDecoder().decode(Simulators.Settings.self, from: data)
+                return try PropertyListDecoder().decode(Simulators.Settings.self, from: data)
             }
 
             var settings: Simulators.Settings?
