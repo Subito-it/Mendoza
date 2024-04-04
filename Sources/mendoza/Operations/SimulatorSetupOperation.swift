@@ -62,6 +62,8 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
                 }
                 
                 if rebootRequired.contains(true) || self.alwaysRebootSimulators {
+                    print("Rebooting simulators")
+                    
                     try? proxy.shutdownAll() // Always shutting down simulators is the safest way to workaround unexpected Simulator.app hangs
                     try proxy.gracefullyQuit()
                 }
