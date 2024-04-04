@@ -294,6 +294,7 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
         var loadedScreenIdentifier: String?
         loadedSettings = try simulatorProxy.loadSimulatorSettings()
         if loadedSettings?.ScreenConfigurations == nil {
+            try simulatorProxy.gracefullyQuit()
             try simulatorProxy.launch()
             Thread.sleep(forTimeInterval: 5.0)
             
