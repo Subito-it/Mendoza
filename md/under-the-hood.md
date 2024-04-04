@@ -24,7 +24,7 @@ Prepares filesystem on the compiling node.
 
 ### remoteSetupOperation
 
-Prepares filesystem on the remote testing nodes. Initializes RAM disks if necessary.
+Prepares filesystem on the remote testing nodes.
 
 ### wakeupOperation
 

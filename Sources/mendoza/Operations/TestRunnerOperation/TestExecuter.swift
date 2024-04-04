@@ -191,7 +191,7 @@ extension TestExecuter {
 
                     testCaseResult = result
                 case .noSpaceOnDevice:
-                    fatalError("💣 No space left on \(executer.address). If you're using a RAM disk in Mendoza's configuration consider increasing size")
+                    fatalError("💣 No space left on \(executer.address).")
                 }
             }
 
