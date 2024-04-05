@@ -127,6 +127,9 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
             let queueProxy = CommandLineProxy.Simulators(executer: queueExecuter, verbose: verbose)
 
             bootQueue.addOperation {
+                #if DEBUG
+                    Swift.print("Booting \(simulator.id)")
+                #endif
                 try? queueProxy.bootSynchronously(simulator: simulator)
 
                 queueProxy.enableXcode11ReleaseNotesWorkarounds(on: simulator)
@@ -134,6 +137,10 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
                 queueProxy.disableSlideToType(on: simulator)
                 _ = try? queueProxy.disablePasswordAutofill(on: simulator)
                 
+                #if DEBUG
+                    Swift.print("Booted \(simulator.id)")
+                #endif
+
                 try? logger.dump()
             }
         }
