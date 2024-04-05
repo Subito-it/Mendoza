@@ -36,7 +36,8 @@ extension CommandLineProxy {
         }
 
         func gracefullyQuit() throws {
-            let commands = ["mendoza mendoza close_simulator_app",
+            let commands = ["defaults read com.apple.iphonesimulator &>/dev/null", // This (unexpectedly) ensures that settings in ~/Library/Preferences/com.apple.iphonesimulator.plist get reloaded
+                            "mendoza mendoza close_simulator_app",
                             "sleep 3"]
 
             try commands.forEach { _ = try executer.execute("\($0) 2>/dev/null || true") }
