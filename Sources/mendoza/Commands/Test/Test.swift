@@ -362,7 +362,7 @@ class Test {
     }
 
     private func monitorOperationsExecutionTime(_ operations: [Operation], testSessionResult: TestSessionResult) {
-        operations.forEach { op in
+        for op in operations {
             let observer = op.observe(\Operation.isFinished) { [unowned self] op, _ in
                 guard let op = op as? BenchmarkedOperation else { return }
 
@@ -377,7 +377,7 @@ class Test {
                 }
             }
 
-            self.observers.append(observer)
+            observers.append(observer)
         }
     }
 }

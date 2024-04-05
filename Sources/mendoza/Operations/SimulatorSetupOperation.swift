@@ -41,40 +41,40 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
 
             try pool.execute { executer, source in
                 let proxy = CommandLineProxy.Simulators(executer: executer, verbose: self.verbose)
-                
+
                 try proxy.checkIfRuntimeInstalled(self.device.runtime, nodeAddress: source.node.address)
 
                 var rebootRequired = [Bool]()
-                
-                rebootRequired.append(try self.shutdownSimulatorOnXcodeVersionMismatch(executer: executer, node: source.node))
-                
+
+                try rebootRequired.append(self.shutdownSimulatorOnXcodeVersionMismatch(executer: executer, node: source.node))
+
                 let nodeSimulators = try self.makeSimulators(node: source.node, executer: executer)
-                
-                rebootRequired.append(try proxy.deleteSettingsIfNeeded())
-                rebootRequired.append(try proxy.enablePasteboardWorkaround())
-                rebootRequired.append(try proxy.enableLowQualityGraphicOverrides())
-                rebootRequired.append(try proxy.disableSimulatorBezel())
-                rebootRequired.append(try self.updateSimulatorsSettings(executer: executer, simulators: nodeSimulators, arrangeSimulators: true))
+
+                try rebootRequired.append(proxy.deleteSettingsIfNeeded())
+                try rebootRequired.append(proxy.enablePasteboardWorkaround())
+                try rebootRequired.append(proxy.enableLowQualityGraphicOverrides())
+                try rebootRequired.append(proxy.disableSimulatorBezel())
+                try rebootRequired.append(self.updateSimulatorsSettings(executer: executer, simulators: nodeSimulators, arrangeSimulators: true))
 
                 for nodeSimulator in nodeSimulators {
-                    rebootRequired.append(try proxy.updateLanguage(on: nodeSimulator, language: self.device.language, locale: self.device.locale))
-                    rebootRequired.append(try proxy.increaseWatchdogExceptionTimeout(on: nodeSimulator, appBundleIndentifier: self.buildBundleIdentifier, testBundleIdentifier: self.testBundleIdentifier))
+                    try rebootRequired.append(proxy.updateLanguage(on: nodeSimulator, language: self.device.language, locale: self.device.locale))
+                    try rebootRequired.append(proxy.increaseWatchdogExceptionTimeout(on: nodeSimulator, appBundleIndentifier: self.buildBundleIdentifier, testBundleIdentifier: self.testBundleIdentifier))
                 }
-                
+
                 if rebootRequired.contains(true) || self.alwaysRebootSimulators {
                     print("Rebooting simulators")
-                    
+
                     try? proxy.shutdownAll() // Always shutting down simulators is the safest way to workaround unexpected Simulator.app hangs
                     try proxy.gracefullyQuit()
                 }
-                
+
                 let bootedSimulators = try proxy.bootedSimulators()
 
                 try self.bootSimulators(node: source.node, simulators: nodeSimulators.filter { !bootedSimulators.contains($0) })
                 if nodeSimulators.count != bootedSimulators.count {
                     try proxy.launch()
                 }
-                
+
                 if rebootRequired.contains(true) || self.alwaysRebootSimulators {
                     self.waitForSimulatorProcessesToIdle(executer: executer)
                 }
@@ -118,7 +118,7 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
 
     private func bootSimulators(node: Node, simulators: [Simulator]) throws {
         let bootQueue = OperationQueue()
-        
+
         for simulator in simulators {
             let logger = ExecuterLogger(name: "\(type(of: self))-AsyncBoot", address: node.address)
             addLogger(logger)
@@ -177,16 +177,16 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
 
         return concurrentTestRunners
     }
-    
+
     private func shutdownSimulatorOnXcodeVersionMismatch(executer: Executer, node: Node) throws -> Bool {
         let systemPath = try executer.execute("xcode-select -p")
-        let path = (self.nodesEnvironment[node.address]?["DEVELOPER_DIR"]) ?? systemPath
+        let path = (nodesEnvironment[node.address]?["DEVELOPER_DIR"]) ?? systemPath
         if try !(executer.execute("ps aux | grep Simulator.app").contains(path)) {
             // Launched Simulator is from a different Xcode version
-            
+
             _ = try? executer.execute("killall -9 com.apple.CoreSimulator.CoreSimulatorService;") // Killing CoreSimulatorService will reset and shutdown all Simulators
             _ = try? executer.execute("killall Simulator")
-            
+
             return true
         }
 
@@ -300,7 +300,7 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
             try simulatorProxy.gracefullyQuit()
             try simulatorProxy.launch()
             Thread.sleep(forTimeInterval: 5.0)
-            
+
             loadedSettings = try simulatorProxy.loadSimulatorSettings()
         }
         if let keys = loadedSettings?.ScreenConfigurations?.keys {
@@ -310,11 +310,11 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
         guard let settings = loadedSettings, let screenIdentifier = loadedScreenIdentifier else {
             fatalError("💣 Failed to get screenIdentifier from simulator plist on \(executer.address)")
         }
-        
+
         var storeConfiguration = false
-        
+
         settings.CurrentDeviceUDID = nil
-                        
+
         let connectHardwareKeyboardFlag = false
 
         settings.AllowFullscreenMode = false
@@ -341,7 +341,7 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
                                                      totalSimulators: simulators.count,
                                                      maxSimulatorsPerRow: arrangeMaxSimulatorsPerRow)
             let windowCenter = "{\(center.x), \(center.y)}"
-            
+
             let devicePreferences = settings.DevicePreferences?[simulator.id] ?? .init()
             devicePreferences.SimulatorWindowOrientation = "Portrait"
             devicePreferences.SimulatorWindowRotationAngle = 0
@@ -373,9 +373,9 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
                 #endif
             }
         }
-        
+
         try simulatorProxy.storeSimulatorSettings(settings)
-        
+
         return storeConfiguration
     }
 

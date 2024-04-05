@@ -95,12 +95,12 @@ private extension Process {
 
         let exports = ExecuterEnvironment.exportsCommand(for: environment)
         arguments = ["-c", "\(Shell.current().source) \(exports) \(LocalExecuter.executablePathExport()) \(cmd)"]
-        
+
         let pipe = Pipe()
         standardOutput = pipe
         standardError = pipe
         qualityOfService = .userInteractive
-        
+
         var outputData = Data()
 
         if progress != nil {
@@ -110,7 +110,7 @@ private extension Process {
                 outputData.append(data)
             }
         }
-                        
+
         let currentShell = Shell.current()
 
         do {
@@ -120,7 +120,7 @@ private extension Process {
                 }
 
                 executableURL = currentShell.url
-                            
+
                 try run()
             } else {
                 if let currentPath = currentUrl?.path {
@@ -137,9 +137,9 @@ private extension Process {
         } catch {
             throw Error(error.localizedDescription)
         }
-        
+
         var trailingData = Data()
-        
+
         if progress == nil {
             // This is neeeded to prevent commands producing large output to hang. This is likely related to
             // https://github.com/kareman/SwiftShell/issues/52 and https://stackoverflow.com/q/33423993
@@ -149,7 +149,7 @@ private extension Process {
         }
 
         waitUntilExit()
-        
+
         trailingData += pipe.fileHandleForReading.readDataToEndOfFile()
 
         progress?(String(decoding: trailingData, as: UTF8.self))

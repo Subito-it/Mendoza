@@ -59,7 +59,7 @@ extension CommandLineProxy {
             let commands = ["defaults delete com.apple.iphonesimulator", // Delete iphone simulator settings to remove multiple `ScreenConfigurations` if present
                             "rm -rf '\(executer.homePath)/Library/Saved Application State/com.apple.iphonesimulator.savedState'"]
             try commands.forEach { _ = try executer.execute("\($0) 2>/dev/null || true") }
-            
+
             return true
         }
 
@@ -93,8 +93,8 @@ extension CommandLineProxy {
 
         func disableSimulatorBezel() throws -> Bool {
             var updates = [Bool]()
-            updates.append(try updateSimulatorDefaultsIfNeeded(key: "FloatingNameMode", value: 3))
-            updates.append(try updateSimulatorDefaultsIfNeeded(key: "ShowChrome", value: false))
+            try updates.append(updateSimulatorDefaultsIfNeeded(key: "FloatingNameMode", value: 3))
+            try updates.append(updateSimulatorDefaultsIfNeeded(key: "ShowChrome", value: false))
             return updates.contains(true)
         }
 
@@ -116,17 +116,17 @@ extension CommandLineProxy {
             let paths = [
                 "~/Library/Developer/CoreSimulator/Devices/\(simulator.id)/data/Containers/Shared/SystemGroup/systemgroup.com.apple.configurationprofiles/Library/ConfigurationProfiles/UserSettings.plist",
                 "~/Library/Developer/CoreSimulator/Devices/\(simulator.id)/data/Library/UserConfigurationProfiles/EffectiveUserSettings.plist",
-                "~/Library/Developer/CoreSimulator/Devices/\(simulator.id)/data/Library/UserConfigurationProfiles/PublicInfo/PublicEffectiveUserSettings.plist"
+                "~/Library/Developer/CoreSimulator/Devices/\(simulator.id)/data/Library/UserConfigurationProfiles/PublicInfo/PublicEffectiveUserSettings.plist",
             ]
-            
+
             var updates = [Bool]()
             for path in paths {
-                updates.append(try updatePlistIfNeeded(path: path, key: "restrictedBool.allowPasswordAutoFill.value", value: false))
+                try updates.append(updatePlistIfNeeded(path: path, key: "restrictedBool.allowPasswordAutoFill.value", value: false))
             }
-            
+
             return updates.contains(true)
         }
-        
+
         func enableXcode11ReleaseNotesWorkarounds(on simulator: Simulator) {
             // See release notes workarounds: https://developer.apple.com/documentation/xcode_release_notes/xcode_11_release_notes?language=objc
             // These settings are hot loaded no reboot of the device is necessary
@@ -193,12 +193,12 @@ extension CommandLineProxy {
         func increaseWatchdogExceptionTimeout(on simulator: Simulator, appBundleIndentifier: String, testBundleIdentifier: String, timeout: Int = 120) throws -> Bool {
             let path = "\(simulatorSettingsPath(for: simulator))/com.apple.springboard.plist"
             let identifiers = [appBundleIndentifier, testBundleIdentifier]
-            
+
             var updates = [Bool]()
             for identifier in identifiers {
                 let key = "FBLaunchWatchdogExceptions.\(identifier.replacingOccurrences(of: ".", with: #"\\"#))"
-            
-                updates.append(try updatePlistIfNeeded(path: path, key: key, value: timeout))
+
+                try updates.append(updatePlistIfNeeded(path: path, key: key, value: timeout))
             }
 
             return updates.contains(true)
@@ -367,40 +367,40 @@ extension CommandLineProxy {
         private func simulatorSettingsPath(for simulator: Simulator) -> String {
             "~/Library/Developer/CoreSimulator/Devices/\(simulator.id)/data/Library/Preferences"
         }
-        
+
         private func updateSimulatorDefaultsIfNeeded(key: String, value: Bool) throws -> Bool {
             if try executer.execute("defaults read com.apple.iphonesimulator \(key) 2>/dev/null || true") != (value ? "1" : "0") {
                 _ = try executer.execute("defaults write com.apple.iphonesimulator \(key) -bool \(value ? "true" : "false")")
                 return true
             }
-            
+
             return false
         }
-        
+
         private func updateSimulatorDefaultsIfNeeded(key: String, value: Int) throws -> Bool {
             if try executer.execute("defaults read com.apple.iphonesimulator \(key) 2>/dev/null || true") != value.description {
                 _ = try executer.execute("defaults write com.apple.iphonesimulator \(key) \(value)")
                 return true
             }
-            
+
             return false
         }
-        
+
         private func updatePlistIfNeeded(path: String, key: String, value: Bool) throws -> Bool {
             if try executer.execute("ls '\(path)' &>/dev/null && plutil -extract \(key) raw '\(path)' || true") != (value ? "true" : "false") {
                 _ = try? executer.execute("plutil -replace \(key) -bool \(value ? "YES" : "NO") '\(path)'")
                 return true
             }
-            
+
             return false
         }
-        
+
         private func updatePlistIfNeeded(path: String, key: String, value: Int) throws -> Bool {
             if try executer.execute("ls '\(path)' &>/dev/null && plutil -extract \(key) raw '\(path)' || true") != value.description {
                 _ = try? executer.execute("plutil -replace \(key) -integer \(value.description) '\(path)'")
                 return true
             }
-            
+
             return false
         }
     }
