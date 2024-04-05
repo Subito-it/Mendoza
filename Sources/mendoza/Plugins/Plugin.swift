@@ -10,26 +10,27 @@ import Foundation
 
 class Plugin<Input: DefaultInitializable, Output: DefaultInitializable> {
     var isInstalled: Bool {
-        fileManager.fileExists(atPath: baseUrl.appendingPathComponent(filename).path)
+        guard let baseUrl else { return false }
+        return fileManager.fileExists(atPath: baseUrl.appendingPathComponent(filename).path)
     }
 
     let logger: ExecuterLogger
-    let plugin: (data: String?, debug: Bool)
+    let plugin: Configuration.Plugins
 
     private let executer: LocalExecuter
     private let name: String
-    private let baseUrl: URL
+    private let baseUrl: URL?
     private var filename: String { "\(name).swift" }
     private let fileManager = FileManager.default
 
     private let pluginOutputMarker = "# plugin-result"
 
-    init(name: String, baseUrl: URL, plugin: (data: String?, debug: Bool)) {
+    init(name: String, baseUrl: URL?, plugin: Configuration.Plugins?) {
         logger = ExecuterLogger(name: "Plugin-\(name)", address: "localhost")
         executer = LocalExecuter(logger: logger)
         self.name = name
         self.baseUrl = baseUrl
-        self.plugin = plugin
+        self.plugin = plugin ?? .init()
     }
 
     func terminate() {
@@ -37,6 +38,10 @@ class Plugin<Input: DefaultInitializable, Output: DefaultInitializable> {
     }
 
     func run(input: Input) throws -> Output {
+        guard let baseUrl else {
+            return Output.defaultInit()
+        }
+
         let start = CFAbsoluteTimeGetCurrent()
         defer { print("🔌 Plugin \(name) took \(CFAbsoluteTimeGetCurrent() - start)s".magenta) }
 
@@ -106,7 +111,8 @@ class Plugin<Input: DefaultInitializable, Output: DefaultInitializable> {
     }
 
     func writeTemplate() throws {
-        let destinationUrl = baseUrl.appendingPathComponent(filename)
+        guard let destinationUrl = baseUrl?.appendingPathComponent(filename) else { return }
+
         var content = [String]()
 
         content += ["#!/usr/bin/swift", ""]

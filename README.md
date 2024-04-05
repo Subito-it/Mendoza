@@ -1,10 +1,8 @@
 # 🍷 Mendoza 
 
-Mendoza allows to parallelize Apple's UI Tests over multiple physical machines. While Xcode recently introduced parallelization it is limited to a single local machine requiring top-notch hardware to run tests on several instances at once. Both macOS and iOS projects are supported.
+Mendoza is a tool designed to offer a more flexible approach to UI Tests parallelization. It allows to dispatch tests execution on an unlimited number of remote machines significantly reducing the time required to run your test suites.
 
-Mendoza is designed to parallelize tests on an unlimited number of different machines offering a scalable solution to reduce UI Testing's execution times. There are no particular contraints on the hardware that can be used, as an example we use rather oldish 2013 i5 MacBooks.
-
-The tool is flexible thanks to [plugins](#Plugins) (that you can write in Swift 😎) allowing to heavily customize several steps in the dispatching pipeline.
+The tools functionality can be extended by adding [plugins](#Plugins) allowing to heavily customize several steps in the dispatching pipeline.
 
 The outcome of a test session will be a set of log files (.json, .html) and a single .xcresult bunble that will contain all results as if all tests were run on a single machine.
 
@@ -20,6 +18,8 @@ A snapshot of a session running on 8 concurrent nodes (each running 2 simulators
 🔌 | Supports plugins (written in Swift!) |
 🔍 | Wide set of result formats |
 🤖 | Supports both iOS and macOS projects |
+
+While the tool is particularly designed for remote execution it enhances local execution as well.
 
 
 # How does it work
@@ -60,7 +60,25 @@ xed .
 
 From the target selection select the Mendoza project and add `/usr/local/include` to 'Header Search Paths' and `/usr/local/lib` to 'Library Search Paths'.
 
-# Quick start
+# Quick start - Local execution
+
+#### iOS project
+
+```
+mendoza test --project SomeProject.xcworkspace --scheme SomeScheme --local_destination_path=/Users/SomeUser/Desktop --device_name="iPhone 8" --device_runtime="12.1"
+```
+
+#### macOS project
+
+```
+mendoza test --project SomeProject.xcworkspace --scheme SomeScheme --local_destination_path=/Users/SomeUser/Desktop
+
+```
+
+This will compile your project, distribute the test bundles, execute the tests, collect the results together on the _destination_ node that was specified during setup and generate a set of [output files](#test-output).
+
+
+# Quick start - Remote execution
 
 Inside your project folder run
 
@@ -74,13 +92,14 @@ this will prompt you with a series of (fairly self-explanatory) questions and pr
 #### iOS project
 
 ```
-mendoza test config.json --device_name="iPhone 8" --device_runtime="12.1"
+mendoza test --project SomeProject.xcworkspace --scheme SomeScheme --remote_nodes_configuration configuration_file_generated_above.json --device_name="iPhone 8" --device_runtime="12.1"
 ```
 
 #### macOS project
 
 ```
-mendoza test configuration.json
+mendoza test --project SomeProject.xcworkspace --scheme SomeScheme --remote_nodes_configuration configuration_file_generated_above.json
+
 ```
 
 This will compile your project, distribute the test bundles, execute the tests, collect the results together on the _destination_ node that was specified during setup and generate a set of [output files](#test-output).
@@ -91,7 +110,7 @@ This will compile your project, distribute the test bundles, execute the tests, 
 
 ## `configuration init`
 
-Generates a new configuration file required to execute tests. you will be prompted with a series of (fairly self-explanatory) questions which will produce a json configuration file as an output.
+Generates a new configuration file required to execute tests remotely. you will be prompted with a series of (fairly self-explanatory) questions which will produce a json configuration file as an output.
 
 ### Concepts
 
@@ -102,7 +121,6 @@ When setting up nodes you'll be asked:
 - label that identifies the node
 - address
 - authentication method
-- ram disk: you can optionally specify if the node should use a ram disk. This has a significant benefit in performances on older machines that have no SSD disk. 
 
 *iOS projects only*
 - concurrent simulators: manually enter the number of concurrent simulators to use at once. The rule of thumb is that you can run 1 simulator per physical CPU core. Specifying more that one simulator per core will work but this will result in slower total execution time because the node will be over-utilized.
@@ -123,31 +141,6 @@ This command allows to create a plugin template script that will be used during 
 
 Will launch tests as specified in the configuration files.
 
-#### Required parameters
-
-- path to the configuration file
-
-*iOS projects only*
-- --device_name=name: device name to use to run tests. e.g. 'iPhone 8'
-- --device_runtime=version: device runtime to use to run tests. e.g. '13.1'
-
-#### Optional parameters
-
-- --timeout=[minutes]: maximum allowed idle time (in seconds) in test standard output before dispatch process is automatically terminated. (default: 60s)
-- --failure_retry=[count]: the number of times a failing tests should be repeated
-- --device_language=[language]: the device's language. e.g. 'en-EN'
-- --device_locale=[locale]: the device's locale. e.g. 'en_US'
-- --include_files=[files]: specify from which files UI tests should be extracted. Accepts wildcards and comma separated. e.g SBTA*.swift,SBTF*.swift. (default: '*.swift')
-- --exclude_files=[files]: specify which files should be skipped when extracting UI tests. Accepts wildcards and comma separated. e.g SBTA*.swift,SBTF*.swift. (default: '')
-- --plugin_data=[data]: a custom string that can be used to inject data to plugins
-- --plugin_debug: write log files for plugin development. Refer to the [plugins](#Plugins) paragraph
-- --nonHeadlessSimulatorsFlag: run simulators in non headless mode. This will make testing slightly slower because devices need to be booted an arranged properly
-- --use_localhost: 🔥 when passing these flag tests will be dispatched on the localhost as well even if it is not specified in the configuration file. This is useful when launching tests locally leveraging additional simulators of your own development machine
-- --xcode_buildnumber=[number]: when multiple xcode versions are installed on the dispatching nodes automatically switch to the specified Xcode build number version (e.g. 12E507 as shown in the About window)
-- --xcresult_blob_threshold_kb=[size]: to reduce the size of the final xcresult it is possible to specify the maximum blob size of the xcresult Data objects. Big blobs are usually trace files that are collected during test execution which might not be needed in all cases. A reasonable value is 1024
-- --llvm_cov_equivalence_path=[path]: the path equivalence that will be passed to 'llvm-cov show' when generating code coverage (<from>,<to>)
-- --clear_derived_data_on_failure: on compilation failure derived data will be cleared and compilation will be retried once
-- --skip_result_merge: skip xcresult merge (keep one xcresult per test in the result folder)
 
 ### Test output
 

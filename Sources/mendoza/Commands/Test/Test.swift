@@ -8,92 +8,30 @@
 import Foundation
 
 class Test {
-    typealias RunOperation = LoggedOperation & BenchmarkedOperation
+    typealias RunOperation = BenchmarkedOperation & LoggedOperation
 
     var didFail: ((Swift.Error) -> Void)?
 
     // swiftlint:disable:next large_tuple
-    private let userOptions: (configuration: Configuration, skipResultMerge: Bool, filePatterns: FilePatterns, maximumStdOutIdleTime: Int?, maximumTestExecutionTime: Int?, failingTestsRetryCount: Int, codeCoveragePathEquivalence: String?, clearDerivedDataOnCompilationFailure: Bool, autodeleteSlowDevices: Bool, dispatchOnLocalHost: Bool, xcresultBlobThresholdKB: Int?, xcodeBuildNumber: String?, killSimulatorProcesses: Bool, verbose: Bool)
-    private let plugin: (data: String?, debug: Bool)
+    private let configuration: Configuration
     private let eventPlugin: EventPlugin
-    private let pluginUrl: URL
+    private let pluginUrl: URL?
     private let syncQueue = DispatchQueue(label: String(describing: Test.self))
     private let timestamp: String
     private var observers = [NSKeyValueObservation]()
 
-    init(configurationUrl: URL, device: Device?, skipResultMerge: Bool, clearDerivedDataOnCompilationFailure: Bool, filePatterns: FilePatterns, maximumStdOutIdleTime _: Int?, maximumTestExecutionTime: Int?, failingTestsRetryCount: Int, codeCoveragePathEquivalence: String?, xcodeBuildNumber: String?, autodeleteSlowDevices: Bool, dispatchOnLocalHost: Bool, excludedNodes: String?, xcresultBlobThresholdKB: Int?, killSimulatorProcesses: Bool, pluginData: String?, debugPlugins: Bool, verbose: Bool) throws {
-        plugin = (data: pluginData, debug: debugPlugins)
+    init(configuration: Configuration, pluginUrl: URL?) throws {
+        self.configuration = configuration
+        self.pluginUrl = pluginUrl
 
-        let configurationData = try Data(contentsOf: configurationUrl)
-        var configuration = try JSONDecoder().decode(Configuration.self, from: configurationData)
-
-        var configurationNodes = configuration.nodes
-        if dispatchOnLocalHost, !configuration.nodes.contains(where: { AddressType(node: $0) == .local }) { // add localhost
-            // This might be wrong since Node.localhost does not have an administrator password which might be needed for certain tasks
-            configurationNodes = configuration.nodes + [Node.localhost()]
-        }
-        if let excludedNodes = excludedNodes?.components(separatedBy: ",") {
-            configurationNodes = configurationNodes.filter { node in !excludedNodes.contains(node.address) && !excludedNodes.contains(node.name) }
-            if configurationNodes.isEmpty {
-                throw Error("No dispatch nodes left, double check that the --exclude_nodes parameter does not contain all nodes specified in the configuration files")
-            }
-        }
-
-        let resultDestination: Configuration.ResultDestination
-        if AddressType(node: configuration.resultDestination.node) == .local {
-            resultDestination = .init(node: Node.localhost(), path: configuration.resultDestination.path)
-        } else {
-            resultDestination = configuration.resultDestination
-        }
-
-        let updatedConfiguration = Configuration(projectPath: configuration.projectPath,
-                                                 workspacePath: configuration.workspacePath,
-                                                 buildBundleIdentifier: configuration.buildBundleIdentifier,
-                                                 testBundleIdentifier: configuration.testBundleIdentifier,
-                                                 scheme: configuration.scheme,
-                                                 buildConfiguration: configuration.buildConfiguration,
-                                                 resultDestination: resultDestination,
-                                                 nodes: configurationNodes,
-                                                 compilation: configuration.compilation,
-                                                 sdk: configuration.sdk,
-                                                 device: device ?? configuration.device,
-                                                 xcresultBlobThresholdKB: xcresultBlobThresholdKB ?? configuration.xcresultBlobThresholdKB)
-        configuration = updatedConfiguration
-
-        userOptions = (configuration: configuration, skipResultMerge: skipResultMerge, filePatterns: filePatterns, maximumStdOutIdleTime: maximumTestExecutionTime, maximumTestExecutionTime: maximumTestExecutionTime, failingTestsRetryCount: failingTestsRetryCount, codeCoveragePathEquivalence: codeCoveragePathEquivalence, clearDerivedDataOnCompilationFailure: clearDerivedDataOnCompilationFailure, autodeleteSlowDevices: autodeleteSlowDevices, dispatchOnLocalHost: dispatchOnLocalHost, xcresultBlobThresholdKB: xcresultBlobThresholdKB, xcodeBuildNumber: xcodeBuildNumber, killSimulatorProcesses: killSimulatorProcesses, verbose: verbose)
-
-        pluginUrl = configurationUrl.deletingLastPathComponent()
-        eventPlugin = EventPlugin(baseUrl: pluginUrl, plugin: plugin)
+        eventPlugin = EventPlugin(baseUrl: pluginUrl, plugin: configuration.plugins)
 
         timestamp = Test.currentTimestamp()
     }
 
     func run() throws {
-        guard let sdk = XcodeProject.SDK(rawValue: userOptions.configuration.sdk) else {
-            throw Error("Invalid sdk \(userOptions.configuration.sdk)")
-        }
-
-        switch sdk {
-        case .ios:
-            if userOptions.configuration.device?.name.isEmpty == true, userOptions.configuration.device?.name.isEmpty == true {
-                throw Error("Missing required arguments `--device_name=name, --device_runtime=version`".red)
-            } else if userOptions.configuration.device?.name.isEmpty == true {
-                throw Error("Missing required arguments `--device_name=name`".red)
-            } else if userOptions.configuration.device?.runtime.isEmpty == true {
-                throw Error("Missing required arguments `--device_runtime=version`".red)
-            }
-        case .macos:
-            break
-        }
-
-        if let codeCoveragePathEquivalence = userOptions.codeCoveragePathEquivalence {
-            if codeCoveragePathEquivalence.components(separatedBy: ",").count % 2 != 0 {
-                throw Error("Invalid format for --llvm_cov_equivalence_path parameter, expecting --llvm_cov_equivalence_path=<from>,<to> with even number of pairs".red)
-            }
-        }
-
         print("ℹ️  Dispatching on".magenta.bold)
-        let nodes = Array(Set(userOptions.configuration.nodes.map(\.address) + (userOptions.dispatchOnLocalHost ? ["localhost"] : []))).sorted()
+        let nodes = Array(Set(configuration.nodes.map(\.address))).sorted()
         print(nodes.joined(separator: "\n").magenta)
 
         let git = Git(executer: LocalExecuter())
@@ -102,65 +40,64 @@ class Test {
         let queue = OperationQueue()
 
         let testSessionResult = TestSessionResult()
-        let arguments: [String?] = [userOptions.configuration.device?.name,
-                                    userOptions.configuration.device?.runtime,
-                                    userOptions.filePatterns.include.sorted().joined(separator: ","),
-                                    userOptions.filePatterns.exclude.sorted().joined(separator: ","),
-                                    plugin.data]
+        let arguments: [String?] = [configuration.device?.name,
+                                    configuration.device?.runtime,
+                                    configuration.building.filePatterns.include.sorted().joined(separator: ","),
+                                    configuration.building.filePatterns.exclude.sorted().joined(separator: ","),
+                                    configuration.plugins?.data]
 
         testSessionResult.launchArguments = arguments.compactMap { $0 }.joined(separator: " ")
 
-        let operations = try makeOperations(gitStatus: gitStatus, testSessionResult: testSessionResult, sdk: sdk)
+        let operations = try makeOperations(gitStatus: gitStatus, testSessionResult: testSessionResult, sdk: configuration.building.sdk)
 
         queue.addOperations(operations, waitUntilFinished: true)
-
-        tearDown(operations: operations, testSessionResult: testSessionResult, error: nil)
     }
 
-    private func makeOperations(gitStatus: GitStatus, testSessionResult: TestSessionResult, sdk: XcodeProject.SDK) throws -> [RunOperation] {
-        let configuration = userOptions.configuration
+    private func makeOperations(gitStatus: GitStatus, testSessionResult: TestSessionResult, sdk: String) throws -> [RunOperation] {
         let resultDestinationPath = "\(configuration.resultDestination.path)/\(timestamp)/\(Environment.resultFoldername)".pathExpandingTilde()
 
-        let filePatterns = userOptions.filePatterns
-        let codeCoveragePathEquivalence = userOptions.codeCoveragePathEquivalence
-        let clearDerivedDataOnCompilationFailure = userOptions.clearDerivedDataOnCompilationFailure
-        let xcresultBlobThresholdKB = userOptions.xcresultBlobThresholdKB
+        let filePatterns = configuration.building.filePatterns
+        let codeCoveragePathEquivalence = configuration.testing.codeCoveragePathEquivalence
+        let clearDerivedDataOnCompilationFailure = configuration.testing.clearDerivedDataOnCompilationFailure
 
-        guard let device = userOptions.configuration.device else { throw Error("Unexpected missing device") }
+        guard let device = configuration.device else {
+            // FIXME: - To support macOS we should not required device
+            throw Error("Unexpected missing device")
+        }
 
         let gitBaseUrl = gitStatus.url
-        let project = try localProject(baseUrl: gitBaseUrl, path: configuration.projectPath)
+        let project = try localProject(baseUrl: gitBaseUrl, path: configuration.building.projectPath)
 
         let uniqueNodes = configuration.nodes.unique()
-        let targets = try project.getTargetsInScheme(configuration.scheme)
-        let testTargetSourceFiles = try project.testTargetSourceFilePaths(scheme: configuration.scheme)
+        let targets = try project.getTargetsInScheme(configuration.building.scheme)
+        let testTargetSourceFiles = try project.testTargetSourceFilePaths(scheme: configuration.building.scheme)
 
         let productNames = project.getProductNames()
 
-        let preCompilationPlugin = PreCompilationPlugin(baseUrl: pluginUrl, plugin: plugin)
-        let postCompilationPlugin = PostCompilationPlugin(baseUrl: pluginUrl, plugin: plugin)
-        let testExtractionPlugin = TestExtractionPlugin(baseUrl: pluginUrl, plugin: plugin)
-        let testSortingPlugin = TestSortingPlugin(baseUrl: pluginUrl, plugin: plugin)
-        let tearDownPlugin = TearDownPlugin(baseUrl: pluginUrl, plugin: plugin)
+        let preCompilationPlugin = PreCompilationPlugin(baseUrl: pluginUrl, plugin: configuration.plugins)
+        let postCompilationPlugin = PostCompilationPlugin(baseUrl: pluginUrl, plugin: configuration.plugins)
+        let testExtractionPlugin = TestExtractionPlugin(baseUrl: pluginUrl, plugin: configuration.plugins)
+        let testSortingPlugin = TestSortingPlugin(baseUrl: pluginUrl, plugin: configuration.plugins)
+        let tearDownPlugin = TearDownPlugin(baseUrl: pluginUrl, plugin: configuration.plugins)
 
-        let initialSetupOperation = InitialSetupOperation(configuration: configuration, nodes: uniqueNodes, xcodeBuildNumber: userOptions.xcodeBuildNumber)
-        let validationOperation = ValidationOperation(configuration: configuration)
-        let macOsValidationOperation = MacOsValidationOperation(configuration: configuration)
+        let initialSetupOperation = InitialSetupOperation(resultDestination: configuration.resultDestination, nodes: uniqueNodes, xcodeBuildNumber: configuration.building.xcodeBuildNumber)
+        let validationOperation = ValidationOperation(nodes: configuration.nodes)
+        let macOsValidationOperation = MacOsValidationOperation(nodes: configuration.nodes)
         let localSetupOperation = LocalSetupOperation(clearDerivedDataOnCompilationFailure: clearDerivedDataOnCompilationFailure)
         let remoteSetupOperation = RemoteSetupOperation(nodes: uniqueNodes)
-        let compileOperation = CompileOperation(configuration: configuration, git: gitStatus, baseUrl: gitBaseUrl, project: project, scheme: configuration.scheme, preCompilationPlugin: preCompilationPlugin, postCompilationPlugin: postCompilationPlugin, sdk: sdk, clearDerivedDataOnCompilationFailure: clearDerivedDataOnCompilationFailure)
-        let testExtractionOperation = TestExtractionOperation(configuration: configuration, baseUrl: gitBaseUrl, testTargetSourceFiles: testTargetSourceFiles, filePatterns: filePatterns, device: device, plugin: testExtractionPlugin)
-        let testSortingOperation = TestSortingOperation(device: device, plugin: testSortingPlugin, verbose: userOptions.verbose)
-        let simulatorSetupOperation = SimulatorSetupOperation(configuration: configuration, nodes: uniqueNodes, device: device, autodeleteSlowDevices: userOptions.autodeleteSlowDevices, verbose: userOptions.verbose)
+        let compileOperation = CompileOperation(building: configuration.building, git: gitStatus, baseUrl: gitBaseUrl, project: project, scheme: configuration.building.scheme, preCompilationPlugin: preCompilationPlugin, postCompilationPlugin: postCompilationPlugin, clearDerivedDataOnCompilationFailure: clearDerivedDataOnCompilationFailure)
+        let testExtractionOperation = TestExtractionOperation(baseUrl: gitBaseUrl, testTargetSourceFiles: testTargetSourceFiles, filePatterns: filePatterns, device: device, plugin: testExtractionPlugin)
+        let testSortingOperation = TestSortingOperation(device: device, plugin: testSortingPlugin, verbose: configuration.verbose)
+        let simulatorSetupOperation = SimulatorSetupOperation(buildBundleIdentifier: configuration.building.buildBundleIdentifier, testBundleIdentifier: configuration.building.testBundleIdentifier, nodes: uniqueNodes, device: device, alwaysRebootSimulators: configuration.testing.alwaysRebootSimulators, verbose: configuration.verbose)
         let processKillerOperation = ProcessKillerOperation(nodes: uniqueNodes)
         let distributeTestBundleOperation = DistributeTestBundleOperation(nodes: uniqueNodes)
-        let testRunnerOperation = TestRunnerOperation(configuration: configuration, destinationPath: resultDestinationPath, testTarget: targets.test.name, productNames: productNames, sdk: sdk, failingTestsRetryCount: userOptions.failingTestsRetryCount, maximumStdOutIdleTime: userOptions.maximumStdOutIdleTime, maximumTestExecutionTime: userOptions.maximumTestExecutionTime, xcresultBlobThresholdKB: xcresultBlobThresholdKB, verbose: userOptions.verbose)
-        let testCollectorOperation = TestCollectorOperation(configuration: configuration, mergeResults: !userOptions.skipResultMerge, destinationPath: resultDestinationPath, productNames: productNames)
+        let testRunnerOperation = TestRunnerOperation(configuration: configuration, destinationPath: resultDestinationPath, testTarget: targets.test.name, productNames: productNames)
+        let testCollectorOperation = TestCollectorOperation(resultDestination: configuration.resultDestination, nodes: configuration.nodes, mergeResults: !configuration.testing.skipResultMerge, destinationPath: resultDestinationPath, productNames: productNames)
 
-        let codeCoverageCollectionOperation = CodeCoverageCollectionOperation(configuration: configuration, pathEquivalence: codeCoveragePathEquivalence, baseUrl: gitBaseUrl, timestamp: timestamp)
-        let cleanupOperation = CleanupOperation(configuration: configuration, timestamp: timestamp)
-        let simulatorTearDownOperation = SimulatorTearDownOperation(configuration: configuration, nodes: uniqueNodes, verbose: userOptions.verbose)
-        let tearDownOperation = TearDownOperation(configuration: configuration, git: gitStatus, timestamp: timestamp, mergeResults: !userOptions.skipResultMerge, autodeleteSlowDevices: userOptions.autodeleteSlowDevices, plugin: tearDownPlugin)
+        let codeCoverageCollectionOperation = CodeCoverageCollectionOperation(resultDestination: configuration.resultDestination, buildBundleIdentifier: configuration.building.buildBundleIdentifier, pathEquivalence: codeCoveragePathEquivalence, baseUrl: gitBaseUrl, timestamp: timestamp)
+        let cleanupOperation = CleanupOperation(resultDestination: configuration.resultDestination, timestamp: timestamp)
+        let simulatorTearDownOperation = SimulatorTearDownOperation(nodes: uniqueNodes, verbose: configuration.verbose)
+        let tearDownOperation = TearDownOperation(resultDestination: configuration.resultDestination, nodes: configuration.nodes, git: gitStatus, timestamp: timestamp, mergeResults: !configuration.testing.skipResultMerge, autodeleteSlowDevices: configuration.testing.autodeleteSlowDevices, plugin: tearDownPlugin)
 
         var operations: [RunOperation] =
             [initialSetupOperation,
@@ -180,7 +117,7 @@ class Test {
              cleanupOperation,
              tearDownOperation]
 
-        switch sdk {
+        switch XcodeProject.SDK(rawValue: sdk)! {
         case .ios:
             macOsValidationOperation.cancel()
         case .macos:
@@ -200,7 +137,7 @@ class Test {
 
         simulatorSetupOperation.addDependencies([localSetupOperation, remoteSetupOperation])
         processKillerOperation.addDependency(simulatorSetupOperation)
-        if userOptions.killSimulatorProcesses {
+        if configuration.testing.killSimulatorProcesses {
             operations.append(processKillerOperation)
         }
 
@@ -282,7 +219,7 @@ class Test {
             }
         }
 
-        switch sdk {
+        switch XcodeProject.SDK(rawValue: sdk)! {
         case .macos:
             testRunnerOperation.testRunners = uniqueNodes.map { (testRunner: $0, node: $0, idle: true) }
         case .ios:
@@ -360,6 +297,10 @@ class Test {
             }
         }
 
+        tearDownOperation.didEnd = { [unowned self] _ in
+            self.tearDown(operations: operations, testSessionResult: testSessionResult, error: nil)
+        }
+
         monitorOperationsExecutionTime(operations, testSessionResult: testSessionResult)
 
         return operations
@@ -371,14 +312,15 @@ class Test {
         let logger = ExecuterLogger(name: "Test", address: "localhost")
         defer { try? logger.dump() }
 
-        let destinationNode = userOptions.configuration.resultDestination.node
-        let destinationPath = "\(userOptions.configuration.resultDestination.path)/\(timestamp)"
+        let destinationNode = configuration.resultDestination.node
+        let destinationPath = "\(configuration.resultDestination.path)/\(timestamp)"
         let logsDestinationPath = "\(destinationPath)/sessionLogs"
 
         let totalExecutionTime = CFAbsoluteTimeGetCurrent() - testSessionResult.startTime
         print("\nℹ️  Total time: \(totalExecutionTime) seconds".bold.yellow)
 
-        let device = userOptions.configuration.device ?? Device.defaultInit()
+        // FIXME: - To support macOS we should not required device
+        let device = configuration.device ?? Device.defaultInit()
 
         do {
             try dumpOperationLogs(operations)
@@ -420,7 +362,7 @@ class Test {
     }
 
     private func monitorOperationsExecutionTime(_ operations: [Operation], testSessionResult: TestSessionResult) {
-        operations.forEach { op in
+        for op in operations {
             let observer = op.observe(\Operation.isFinished) { [unowned self] op, _ in
                 guard let op = op as? BenchmarkedOperation else { return }
 
@@ -435,7 +377,7 @@ class Test {
                 }
             }
 
-            self.observers.append(observer)
+            observers.append(observer)
         }
     }
 }
@@ -463,7 +405,11 @@ private extension Test {
     }
 
     func localProject(baseUrl: URL, path: String) throws -> XcodeProject {
-        try XcodeProject(url: baseUrl.appendingPathComponent(path))
+        if path.hasPrefix("/") {
+            return try XcodeProject(url: URL(filePath: path))
+        } else {
+            return try XcodeProject(url: baseUrl.appendingPathComponent(path))
+        }
     }
 }
 

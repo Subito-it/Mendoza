@@ -94,12 +94,22 @@ private extension Process {
         logger?.log(command: cmd)
 
         let exports = ExecuterEnvironment.exportsCommand(for: environment)
-        arguments = ["-c", "\(Shell.current().source) \(LocalExecuter.executablePathExport()) \(exports) \(cmd)"]
+        arguments = ["-c", "\(Shell.current().source) \(exports) \(LocalExecuter.executablePathExport()) \(cmd)"]
 
         let pipe = Pipe()
         standardOutput = pipe
         standardError = pipe
-        qualityOfService = .userInitiated
+        qualityOfService = .userInteractive
+
+        var outputData = Data()
+
+        if progress != nil {
+            pipe.fileHandleForReading.readabilityHandler = { fileHandle in
+                let data = fileHandle.availableData
+                progress?(String(decoding: data, as: UTF8.self))
+                outputData.append(data)
+            }
+        }
 
         let currentShell = Shell.current()
 
@@ -110,6 +120,7 @@ private extension Process {
                 }
 
                 executableURL = currentShell.url
+
                 try run()
             } else {
                 if let currentPath = currentUrl?.path {
@@ -124,18 +135,23 @@ private extension Process {
                 launch()
             }
         } catch {
-            throw Error(error)
+            throw Error(error.localizedDescription)
         }
 
-        var outputData = Data()
-        while isRunning {
-            let data = pipe.fileHandleForReading.readData(ofLength: 512)
-            guard !data.isEmpty else { continue }
+        var trailingData = Data()
 
-            outputData.append(data)
-            progress?(String(decoding: data, as: UTF8.self))
+        if progress == nil {
+            // This is neeeded to prevent commands producing large output to hang. This is likely related to
+            // https://github.com/kareman/SwiftShell/issues/52 and https://stackoverflow.com/q/33423993
+            trailingData += pipe.fileHandleForReading.readDataToEndOfFile()
+        } else {
+            outputData.append(pipe.fileHandleForReading.readData(ofLength: 1024))
         }
-        let trailingData = pipe.fileHandleForReading.readDataToEndOfFile()
+
+        waitUntilExit()
+
+        trailingData += pipe.fileHandleForReading.readDataToEndOfFile()
+
         progress?(String(decoding: trailingData, as: UTF8.self))
         outputData.append(trailingData)
 

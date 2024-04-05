@@ -35,7 +35,7 @@ class XcodeProject: NSObject {
     private let project: XcodeProj
     private let path: PathKit.Path
 
-    static func projectUrl(from workspaceUrl: URL?) -> URL? {
+    private static func projectUrl(from workspaceUrl: URL?) -> URL? {
         guard let path = workspaceUrl?.path else { return nil }
 
         guard let got = try? XCWorkspace(pathString: path) else { return nil }
@@ -52,7 +52,12 @@ class XcodeProject: NSObject {
     }
 
     init(url: URL) throws {
-        path = PathKit.Path(url.path)
+        if url.pathExtension == "xcworkspace", let url = Self.projectUrl(from: url) {
+            path = PathKit.Path(url.path)
+        } else {
+            path = PathKit.Path(url.path)
+        }
+
         project = try XcodeProj(path: path)
     }
 
@@ -149,12 +154,12 @@ class XcodeProject: NSObject {
         return (build: buildTargets.first!, test: uitestTargets.first!) // swiftlint:disable:this force_unwrapping
     }
 
-    func getTargetsBundleIdentifiers(for schemeName: String) throws -> (build: String, test: String) {
-        let (buildTarget, uitestTarget) = try getTargetsInScheme(schemeName)
+    func getTargetsBundleIdentifiers(scheme: String) throws -> (build: String, test: String) {
+        let (buildTarget, uitestTarget) = try getTargetsInScheme(scheme)
 
         let anyTargetBuildConfigurations: (PBXNativeTarget) throws -> XCBuildConfiguration = { target in
             guard let buildConfiguration = target.buildConfigurationList?.buildConfigurations.first else {
-                throw Error("No build configuration found in target \(target.name) in scheme \(schemeName)")
+                throw Error("No build configuration found in target \(target.name) in scheme \(scheme)")
             }
 
             return buildConfiguration
@@ -173,8 +178,8 @@ class XcodeProject: NSObject {
         project.pbxproj.rootObject?.targets.compactMap(\.productName) ?? []
     }
 
-    func getBuildSDK(for schemeName: String) throws -> SDK {
-        let (buildTarget, _) = try getTargetsInScheme(schemeName)
+    func getBuildSDK(scheme: String) throws -> SDK {
+        let (buildTarget, _) = try getTargetsInScheme(scheme)
 
         guard let buildProject = project.pbxproj.projects.first(where: { project in project.targets.map(\.name).contains(buildTarget.name) }) else {
             throw Error("Failed to extract build project")

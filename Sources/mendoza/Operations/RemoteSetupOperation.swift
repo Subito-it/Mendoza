@@ -24,19 +24,6 @@ class RemoteSetupOperation: BaseOperation<Void> {
             try pool.execute { executer, source in
                 _ = try executer.execute("mkdir -p '\(Path.base.rawValue)' || true")
 
-                let ramDisks = CommandLineProxy.RamDisk(executer: executer)
-                try ramDisks.eject(name: Environment.ramDiskName, throwOnError: false)
-
-                switch AddressType(node: source.node) {
-                case .remote:
-                    if let ramDiskSize = source.node.ramDiskSizeMB {
-                        let ramDiskProxy = CommandLineProxy.RamDisk(executer: executer)
-                        try ramDiskProxy.create(name: Environment.ramDiskName, sizeMB: ramDiskSize)
-                    }
-                case .local:
-                    break // never create ram disk on local address because we already wrote critical files to Path.base
-                }
-
                 switch AddressType(node: source.node) {
                 case .remote:
                     for path in Path.allCases.filter({ $0 != .base }) {

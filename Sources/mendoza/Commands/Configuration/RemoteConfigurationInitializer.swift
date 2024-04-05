@@ -1,5 +1,5 @@
 //
-//  ConfigurationInitializer.swift
+//  RemoteConfigurationInitializer.swift
 //  Mendoza
 //
 //  Created by Tomas Camin on 08/01/2019.
@@ -9,55 +9,13 @@ import Bariloche
 import Foundation
 import KeychainAccess
 
-struct ConfigurationInitializer {
+struct RemoteConfigurationInitializer {
     private let fileManager = FileManager.default
 
     func run() throws {
-        let git = Git(executer: LocalExecuter())
-        guard git.valid() else { throw Error("Git repo not inited or no refs found!") }
-        #if !DEBUG
-            guard git.clean() else { throw Error("Git repo is dirty!") }
-        #endif
-
-        print("Loading project...".blue)
-
-        let gitStatus = try git.status()
-
-        let baseUrl = gitStatus.url
         let currentUrl = URL(fileURLWithPath: fileManager.currentDirectoryPath)
 
-        let filePaths = try fileManager.contentsOfDirectory(at: currentUrl,
-                                                            includingPropertiesForKeys: nil,
-                                                            options: .skipsSubdirectoryDescendants)
-        let workspaces = filePaths.filter { $0.path.hasSuffix(".xcworkspace") }
-        let projects = filePaths.filter { $0.path.hasSuffix(".xcodeproj") }
-
-        guard workspaces.count < 2 else { throw Error("Too many .xcworkspace found in folder!") }
-        guard workspaces.count == 1 || projects.count < 2 else { throw Error("Too many .xcodeproj found in folder!") }
-        guard let url = XcodeProject.projectUrl(from: workspaces.first) ?? projects.first else { throw Error("Failed to load .xcworkspace!") }
-        guard let project = (try? XcodeProject(url: url)) else { throw Error("Failed to load .xcodeproj!") }
-
-        let testingSchemes = project.testingSchemes().sorted { $0.name > $1.name }
-        guard !testingSchemes.isEmpty else { throw Error("No shared testing scheme found in \(url.path), does your UI Testing target have a dedicated scheme?") }
-
-        let selectedScheme = Bariloche.ask(title: "Select UI Testing scheme:", array: testingSchemes)
-
-        let buildConfigurations = project.buildConfigurations().sorted()
-        guard !buildConfigurations.isEmpty else { throw Error("No build configuration found in \(url.path)!") }
-
-        let selectedBuildConfiguration = Bariloche.ask(title: "Select build configuration used to run UI Tests:", array: buildConfigurations)
-
-        var bundleIdentifiers = try project.getTargetsBundleIdentifiers(for: selectedScheme.value.name)
-        if bundleIdentifiers.build.hasPrefix("$(") {
-            let identifier: String = Bariloche.ask("\nBundle identifier coulnd't be autodetected. Please specify the bundle identifier of the app to test:".underline) { guard !$0.isEmpty else { throw Error("Invalid value") }; return $0 }
-            bundleIdentifiers.build = identifier
-        }
-        if bundleIdentifiers.test.hasPrefix("$(") {
-            let identifier: String = Bariloche.ask("\nBundle identifier coulnd't be autodetected. Please specify the bundle identifier of the runner app:".underline) { guard !$0.isEmpty else { throw Error("Invalid value") }; return $0 }
-            bundleIdentifiers.test = identifier
-        }
-
-        let sdk = try project.getBuildSDK(for: selectedScheme.value.name)
+        let sdk = askProjectSdk()
 
         let nodes = try askNodes(sdk: sdk)
 
@@ -70,24 +28,9 @@ struct ConfigurationInitializer {
         }
 
         let resultDestinationPath: String = Bariloche.ask("\nPlease select at which path on `\(resultDestinationNodeName.value)` results should be saved".underline)
-        let resultDestination = Configuration.ResultDestination(node: destinationNode, path: resultDestinationPath)
+        let resultDestination = ConfigurationResultDestination(node: destinationNode, path: resultDestinationPath)
 
-        let basePath = "\(baseUrl.path)/"
-        let projectRelativePath = url.path.replacingOccurrences(of: basePath, with: "")
-        let workspaceRelativePath = workspaces.first?.path.replacingOccurrences(of: basePath, with: "")
-
-        let configuration = Configuration(projectPath: projectRelativePath,
-                                          workspacePath: workspaceRelativePath,
-                                          buildBundleIdentifier: bundleIdentifiers.build,
-                                          testBundleIdentifier: bundleIdentifiers.test,
-                                          scheme: selectedScheme.value.name,
-                                          buildConfiguration: selectedBuildConfiguration.value,
-                                          resultDestination: resultDestination,
-                                          nodes: nodes,
-                                          compilation: Configuration.Compilation(),
-                                          sdk: sdk.rawValue,
-                                          device: nil,
-                                          xcresultBlobThresholdKB: nil)
+        let configuration = RemoteConfiguration(resultDestination: resultDestination, nodes: nodes)
 
         let encoder = JSONEncoder()
         encoder.outputFormatting = .prettyPrinted
@@ -121,7 +64,6 @@ struct ConfigurationInitializer {
 
         let sshAuthentication: SSHAuthentication
         let concurrentTestRunners: Node.ConcurrentTestRunners
-        var ramDiskSize: UInt?
 
         let address = try askAddress()
         if ["127.0.0.1", "localhost"].contains(address) {
@@ -143,25 +85,12 @@ struct ConfigurationInitializer {
             case .ios:
                 concurrentTestRunners = askConcurrentSimulators()
             }
-
-            Bariloche.ask("\nRam disk size in MB (useful for nodes without SSDs). Suggested 1024MB, not used if empty".underline) { (answer: String) in
-                if answer.isEmpty {
-                    ramDiskSize = nil
-                } else if let size = UInt(answer) {
-                    ramDiskSize = size
-                } else {
-                    throw Error("Invalid value")
-                }
-
-                return ""
-            }
         }
 
         return Node(name: name,
                     address: address,
                     authentication: sshAuthentication,
-                    concurrentTestRunners: concurrentTestRunners,
-                    ramDiskSizeMB: ramDiskSize)
+                    concurrentTestRunners: concurrentTestRunners)
     }
 
     func askAddress() throws -> String {
@@ -186,6 +115,18 @@ struct ConfigurationInitializer {
         case 1:
             let count: UInt = Bariloche.ask("\nConcurrent simulators:".underline)
             return .manual(count: count)
+        default:
+            fatalError("Unexpected case \(result.index)")
+        }
+    }
+
+    func askProjectSdk() -> XcodeProject.SDK {
+        let result = Bariloche.ask(title: "Will you run tests on macOS?", array: ["Yes", "No"])
+        switch result.index {
+        case 0:
+            return .macos
+        case 1:
+            return .ios
         default:
             fatalError("Unexpected case \(result.index)")
         }

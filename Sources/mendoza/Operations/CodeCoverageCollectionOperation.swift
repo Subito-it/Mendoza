@@ -10,13 +10,15 @@ import Foundation
 class CodeCoverageCollectionOperation: BaseOperation<Coverage?> {
     private lazy var executer: Executer = makeLocalExecuter()
 
-    private let configuration: Configuration
+    private let resultDestination: ConfigurationResultDestination
+    private let buildBundleIdentifier: String
     private let pathEquivalence: String?
     private let baseUrl: URL
     private let timestamp: String
 
-    init(configuration: Configuration, pathEquivalence: String?, baseUrl: URL, timestamp: String) {
-        self.configuration = configuration
+    init(resultDestination: ConfigurationResultDestination, buildBundleIdentifier: String, pathEquivalence: String?, baseUrl: URL, timestamp: String) {
+        self.resultDestination = resultDestination
+        self.buildBundleIdentifier = buildBundleIdentifier
         self.pathEquivalence = pathEquivalence
         self.baseUrl = baseUrl
         self.timestamp = timestamp
@@ -28,12 +30,12 @@ class CodeCoverageCollectionOperation: BaseOperation<Coverage?> {
         do {
             didStart?()
 
-            let destinationNode = configuration.resultDestination.node
+            let destinationNode = resultDestination.node
 
             let logger = ExecuterLogger(name: "\(type(of: self))", address: destinationNode.address)
             let destinationExecuter = try destinationNode.makeExecuter(logger: logger, environment: nodesEnvironment[destinationNode.address] ?? [:])
 
-            let resultPath = "\(configuration.resultDestination.path)/\(timestamp)"
+            let resultPath = "\(resultDestination.path)/\(timestamp)"
 
             var coverage: Coverage? = nil
             let coverageMerger = CodeCoverageMerger(executer: destinationExecuter, searchPath: resultPath)
@@ -77,7 +79,7 @@ class CodeCoverageCollectionOperation: BaseOperation<Coverage?> {
             replacePath = "| sed 's|\(source)|\(destination)|g'"
         }
 
-        let executablePath = try findExecutablePath(executer: executer, configuration: configuration)
+        let executablePath = try findExecutablePath(executer: executer, buildBundleIdentifier: buildBundleIdentifier)
         let url = Path.temp.url.appendingPathComponent("\(UUID().uuidString).json")
         let summaryParameter = summary ? "--summary-only" : ""
         let cmd = "xcrun llvm-cov export -instr-profile \(coverageUrl.path) \(executablePath) \(summaryParameter) \(truncateDecimals) \(replacePath) \(stripBasePath) > \(url.path)"
@@ -88,7 +90,7 @@ class CodeCoverageCollectionOperation: BaseOperation<Coverage?> {
     }
 
     private func generateHtmlCoverage(coverageUrl: URL, pathEquivalence: String?) throws -> URL {
-        let executablePath = try findExecutablePath(executer: executer, configuration: configuration)
+        let executablePath = try findExecutablePath(executer: executer, buildBundleIdentifier: buildBundleIdentifier)
         let url = Path.temp.url.appendingPathComponent("\(UUID().uuidString).html")
         var cmd = "xcrun llvm-cov show --format=html -instr-profile \(coverageUrl.path) \(executablePath)"
 

@@ -8,13 +8,13 @@
 import Foundation
 
 extension BaseOperation {
-    func findExecutablePath(executer: Executer, configuration: Configuration) throws -> String {
+    func findExecutablePath(executer: Executer, buildBundleIdentifier: String) throws -> String {
         let plistPaths = try executer.execute("find '\(Path.build.rawValue)' -type f -name 'Info.plist' | grep -Ei '.app(/.*)?/Info.plist'").components(separatedBy: "\n")
         for plistPath in plistPaths {
             guard let data = try? Data(contentsOf: URL(fileURLWithPath: plistPath)) else { continue }
             guard let plistInfo = try? PropertyListDecoder().decode(InfoPlist.self, from: data) else { continue }
 
-            if plistInfo.bundleIdentifier == configuration.buildBundleIdentifier {
+            if plistInfo.bundleIdentifier == buildBundleIdentifier {
                 let executablePath: String
                 if plistInfo.supportedPlatforms?.contains("MacOSX") == true {
                     executablePath = URL(fileURLWithPath: plistPath).deletingLastPathComponent().appendingPathComponent("MacOS").appendingPathComponent(plistInfo.executableName).path

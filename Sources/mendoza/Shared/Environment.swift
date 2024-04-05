@@ -1,5 +1,5 @@
 //
-//  Global.swift
+//  Environment.swift
 //  Mendoza
 //
 //  Created by Tomas Camin on 07/03/2019.
@@ -10,7 +10,6 @@ import Foundation
 enum Environment {
     static let bundle = "com.subito.mendoza"
     static let defaultConfigurationFilename = "config.json"
-    static let ramDiskName = "mendoza"
     static let temporaryBasePath = "/tmp/mendoza"
     static let htmlTestSummaryFilename = "test_result.html"
     static let jsonTestSummaryFilename = "test_result.json"

@@ -1,5 +1,5 @@
 //
-//  TestRunner.swift
+//  TestExecuter.swift
 //  Mendoza
 //
 //  Created by tomas.camin on 01/06/22.
@@ -17,9 +17,8 @@ class TestExecuter {
     private let testRunner: TestRunner
     private let runnerIndex: Int
 
-    private let configuration: Configuration
-    private let maximumStdOutIdleTime: Int?
-    private let maximumTestExecutionTime: Int?
+    private let building: Configuration.Building
+    private let testing: Configuration.Testing
     private let xcodebuildDestination: String
 
     private let verbose: Bool
@@ -33,10 +32,8 @@ class TestExecuter {
     init(executer: Executer,
          testCase: TestCase,
          testTarget: String,
-         configuration: Configuration,
-         sdk: XcodeProject.SDK,
-         maximumStdOutIdleTime: Int?,
-         maximumTestExecutionTime: Int?,
+         building: Configuration.Building,
+         testing: Configuration.Testing,
          node: Node,
          testRunner: TestRunner,
          runnerIndex: Int,
@@ -45,15 +42,14 @@ class TestExecuter {
         self.executer = executer
         self.testCase = testCase
         self.testTarget = testTarget
-        self.configuration = configuration
-        self.maximumStdOutIdleTime = maximumStdOutIdleTime
-        self.maximumTestExecutionTime = maximumTestExecutionTime
+        self.building = building
+        self.testing = testing
         self.testRunner = testRunner
         self.node = node
         self.runnerIndex = runnerIndex
         self.verbose = verbose
 
-        switch sdk {
+        switch XcodeProject.SDK(rawValue: building.sdk)! {
         case .ios:
             xcodebuildDestination = "platform=iOS Simulator,id=\(testRunner.id)"
         case .macos:
@@ -107,7 +103,7 @@ class TestExecuter {
     }
 
     private func startStdOutTimeoutHandler() {
-        if let maximumStdOutIdleTime = maximumStdOutIdleTime {
+        if let maximumStdOutIdleTime = testing.maximumStdOutIdleTime {
             lastStdOutputUpdateTimeInterval = CFAbsoluteTimeGetCurrent()
             timer = Timer.scheduledTimer(withTimeInterval: 10, repeats: true) { [weak self] _ in
                 guard let self = self else { return }
@@ -117,8 +113,8 @@ class TestExecuter {
 
                         // Terminating the app will make the test fail
                         let proxy = CommandLineProxy.Simulators(executer: localExecuter, verbose: self.verbose)
-                        try? proxy.terminateApp(identifier: self.configuration.buildBundleIdentifier, on: simulator)
-                        try? proxy.terminateApp(identifier: self.configuration.testBundleIdentifier, on: simulator)
+                        try? proxy.terminateApp(identifier: self.building.buildBundleIdentifier, on: simulator)
+                        try? proxy.terminateApp(identifier: self.building.testBundleIdentifier, on: simulator)
                         if self.verbose {
                             self.print("⏰", "did terminate application", color: { $0.yellow })
                         }
@@ -156,7 +152,7 @@ extension TestExecuter {
     private func findTestRun(executer: Executer) throws -> String {
         let testBundlePath = Path.testBundle.rawValue
 
-        let testRuns = try executer.execute("find '\(testBundlePath)' -type f -name '\(configuration.scheme)*.xctestrun'").components(separatedBy: "\n")
+        let testRuns = try executer.execute("find '\(testBundlePath)' -type f -name '\(building.scheme)*.xctestrun'").components(separatedBy: "\n")
         guard let testRun = testRuns.first, !testRun.isEmpty else { throw Error("No test bundle found", logger: executer.logger) }
         guard testRuns.count == 1 else { throw Error("Too many xctestrun bundles found:\n\(testRuns)", logger: executer.logger) }
 
@@ -195,7 +191,7 @@ extension TestExecuter {
 
                     testCaseResult = result
                 case .noSpaceOnDevice:
-                    fatalError("💣 No space left on \(executer.address). If you're using a RAM disk in Mendoza's configuration consider increasing size")
+                    fatalError("💣 No space left on \(executer.address).")
                 }
             }
 
@@ -221,7 +217,7 @@ extension TestExecuter {
         let destinationPath = Path.logs.url.appendingPathComponent(testRunner.id).path
 
         var maxAllowedTestExecutionTimeParameter = ""
-        if let maximumTestExecutionTime = maximumTestExecutionTime {
+        if let maximumTestExecutionTime = testing.maximumTestExecutionTime {
             maxAllowedTestExecutionTimeParameter = "-maximum-test-execution-time-allowance \(maximumTestExecutionTime)"
         }
 

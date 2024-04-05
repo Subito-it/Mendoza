@@ -130,7 +130,7 @@ final class RemoteExecuter: Executer {
                 try rethrow((status: -1, output: redactedError), Error("While running `\(redactedCmd)` got: \(redactedError)"))
                 return result
             } else {
-                throw Error(error)
+                throw Error(error.localizedDescription)
             }
         }
     }

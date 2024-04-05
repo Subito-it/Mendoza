@@ -1,5 +1,5 @@
 //
-//  ConfigurationValidator.swift
+//  RemoteConfigurationValidator.swift
 //  Mendoza
 //
 //  Created by Tomas Camin on 20/01/2019.
@@ -7,13 +7,13 @@
 
 import Foundation
 
-class ConfigurationValidator {
+class RemoteConfigurationValidator {
     var loggers: Set<ExecuterLogger> = []
 
-    private let configuration: Configuration
+    private let nodes: [Node]
 
-    init(configuration: Configuration) {
-        self.configuration = configuration
+    init(nodes: [Node]) {
+        self.nodes = nodes
     }
 
     func validate() throws {
@@ -24,23 +24,25 @@ class ConfigurationValidator {
     }
 
     func validateNodes() throws {
-        for node in configuration.nodes {
-            guard configuration.nodes.filter({ $0.name == node.name }).count == 1 else {
+        for node in nodes {
+            guard nodes.filter({ $0.name == node.name }).count == 1 else {
                 throw Error("Node name `\(node.name)` repeated more than once in configuration")
             }
 
-            guard configuration.nodes.filter({ $0.address == node.address }).count == 1 else {
+            guard nodes.filter({ $0.address == node.address }).count == 1 else {
                 throw Error("Node address `\(node.address)` repeated more than once in configuration")
             }
         }
     }
 
     func validAuthentication(node: Node) -> Bool {
-        node.authentication != nil
+        guard AddressType(node: node) == .remote else { return true }
+
+        return node.authentication != nil
     }
 
     private func validateReachability() throws {
-        let remoteNodes = configuration.nodes.remote()
+        let remoteNodes = nodes.remote()
 
         let logger = ExecuterLogger(name: "\(type(of: self))", address: "localhost")
         let localExecuter = LocalExecuter(logger: logger)
@@ -61,7 +63,7 @@ class ConfigurationValidator {
     }
 
     private func validateConnections() throws {
-        let remoteNodes = configuration.nodes.remote()
+        let remoteNodes = nodes.remote()
 
         do {
             let logger: (Node) -> ExecuterLogger = { ExecuterLogger(name: "\(type(of: self))", address: $0.address) }
@@ -75,13 +77,13 @@ class ConfigurationValidator {
                 _ = try executer.execute("ls")
             }
         } catch {
-            throw Error("Invalid credentials for connection. Configuration file needs to be updated! Please run `\(ConfigurationRootCommand().name!) \(ConfigurationAuthententicationUpdateCommand().name!)` command. Got \(error)".red) // swiftlint:disable:this force_unwrapping
+            throw Error("Invalid credentials for connection. Configuration file needs to be updated! Please run `\(RemoteConfigurationRootCommand().name!) \(RemoteConfigurationAuthententicationUpdateCommand().name!)` command. Got \(error)".red) // swiftlint:disable:this force_unwrapping
         }
     }
 
     private func validateAuthentication() throws {
-        guard configuration.nodes.allSatisfy({ validAuthentication(node: $0) }) else {
-            throw Error("Invalid credentials found. Configuration file needs to be updated! Please run `\(ConfigurationRootCommand().name!) \(ConfigurationAuthententicationUpdateCommand().name!)` command".red) // swiftlint:disable:this force_unwrapping
+        guard nodes.allSatisfy({ validAuthentication(node: $0) }) else {
+            throw Error("Invalid credentials found. Configuration file needs to be updated! Please run `\(RemoteConfigurationRootCommand().name!) \(RemoteConfigurationAuthententicationUpdateCommand().name!)` command".red) // swiftlint:disable:this force_unwrapping
         }
     }
 }

@@ -1,5 +1,5 @@
 //
-//  CleanupOpertion.swift
+//  CleanupOperation.swift
 //  Mendoza
 //
 //  Created by Tomas Camin on 05/03/2019.
@@ -8,17 +8,17 @@
 import Foundation
 
 class CleanupOperation: BaseOperation<Void> {
-    private let configuration: Configuration
+    private let resultDestination: ConfigurationResultDestination
     private let timestamp: String
     private lazy var destinationExecuter: Executer? = {
-        let destinationNode = configuration.resultDestination.node
+        let destinationNode = resultDestination.node
 
         let logger = ExecuterLogger(name: "\(type(of: self))", address: destinationNode.address)
         return try? destinationNode.makeExecuter(logger: logger, environment: nodesEnvironment[destinationNode.address] ?? [:])
     }()
 
-    init(configuration: Configuration, timestamp: String) {
-        self.configuration = configuration
+    init(resultDestination: ConfigurationResultDestination, timestamp: String) {
+        self.resultDestination = resultDestination
         self.timestamp = timestamp
     }
 
@@ -28,7 +28,7 @@ class CleanupOperation: BaseOperation<Void> {
         do {
             didStart?()
 
-            let destinationPath = "\(configuration.resultDestination.path)/\(timestamp)"
+            let destinationPath = "\(resultDestination.path)/\(timestamp)"
 
             guard let executer = destinationExecuter else { fatalError("💣 Failed making executer") }
 

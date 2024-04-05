@@ -15,18 +15,21 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
     private let windowMenubarHeight = 38
 
     private let syncQueue = DispatchQueue(label: String(describing: SimulatorSetupOperation.self))
-    private let configuration: Configuration
+    private let buildBundleIdentifier: String
+    private let testBundleIdentifier: String
     private let nodes: [Node]
     private let device: Device
-    private let autodeleteSlowDevices: Bool
+    private let alwaysRebootSimulators: Bool
     private let verbose: Bool
     private lazy var pool: ConnectionPool = makeConnectionPool(sources: nodes)
+    private var cachedScreenResolution: ScreenResolution?
 
-    init(configuration: Configuration, nodes: [Node], device: Device, autodeleteSlowDevices: Bool, verbose: Bool) {
+    init(buildBundleIdentifier: String, testBundleIdentifier: String, nodes: [Node], device: Device, alwaysRebootSimulators: Bool, verbose: Bool) {
+        self.buildBundleIdentifier = buildBundleIdentifier
+        self.testBundleIdentifier = testBundleIdentifier
         self.nodes = nodes
-        self.configuration = configuration
         self.device = device
-        self.autodeleteSlowDevices = autodeleteSlowDevices
+        self.alwaysRebootSimulators = alwaysRebootSimulators
         self.verbose = verbose
     }
 
@@ -37,104 +40,43 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
             didStart?()
 
             try pool.execute { executer, source in
-                let node = source.node
-
-                // Killing CoreSimulatorService will reset and shutdown all Simulators
-                _ = try? executer.execute("killall -9 com.apple.CoreSimulator.CoreSimulatorService;")
-
-                let systemPath = try executer.execute("xcode-select -p")
-                let path = (self.nodesEnvironment[source.node.address]?["DEVELOPER_DIR"]) ?? systemPath
-                if try !(executer.execute("ps aux | grep Simulator.app").contains(path)) {
-                    // Launched Simulator is from a different Xcode version
-                    _ = try? executer.execute("killall Simulator")
-                }
-
                 let proxy = CommandLineProxy.Simulators(executer: executer, verbose: self.verbose)
 
-                try proxy.installRuntimeIfNeeded(self.device.runtime, nodeAddress: node.address)
+                try proxy.checkIfRuntimeInstalled(self.device.runtime, nodeAddress: source.node.address)
 
-                let concurrentTestRunners: Int
-                switch node.concurrentTestRunners {
-                case let .manual(count) where count > 0: // swiftlint:disable:this empty_count
-                    concurrentTestRunners = Int(count)
-                default:
-                    concurrentTestRunners = try self.physicalCPUs(executer: executer, node: node)
-                }
+                var rebootRequired = [Bool]()
 
-                let simulatorNames = (1 ... concurrentTestRunners).map { "\(self.device.name)-\($0)" }
+                try rebootRequired.append(self.shutdownSimulatorOnXcodeVersionMismatch(executer: executer, node: source.node))
 
-                let rawSimulatorStatus = try proxy.rawSimulatorStatus()
-                let nodeSimulators = try simulatorNames.compactMap { try proxy.makeSimulatorIfNeeded(name: $0, device: self.device, cachedSimulatorStatus: rawSimulatorStatus) }
+                let nodeSimulators = try self.makeSimulators(node: source.node, executer: executer)
 
-                try proxy.rewriteSettingsIfNeeded()
-
-                try self.updateSimulatorsSettings(executer: executer, simulators: nodeSimulators, arrangeSimulators: true)
-                
-                try proxy.enablePasteboardWorkaround()
-                try proxy.enableLowQualityGraphicOverrides()
-                try proxy.disableSimulatorBezel()
+                try rebootRequired.append(proxy.deleteSettingsIfNeeded())
+                try rebootRequired.append(proxy.enablePasteboardWorkaround())
+                try rebootRequired.append(proxy.enableLowQualityGraphicOverrides())
+                try rebootRequired.append(proxy.disableSimulatorBezel())
+                try rebootRequired.append(self.updateSimulatorsSettings(executer: executer, simulators: nodeSimulators, arrangeSimulators: true))
 
                 for nodeSimulator in nodeSimulators {
-                    _ = try proxy.updateLanguage(on: nodeSimulator, language: self.device.language, locale: self.device.locale)
-                    _ = try proxy.increaseWatchdogExceptionTimeout(on: nodeSimulator, appBundleIndentifier: self.configuration.buildBundleIdentifier, testBundleIdentifier: self.configuration.testBundleIdentifier)
+                    try rebootRequired.append(proxy.updateLanguage(on: nodeSimulator, language: self.device.language, locale: self.device.locale))
+                    try rebootRequired.append(proxy.increaseWatchdogExceptionTimeout(on: nodeSimulator, appBundleIndentifier: self.buildBundleIdentifier, testBundleIdentifier: self.testBundleIdentifier))
                 }
 
-                try? proxy.shutdownAll() // Always shutting down simulators is the safest way to workaround unexpected Simulator.app hangs
+                if rebootRequired.contains(true) || self.alwaysRebootSimulators {
+                    print("Rebooting simulators")
 
-                try proxy.gracefullyQuit()
-
-                let bootQueue = OperationQueue()
-
-                for nodeSimulator in nodeSimulators {
-                    let logger = ExecuterLogger(name: "\(type(of: self))-AsyncBoot", address: node.address)
-                    self.addLogger(logger)
-
-                    let queueExecuter = try source.node.makeExecuter(logger: logger, environment: self.nodesEnvironment[source.node.address] ?? [:])
-                    let queueProxy = CommandLineProxy.Simulators(executer: queueExecuter, verbose: self.verbose)
-
-                    bootQueue.addOperation {
-                        try? queueProxy.bootSynchronously(simulator: nodeSimulator)
-
-                        queueProxy.enableXcode11ReleaseNotesWorkarounds(on: nodeSimulator)
-                        queueProxy.enableXcode13Workarounds(on: nodeSimulator)
-                        queueProxy.disableSlideToType(on: nodeSimulator)
-                        queueProxy.disablePasswordAutofill(on: nodeSimulator)
-
-                        try? logger.dump()
-                    }
+                    try? proxy.shutdownAll() // Always shutting down simulators is the safest way to workaround unexpected Simulator.app hangs
+                    try proxy.gracefullyQuit()
                 }
-                bootQueue.waitUntilAllOperationsAreFinished()
 
-                try proxy.launch()
+                let bootedSimulators = try proxy.bootedSimulators()
 
-                if self.autodeleteSlowDevices {
-                    // Particularly on newly created devices it can happen that certain processes hug the simulators. For example healthappd seems
-                    // to take significant amount of cpu time on first device launch. This causes the initial tests to take longer to begin and this
-                    // in turn causes at the end of tests execution the slowdevices logic to kick in that will again delete simulators. To avoid the
-                    // loop we wait for the processes on the simulators to idle so that initial tests will begin earlier.
-                    var didTimeout = true
-                    for _ in 0 ..< 5 {
-                        guard let psAux = try? executer.execute("ps aux | grep -E 'diagnosticd|healthappd|healthd|Calendar' | tr -s ' ' | cut -d ' ' -f3") else {
-                            break
-                        }
+                try self.bootSimulators(node: source.node, simulators: nodeSimulators.filter { !bootedSimulators.contains($0) })
+                if nodeSimulators.count != bootedSimulators.count {
+                    try proxy.launch()
+                }
 
-                        let cpuUsages = psAux.components(separatedBy: "\n").compactMap { Float($0) }
-                        let totalCpuUsage = cpuUsages.reduce(0, +)
-
-                        #if DEBUG
-                            print("[Boot-CPU] \(executer.address) total cpu: \(totalCpuUsage)")
-                        #endif
-
-                        if totalCpuUsage < 100.0 {
-                            didTimeout = false
-                            break
-                        }
-                        Thread.sleep(forTimeInterval: 10.0)
-                    }
-
-                    if didTimeout {
-                        print("⚠️ \(executer.address) process idle timeout!")
-                    }
+                if rebootRequired.contains(true) || self.alwaysRebootSimulators {
+                    self.waitForSimulatorProcessesToIdle(executer: executer)
                 }
 
                 self.syncQueue.sync { [unowned self] in
@@ -155,12 +97,100 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
         super.cancel()
     }
 
+    private func makeSimulators(node: Node, executer: Executer) throws -> [Simulator] {
+        var concurrentTestRunners: Int
+        switch node.concurrentTestRunners {
+        case let .manual(count) where count > 0: // swiftlint:disable:this empty_count
+            concurrentTestRunners = Int(count)
+        default:
+            concurrentTestRunners = try physicalCPUs(executer: executer, node: node) / 2
+        }
+        concurrentTestRunners = max(1, concurrentTestRunners)
+
+        let simulatorNames = (1 ... concurrentTestRunners).map { "\(self.device.name)-\($0)" }
+
+        let proxy = CommandLineProxy.Simulators(executer: executer, verbose: verbose)
+        let rawSimulatorStatus = try proxy.rawSimulatorStatus()
+        let simulators = try simulatorNames.compactMap { try proxy.makeSimulatorIfNeeded(name: $0, device: self.device, cachedSimulatorStatus: rawSimulatorStatus) }
+
+        return simulators
+    }
+
+    private func bootSimulators(node: Node, simulators: [Simulator]) throws {
+        let bootQueue = OperationQueue()
+
+        for simulator in simulators {
+            let logger = ExecuterLogger(name: "\(type(of: self))-AsyncBoot", address: node.address)
+            addLogger(logger)
+
+            let queueExecuter = try node.makeExecuter(logger: logger, environment: nodesEnvironment[node.address] ?? [:])
+            let queueProxy = CommandLineProxy.Simulators(executer: queueExecuter, verbose: verbose)
+
+            bootQueue.addOperation {
+                try? queueProxy.bootSynchronously(simulator: simulator)
+
+                queueProxy.enableXcode11ReleaseNotesWorkarounds(on: simulator)
+                _ = try? queueProxy.enableXcode13Workarounds(on: simulator)
+                queueProxy.disableSlideToType(on: simulator)
+                _ = try? queueProxy.disablePasswordAutofill(on: simulator)
+
+                try? logger.dump()
+            }
+        }
+        bootQueue.waitUntilAllOperationsAreFinished()
+    }
+
+    private func waitForSimulatorProcessesToIdle(executer: Executer) {
+        // Particularly on newly created devices it can happen that certain processes hug the simulators. For example healthappd seems
+        // to take significant amount of cpu time on first device launch. This causes the initial tests to take longer to begin and this
+        // in turn causes at the end of tests execution the slowdevices logic to kick in that will again delete simulators. To avoid the
+        // loop we wait for the processes on the simulators to idle so that initial tests will begin earlier.
+        var didTimeout = true
+        for _ in 0 ..< 5 {
+            guard let psAux = try? executer.execute("ps aux | grep -E 'diagnosticd|healthappd|healthd|Calendar' | tr -s ' ' | cut -d ' ' -f3") else {
+                break
+            }
+
+            let cpuUsages = psAux.components(separatedBy: "\n").compactMap { Float($0) }
+            let totalCpuUsage = cpuUsages.reduce(0, +)
+
+            #if DEBUG
+                print("[Boot-CPU] \(executer.address) total cpu: \(totalCpuUsage)")
+            #endif
+
+            if totalCpuUsage < 100.0 {
+                didTimeout = false
+                break
+            }
+            Thread.sleep(forTimeInterval: 10.0)
+        }
+
+        if didTimeout {
+            print("⚠️ \(executer.address) process idle timeout!")
+        }
+    }
+
     private func physicalCPUs(executer: Executer, node _: Node) throws -> Int {
         guard let concurrentTestRunners = try Int(executer.execute("sysctl -n hw.physicalcpu")) else {
             throw Error("Failed getting concurrent simulators", logger: executer.logger)
         }
 
         return concurrentTestRunners
+    }
+
+    private func shutdownSimulatorOnXcodeVersionMismatch(executer: Executer, node: Node) throws -> Bool {
+        let systemPath = try executer.execute("xcode-select -p")
+        let path = (nodesEnvironment[node.address]?["DEVELOPER_DIR"]) ?? systemPath
+        if try !(executer.execute("ps aux | grep Simulator.app").contains(path)) {
+            // Launched Simulator is from a different Xcode version
+
+            _ = try? executer.execute("killall -9 com.apple.CoreSimulator.CoreSimulatorService;") // Killing CoreSimulatorService will reset and shutdown all Simulators
+            _ = try? executer.execute("killall Simulator")
+
+            return true
+        }
+
+        return false
     }
 
     private func simulatorsProperlyArranged(executer: Executer, simulators: [Simulator]) throws -> Bool {
@@ -259,26 +289,29 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
     ///
     /// - Parameters:
     ///   - param1: simulators to arrange
-    private func updateSimulatorsSettings(executer: Executer, simulators: [Simulator], arrangeSimulators: Bool) throws {
+    private func updateSimulatorsSettings(executer: Executer, simulators: [Simulator], arrangeSimulators: Bool) throws -> Bool {
         let simulatorProxy = CommandLineProxy.Simulators(executer: executer, verbose: verbose)
 
         // Configuration file might not be ready yet
-        var loadSettings: CommandLineProxy.Simulators.Settings?
-        var loadScreenIdentifier: String?
-        for _ in 0 ..< 5 {
-            loadSettings = try simulatorProxy.loadSimulatorSettings()
-            if let keys = loadSettings?.ScreenConfigurations?.keys {
-                loadScreenIdentifier = Array(keys).last ?? ""
-                if loadScreenIdentifier?.isEmpty == false {
-                    break
-                }
-            }
-            Thread.sleep(forTimeInterval: 3.0)
+        var loadedSettings: CommandLineProxy.Simulators.Settings?
+        var loadedScreenIdentifier: String?
+        loadedSettings = try simulatorProxy.loadSimulatorSettings()
+        if loadedSettings?.ScreenConfigurations == nil {
+            try simulatorProxy.gracefullyQuit()
+            try simulatorProxy.launch()
+            Thread.sleep(forTimeInterval: 5.0)
+
+            loadedSettings = try simulatorProxy.loadSimulatorSettings()
+        }
+        if let keys = loadedSettings?.ScreenConfigurations?.keys {
+            loadedScreenIdentifier = Array(keys).last ?? ""
         }
 
-        guard let settings = loadSettings, let screenIdentifier = loadScreenIdentifier else {
+        guard let settings = loadedSettings, let screenIdentifier = loadedScreenIdentifier else {
             fatalError("💣 Failed to get screenIdentifier from simulator plist on \(executer.address)")
         }
+
+        var storeConfiguration = false
 
         settings.CurrentDeviceUDID = nil
 
@@ -310,10 +343,13 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
             let windowCenter = "{\(center.x), \(center.y)}"
 
             let devicePreferences = settings.DevicePreferences?[simulator.id] ?? .init()
-            devicePreferences.SimulatorExternalDisplay = nil
             devicePreferences.SimulatorWindowOrientation = "Portrait"
             devicePreferences.SimulatorWindowRotationAngle = 0
             devicePreferences.ConnectHardwareKeyboard = connectHardwareKeyboardFlag
+            if settings.DevicePreferences?[simulator.id] != devicePreferences {
+                storeConfiguration = true
+            }
+            devicePreferences.SimulatorExternalDisplay = nil
             settings.DevicePreferences?[simulator.id] = devicePreferences
 
             if settings.DevicePreferences?[simulator.id]?.SimulatorWindowGeometry == nil {
@@ -324,6 +360,9 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
                 let windowGeometry = settings.DevicePreferences?[simulator.id]?.SimulatorWindowGeometry?[screenIdentifier] ?? .init()
                 windowGeometry.WindowScale = Double(scaleFactor)
                 windowGeometry.WindowCenter = windowCenter
+                if settings.DevicePreferences?[simulator.id]?.SimulatorWindowGeometry?[screenIdentifier] != windowGeometry {
+                    storeConfiguration = true
+                }
                 settings.DevicePreferences?[simulator.id]?.SimulatorWindowGeometry?[screenIdentifier] = windowGeometry
 
                 executer.logger?.log(command: "Arranging simulator \(simulator.id) on \(executer.address) at location (\(center))")
@@ -336,6 +375,8 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
         }
 
         try simulatorProxy.storeSimulatorSettings(settings)
+
+        return storeConfiguration
     }
 
     private func arrangedSimulatorCenter(index: Int, executer: Executer, device: Device, displayMargin: Int, totalSimulators: Int, maxSimulatorsPerRow: Int) throws -> CGPoint {
@@ -370,8 +411,12 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
     }
 
     private func screenResolution(executer: Executer) throws -> ScreenResolution {
+        if let cachedScreenResolution {
+            return cachedScreenResolution
+        }
         let rawResolution = try executer.execute(#"mendoza mendoza screen_point_size"#)
-        return try JSONDecoder().decode(ScreenResolution.self, from: Data(rawResolution.utf8))
+        cachedScreenResolution = try JSONDecoder().decode(ScreenResolution.self, from: Data(rawResolution.utf8))
+        return cachedScreenResolution!
     }
 
     private func simulatorsWindowLocation(executer: Executer) throws -> [SimulatorWindowLocation] {

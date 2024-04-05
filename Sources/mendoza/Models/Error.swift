@@ -19,10 +19,6 @@ struct Error: LocalizedError {
         logger?.log(exception: description)
     }
 
-    init(_ error: Swift.Error) {
-        self.init(error.localizedDescription, logger: nil)
-    }
-
     private static func truncate(_ text: String) -> String {
         let truncateSize = 8192
         let head = String(text.prefix(truncateSize))
