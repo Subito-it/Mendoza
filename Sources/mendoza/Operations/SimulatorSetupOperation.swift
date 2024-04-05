@@ -98,13 +98,14 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
     }
 
     private func makeSimulators(node: Node, executer: Executer) throws -> [Simulator] {
-        let concurrentTestRunners: Int
+        var concurrentTestRunners: Int
         switch node.concurrentTestRunners {
         case let .manual(count) where count > 0: // swiftlint:disable:this empty_count
             concurrentTestRunners = Int(count)
         default:
             concurrentTestRunners = try physicalCPUs(executer: executer, node: node) / 2
         }
+        concurrentTestRunners = max(1, concurrentTestRunners)
 
         let simulatorNames = (1 ... concurrentTestRunners).map { "\(self.device.name)-\($0)" }
 
