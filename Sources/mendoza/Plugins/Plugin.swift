@@ -15,7 +15,7 @@ class Plugin<Input: DefaultInitializable, Output: DefaultInitializable> {
     }
 
     let logger: ExecuterLogger
-    let plugin: ModernConfiguration.Plugins
+    let plugin: Configuration.Plugins
 
     private let executer: LocalExecuter
     private let name: String
@@ -25,7 +25,7 @@ class Plugin<Input: DefaultInitializable, Output: DefaultInitializable> {
 
     private let pluginOutputMarker = "# plugin-result"
 
-    init(name: String, baseUrl: URL?, plugin: ModernConfiguration.Plugins?) {
+    init(name: String, baseUrl: URL?, plugin: Configuration.Plugins?) {
         logger = ExecuterLogger(name: "Plugin-\(name)", address: "localhost")
         executer = LocalExecuter(logger: logger)
         self.name = name

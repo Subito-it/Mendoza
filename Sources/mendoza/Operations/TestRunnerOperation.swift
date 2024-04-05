@@ -12,7 +12,7 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
     var sortedTestCases: [TestCase]?
     var testRunners: [(testRunner: TestRunner, node: Node, idle: Bool)]?
 
-    private let configuration: ModernConfiguration
+    private let configuration: Configuration
 
     private var testCasesCount = 0
     private var testCasesCompletedCount = 0
@@ -38,7 +38,7 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
         return makeConnectionPool(sources: input.map { (node: $0.0.node, value: $0.0.testRunner) })
     }()
 
-    init(configuration: ModernConfiguration, destinationPath: String, testTarget: String, productNames: [String]) {
+    init(configuration: Configuration, destinationPath: String, testTarget: String, productNames: [String]) {
         testExecuterBuilder = { executer, testCase, node, testRunner, runnerIndex in
             TestExecuter(executer: executer, testCase: testCase, testTarget: testTarget, building: configuration.building, testing: configuration.testing, node: node, testRunner: testRunner, runnerIndex: runnerIndex, verbose: configuration.verbose)
         }

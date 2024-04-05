@@ -63,7 +63,7 @@ class TestCommand: Command {
         return true
     }
 
-    private func makeConfiguration() throws -> ModernConfiguration {
+    private func makeConfiguration() throws -> Configuration {
         if remoteNodesConfigurationPath.value?.path.isEmpty == true, localDestinationPath.value?.path.isEmpty == true {
             throw Error("Missing required arguments: `\(remoteNodesConfigurationPath.longDescription)=\(remoteNodesConfigurationPath.name)` or `\(localDestinationPath.longDescription)=\(localDestinationPath.name)`".red)
         } else if remoteNodesConfigurationPath.value?.path.isEmpty == localDestinationPath.value?.path.isEmpty {
@@ -102,7 +102,7 @@ class TestCommand: Command {
 
         let filePatterns = FilePatterns(commaSeparatedIncludePattern: includePattern.value, commaSeparatedExcludePattern: excludePattern.value)
 
-        let building = ModernConfiguration.Building(projectPath: projectUrl.path, buildBundleIdentifier: bundleIdentifiers.build, testBundleIdentifier: bundleIdentifiers.test, scheme: scheme, buildConfiguration: buildConfiguration, sdk: sdk.rawValue, filePatterns: filePatterns, xcodeBuildNumber: xcodeBuildNumber)
+        let building = Configuration.Building(projectPath: projectUrl.path, buildBundleIdentifier: bundleIdentifiers.build, testBundleIdentifier: bundleIdentifiers.test, scheme: scheme, buildConfiguration: buildConfiguration, sdk: sdk.rawValue, filePatterns: filePatterns, xcodeBuildNumber: xcodeBuildNumber)
 
         if let codeCoveragePathEquivalenceValue = codeCoveragePathEquivalence.value {
             if codeCoveragePathEquivalenceValue.components(separatedBy: ",").count % 2 != 0 {
@@ -110,22 +110,22 @@ class TestCommand: Command {
             }
         }
 
-        let testing = ModernConfiguration.Testing(maximumStdOutIdleTime: maximumStdOutIdleTime.value,
-                                                  maximumTestExecutionTime: maximumTestExecutionTime.value,
-                                                  failingTestsRetryCount: failingTestsRetryCount.value,
-                                                  xcresultBlobThresholdKB: xcresultBlobThresholdKB.value,
-                                                  killSimulatorProcesses: killSimulatorProcesses.value,
-                                                  alwaysRebootSimulators: alwaysRebootSimulators.value,
-                                                  autodeleteSlowDevices: autodeleteSlowDevices.value,
-                                                  codeCoveragePathEquivalence: codeCoveragePathEquivalence.value,
-                                                  clearDerivedDataOnCompilationFailure: clearDerivedDataOnCompilationFailure.value,
-                                                  skipResultMerge: skipResultMerge.value)
+        let testing = Configuration.Testing(maximumStdOutIdleTime: maximumStdOutIdleTime.value,
+                                            maximumTestExecutionTime: maximumTestExecutionTime.value,
+                                            failingTestsRetryCount: failingTestsRetryCount.value,
+                                            xcresultBlobThresholdKB: xcresultBlobThresholdKB.value,
+                                            killSimulatorProcesses: killSimulatorProcesses.value,
+                                            alwaysRebootSimulators: alwaysRebootSimulators.value,
+                                            autodeleteSlowDevices: autodeleteSlowDevices.value,
+                                            codeCoveragePathEquivalence: codeCoveragePathEquivalence.value,
+                                            clearDerivedDataOnCompilationFailure: clearDerivedDataOnCompilationFailure.value,
+                                            skipResultMerge: skipResultMerge.value)
 
-        let plugins: ModernConfiguration.Plugins
+        let plugins: Configuration.Plugins
         if let pluginsData = pluginCustom.value {
-            plugins = ModernConfiguration.Plugins(data: pluginsData, debug: debugPluginsFlag.value)
+            plugins = Configuration.Plugins(data: pluginsData, debug: debugPluginsFlag.value)
         } else {
-            plugins = ModernConfiguration.Plugins(data: "", debug: false)
+            plugins = Configuration.Plugins(data: "", debug: false)
         }
 
         let resultDestination: ConfigurationResultDestination
@@ -156,7 +156,7 @@ class TestCommand: Command {
             throw Error("Missing required arguments `\(deviceName.longDescription)=\(deviceName.name)`, `\(deviceRuntime.longDescription)=\(deviceRuntime.name)`".red)
         }
 
-        return ModernConfiguration(building: building, testing: testing, device: device, plugins: plugins, resultDestination: resultDestination, nodes: nodes, verbose: verboseFlag.value)
+        return Configuration(building: building, testing: testing, device: device, plugins: plugins, resultDestination: resultDestination, nodes: nodes, verbose: verboseFlag.value)
     }
 
     private func remoteConfigurationUrl() -> URL? {

@@ -8,7 +8,7 @@
 import Foundation
 
 class TestExtractionPlugin: Plugin<TestExtractionInput, [TestCase]> {
-    init(baseUrl: URL?, plugin: ModernConfiguration.Plugins? = nil) {
+    init(baseUrl: URL?, plugin: Configuration.Plugins? = nil) {
         super.init(name: "TestExtractionPlugin", baseUrl: baseUrl, plugin: plugin)
     }
 }

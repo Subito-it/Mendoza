@@ -1,5 +1,5 @@
 //
-//  ModernConfiguration.swift
+//  Configuration.swift
 //
 //
 //  Created by tomas on 27/03/24.
@@ -7,7 +7,7 @@
 
 import Foundation
 
-struct ModernConfiguration: Codable {
+struct Configuration: Codable {
     let building: Building
     let testing: Testing
     let device: Device?
@@ -19,7 +19,7 @@ struct ModernConfiguration: Codable {
     let verbose: Bool
 }
 
-extension ModernConfiguration {
+extension Configuration {
     struct Building: Codable {
         let projectPath: String // .xcworkspace or .xcodeproj
         let buildBundleIdentifier: String
@@ -68,7 +68,7 @@ extension ModernConfiguration {
     }
 }
 
-extension ModernConfiguration.Building {
+extension Configuration.Building {
     struct Settings: Codable {
         let buildSettings: String
         let onlyActiveArchitecture: String

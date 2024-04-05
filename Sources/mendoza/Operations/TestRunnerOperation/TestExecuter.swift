@@ -17,8 +17,8 @@ class TestExecuter {
     private let testRunner: TestRunner
     private let runnerIndex: Int
 
-    private let building: ModernConfiguration.Building
-    private let testing: ModernConfiguration.Testing
+    private let building: Configuration.Building
+    private let testing: Configuration.Testing
     private let xcodebuildDestination: String
 
     private let verbose: Bool
@@ -32,8 +32,8 @@ class TestExecuter {
     init(executer: Executer,
          testCase: TestCase,
          testTarget: String,
-         building: ModernConfiguration.Building,
-         testing: ModernConfiguration.Testing,
+         building: Configuration.Building,
+         testing: Configuration.Testing,
          node: Node,
          testRunner: TestRunner,
          runnerIndex: Int,

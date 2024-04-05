@@ -8,7 +8,7 @@
 import Foundation
 
 class EventPlugin: Plugin<EventPluginInput, PluginVoid> {
-    init(baseUrl: URL?, plugin: ModernConfiguration.Plugins? = nil) {
+    init(baseUrl: URL?, plugin: Configuration.Plugins? = nil) {
         super.init(name: "EventPlugin", baseUrl: baseUrl, plugin: plugin)
     }
 

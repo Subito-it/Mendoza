@@ -8,7 +8,7 @@
 import Foundation
 
 class PreCompilationPlugin: Plugin<PluginVoid, PluginVoid> {
-    init(baseUrl: URL?, plugin: ModernConfiguration.Plugins? = nil) {
+    init(baseUrl: URL?, plugin: Configuration.Plugins? = nil) {
         super.init(name: "PreCompilationPlugin", baseUrl: baseUrl, plugin: plugin)
     }
 }

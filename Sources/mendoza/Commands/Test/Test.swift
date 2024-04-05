@@ -13,14 +13,14 @@ class Test {
     var didFail: ((Swift.Error) -> Void)?
 
     // swiftlint:disable:next large_tuple
-    private let configuration: ModernConfiguration
+    private let configuration: Configuration
     private let eventPlugin: EventPlugin
     private let pluginUrl: URL?
     private let syncQueue = DispatchQueue(label: String(describing: Test.self))
     private let timestamp: String
     private var observers = [NSKeyValueObservation]()
 
-    init(configuration: ModernConfiguration, pluginUrl: URL?) throws {
+    init(configuration: Configuration, pluginUrl: URL?) throws {
         self.configuration = configuration
         self.pluginUrl = pluginUrl
 

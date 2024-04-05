@@ -8,7 +8,7 @@
 import Foundation
 
 class CompileOperation: BaseOperation<AppInfo> {
-    private let building: ModernConfiguration.Building
+    private let building: Configuration.Building
     private let git: GitStatus?
     private let baseUrl: URL
     private let project: XcodeProject
@@ -19,7 +19,7 @@ class CompileOperation: BaseOperation<AppInfo> {
 
     private lazy var executer: Executer = self.makeLocalExecuter()
 
-    init(building: ModernConfiguration.Building, git: GitStatus?, baseUrl: URL, project: XcodeProject, scheme: String, preCompilationPlugin: PreCompilationPlugin, postCompilationPlugin: PostCompilationPlugin, clearDerivedDataOnCompilationFailure: Bool) {
+    init(building: Configuration.Building, git: GitStatus?, baseUrl: URL, project: XcodeProject, scheme: String, preCompilationPlugin: PreCompilationPlugin, postCompilationPlugin: PostCompilationPlugin, clearDerivedDataOnCompilationFailure: Bool) {
         self.building = building
         self.git = git
         self.baseUrl = baseUrl

@@ -8,7 +8,7 @@
 import Foundation
 
 class PostCompilationPlugin: Plugin<PostCompilationInput, PluginVoid> {
-    init(baseUrl: URL?, plugin: ModernConfiguration.Plugins? = nil) {
+    init(baseUrl: URL?, plugin: Configuration.Plugins? = nil) {
         super.init(name: "PostCompilationPlugin", baseUrl: baseUrl, plugin: plugin)
     }
 }
