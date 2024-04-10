@@ -35,7 +35,7 @@ protocol Executer: AnyObject {
 
 extension Executer {
     static func executablePathExport() -> String {
-        "export PATH=~/.rbenv/shims:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/usr/sbin:/sbin:/bin;"
+        "export PATH=~/.rbenv/shims:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/usr/sbin:/sbin:/bin:$PATH;"
     }
 }
 
