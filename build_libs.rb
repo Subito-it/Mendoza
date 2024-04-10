@@ -38,7 +38,7 @@ def main
     fetch_pkg("libssh2")
     libssh2_path = `find #{$DESTINATION_PATH} -name 'libssh2-*' -type d`.strip
     Dir.chdir(libssh2_path) do
-      system("export LDFLAGS=\"-L#{openssl_path}\"; export CFLAGS=\"-arch #{arch}\"; export CPPFLAGS=\"-arch #{arch}\"; ./configure --host=#{arch}-apple-darwin --disable-debug --disable-dependency-tracking --disable-silent-rules --disable-examples-build --without-libz --with-crypto=openssl --with-libssl-prefix=#{openssl_path}; make -j $(sysctl hw.ncpu | awk '{print $2}')")
+      system("export MACOSX_DEPLOYMENT_TARGET=\"10.13\"; export LDFLAGS=\"-L#{openssl_path}\"; export CFLAGS=\"-arch #{arch}\"; export CPPFLAGS=\"-arch #{arch}\"; ./configure --host=#{arch}-apple-darwin --disable-debug --disable-dependency-tracking --disable-silent-rules --disable-examples-build --without-libz --with-crypto=openssl --with-libssl-prefix=#{openssl_path}; make -j $(sysctl hw.ncpu | awk '{print $2}')")
 
       $EXTS.each do |ext|
         system("mv $(readlink -f ./src/.libs/libssh2.#{ext}) ../libssh2-#{arch}.#{ext}")
