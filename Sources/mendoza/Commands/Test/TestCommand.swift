@@ -31,7 +31,7 @@ class TestCommand: Command {
     let maximumTestExecutionTime = Argument<Int>(name: "seconds", kind: .named(short: nil, long: "max_execution_time"), optional: true, help: "Maximum execution time (in seconds) before test fails with a timeout error")
     let pluginCustom = Argument<String>(name: "data", kind: .named(short: nil, long: "plugin_data"), optional: true, help: "A custom string that can be used to inject data to plugins")
     let failingTestsRetryCount = Argument<Int>(name: "count", kind: .named(short: nil, long: "failure_retry"), optional: true, help: "Number of times a failing tests should be repeated")
-    let codeCoveragePathEquivalence = Argument<String>(name: "path", kind: .named(short: nil, long: "llvm_cov_equivalence_path"), optional: true, help: "Path equivalence path passed to 'llvm-cov show' when extracting code coverage (<from>,<to>)")
+    let codeCoveragePathEquivalence = Argument<String>(name: "path", kind: .named(short: nil, long: "llvm_cov_equivalence_path"), optional: true, help: "Path equivalence path passed to 'llvm-cov show' when extracting code coverage (<from1>,<to1>,<from2>,<to2>...)")
     let xcodeBuildNumber = Argument<String>(name: "number", kind: .named(short: nil, long: "xcode_buildnumber"), optional: true, help: "Build number of the Xcode version to use (e.g. 12E507)")
     let skipResultMerge = Flag(short: nil, long: "skip_result_merge", help: "Skip xcresult merge (keep one xcresult per test in the result folder)")
     let clearDerivedDataOnCompilationFailure = Flag(short: nil, long: "clear_derived_data_on_failure", help: "On compilation failure derived data will be cleared and compilation will be retried once")
