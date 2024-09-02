@@ -14,7 +14,7 @@ let package = Package(
         .package(url: "https://github.com/Subito-it/Shout.git", branch: "mendoza/stable"),
         .package(url: "https://github.com/Subito-it/XcodeProj.git", branch: "mendoza/stable"),
         .package(url: "https://github.com/jpsim/SourceKitten.git", branch: "main"),
-        .package(url: "https://github.com/nicklockwood/SwiftFormat", branch: "master"),
+        .package(url: "https://github.com/nicklockwood/SwiftFormat", branch: "main"),
         .package(url: "https://github.com/Subito-it/CachiKit", branch: "master"),
     ],
     targets: [

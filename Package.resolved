@@ -33,7 +33,7 @@
       "location" : "https://github.com/Subito-it/CachiKit",
       "state" : {
         "branch" : "master",
-        "revision" : "9662b11157bb59558ca66923618a10f893048e09"
+        "revision" : "0440c09a1972d68025f640ae09af253ed8fb285b"
       }
     },
     {
@@ -41,8 +41,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/michaeleisel/JJLISO8601DateFormatter",
       "state" : {
-        "revision" : "de422afd9a47b72703c30a81423c478337191390",
-        "version" : "0.1.6"
+        "revision" : "741a9e45db01148a8ac60c5e12f7c978181a22d3",
+        "version" : "0.1.8"
       }
     },
     {
@@ -51,7 +51,7 @@
       "location" : "https://github.com/kishikawakatsumi/KeychainAccess",
       "state" : {
         "branch" : "master",
-        "revision" : "ecb18d8ce4d88277cc4fb103973352d91e18c535"
+        "revision" : "e0c7eebc5a4465a3c4680764f26b7a61f567cdaf"
       }
     },
     {
@@ -96,7 +96,7 @@
       "location" : "https://github.com/jpsim/SourceKitten.git",
       "state" : {
         "branch" : "main",
-        "revision" : "b1f22c841ef116e68e9fa5f006e20eaeda164308"
+        "revision" : "fbd6bbcddffa97dca4b8a6b5d5a8246a430be9c7"
       }
     },
     {
@@ -113,8 +113,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-argument-parser.git",
       "state" : {
-        "revision" : "fee6933f37fde9a5e12a1e4aeaa93fe60116ff2a",
-        "version" : "1.2.2"
+        "revision" : "41982a3656a71c768319979febd796c6fd111d5c",
+        "version" : "1.5.0"
       }
     },
     {
@@ -122,8 +122,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/nicklockwood/SwiftFormat",
       "state" : {
-        "branch" : "master",
-        "revision" : "440db3030205e6d19bfb88e5d83b8aa87e15874a"
+        "branch" : "main",
+        "revision" : "076525b91983bcd91f59367ed500b23d2a46c2e3"
       }
     },
     {
@@ -149,8 +149,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/jpsim/Yams.git",
       "state" : {
-        "revision" : "0d9ee7ea8c4ebd4a489ad7a73d5c6cad55d6fed3",
-        "version" : "5.0.6"
+        "revision" : "3036ba9d69cf1fd04d433527bc339dc0dc75433d",
+        "version" : "5.1.3"
       }
     },
     {
@@ -159,7 +159,7 @@
       "location" : "https://github.com/michaeleisel/ZippyJSON",
       "state" : {
         "branch" : "master",
-        "revision" : "3a80ab6a4bfdf36f3b87d732ece6f598c02262d0"
+        "revision" : "ddbbc024ba5a826f9676035a0a090a0bc2d40755"
       }
     },
     {
@@ -167,8 +167,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/michaeleisel/ZippyJSONCFamily",
       "state" : {
-        "revision" : "8abdd7a5e943afe68e7b03fdaa63b21c042a3893",
-        "version" : "1.2.9"
+        "revision" : "c1c0f88977359ea85b81e128b2d988e8250dfdae",
+        "version" : "1.2.14"
       }
     }
   ],
