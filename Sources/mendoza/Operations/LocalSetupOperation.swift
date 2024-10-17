@@ -27,7 +27,7 @@ class LocalSetupOperation: BaseOperation<Void> {
             if clearDerivedDataOnCompilationFailure {
                 for path in Path.allCases {
                     switch path {
-                    case .base, .build:
+                    case .base, .build, .coverage, .individualCoverage:
                         break
                     case .testBundle:
                         _ = try executer.execute("rm -rf '\(path.rawValue)/'*.xctestrun || true")

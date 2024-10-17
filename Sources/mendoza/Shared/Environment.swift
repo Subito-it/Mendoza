@@ -23,5 +23,6 @@ enum Environment {
     static let coverageFilename = "coverage.json"
     static let coverageSummaryFilename = "coverage-summary.json"
     static let coverageHtmlFilename = "coverage.html"
+    static let individualTestCoveragePath = "individual_coverage"
     static let resultFoldername = "results"
 }
