@@ -40,9 +40,10 @@ class CodeCoverageCollectionOperation: BaseOperation<Coverage?> {
                 let localCoverageUrl = Path.temp.url.appendingPathComponent("\(UUID().uuidString).profdata")
                 try destinationExecuter.download(remotePath: mergedPath, localUrl: localCoverageUrl)
 
-                let jsonCoverageUrl = try generateJsonCoverage(coverageUrl: localCoverageUrl, summary: false, pathEquivalence: pathEquivalence)
-                let jsonCoverageSummaryUrl = try generateJsonCoverage(coverageUrl: localCoverageUrl, summary: true, pathEquivalence: pathEquivalence)
-                let htmlCoverageSummaryUrl = try generateHtmlCoverage(coverageUrl: localCoverageUrl, pathEquivalence: pathEquivalence)
+                let pathEquivalence = configuration.testing.codeCoveragePathEquivalence
+                let jsonCoverageUrl = try generateJsonCoverage(executer: executer, coverageUrl: localCoverageUrl, summary: false, pathEquivalence: pathEquivalence)
+                let jsonCoverageSummaryUrl = try generateJsonCoverage(executer: executer, coverageUrl: localCoverageUrl, summary: true, pathEquivalence: pathEquivalence)
+                let htmlCoverageSummaryUrl = try generateHtmlCoverage(executer: executer, coverageUrl: localCoverageUrl, pathEquivalence: pathEquivalence)
 
                 try destinationExecuter.upload(localUrl: jsonCoverageSummaryUrl, remotePath: "\(resultPath)/\(Environment.resultFoldername)/\(Environment.coverageSummaryFilename)")
                 try destinationExecuter.upload(localUrl: jsonCoverageUrl, remotePath: "\(resultPath)/\(Environment.resultFoldername)/\(Environment.coverageFilename)")
@@ -61,8 +62,8 @@ class CodeCoverageCollectionOperation: BaseOperation<Coverage?> {
         }
     }
 
-    private func generateJsonCoverage(coverageUrl: URL, summary: Bool, pathEquivalence: String?) throws -> URL {
-        let executablePath = try findExecutablePath(executer: executer, buildBundleIdentifier: buildBundleIdentifier)
+    private func generateJsonCoverage(executer: Executer, coverageUrl: URL, summary: Bool, pathEquivalence: String?) throws -> URL {
+        let executablePath = try findExecutablePath(executer: executer, buildBundleIdentifier: configuration.building.buildBundleIdentifier)
         let summaryParameter = summary ? "--summary-only" : ""
         let truncateDecimals = #"| sed -E 's/(percent":[0-9]*\.[0-9])[0-9]*/\1/g'"#
         var cmd = "xcrun llvm-cov export -instr-profile \(coverageUrl.path) \(executablePath) \(summaryParameter) \(truncateDecimals)"
@@ -80,8 +81,8 @@ class CodeCoverageCollectionOperation: BaseOperation<Coverage?> {
         return url
     }
 
-    private func generateHtmlCoverage(coverageUrl: URL, pathEquivalence: String?) throws -> URL {
-        let executablePath = try findExecutablePath(executer: executer, buildBundleIdentifier: buildBundleIdentifier)
+    private func generateHtmlCoverage(executer: Executer, coverageUrl: URL, pathEquivalence: String?) throws -> URL {
+        let executablePath = try findExecutablePath(executer: executer, buildBundleIdentifier: configuration.building.buildBundleIdentifier)
         var cmd = "xcrun llvm-cov show --format=html -instr-profile \(coverageUrl.path) \(executablePath)"
 
         if let pathEquivalence {
