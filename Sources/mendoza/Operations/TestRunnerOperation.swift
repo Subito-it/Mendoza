@@ -13,6 +13,7 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
     var testRunners: [(testRunner: TestRunner, node: Node, idle: Bool)]?
 
     private let configuration: Configuration
+    private let baseUrl: URL
 
     private var testCasesCount = 0
     private var testCasesCompletedCount = 0
@@ -38,12 +39,13 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
         return makeConnectionPool(sources: input.map { (node: $0.0.node, value: $0.0.testRunner) })
     }()
 
-    init(configuration: Configuration, destinationPath: String, testTarget: String, productNames: [String]) {
+    init(configuration: Configuration, baseUrl: URL, destinationPath: String, testTarget: String, productNames: [String]) {
         testExecuterBuilder = { executer, testCase, node, testRunner, runnerIndex in
             TestExecuter(executer: executer, testCase: testCase, testTarget: testTarget, building: configuration.building, testing: configuration.testing, node: node, testRunner: testRunner, runnerIndex: runnerIndex, verbose: configuration.verbose)
         }
 
         self.configuration = configuration
+        self.baseUrl = baseUrl
 
         self.productNames = productNames
         self.destinationPath = destinationPath
@@ -171,19 +173,10 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
 
                     let coverageFiles = try findCoverageFilePaths(executer: executer, coveragePath: searchPath)
 
-                    if let testCaseResult, configuration.testing.extractIndividualTestCoverage {
-                        if coverageFiles.count == 1 {
-                            let coverageFilename = "\(testCaseResult.suite).\(testCaseResult.name).\(Int(testCaseResult.startInterval)).individual_profdata"
-                            _ = try executer.execute("cp '\(coverageFiles[0])' '\(Path.individualCoverage.rawValue)/\(coverageFilename)'")
-                        } else if coverageFiles.count > 1 {
-                            print("🆘 Multiple coverage files found!")
-                        }
-                    }
-
                     let coverageMerger = CodeCoverageMerger(executer: executer)
 
                     let start = CFAbsoluteTimeGetCurrent()
-                    _ = try? coverageMerger.merge(coverageFiles: coverageFiles)
+                    let coverageFile = try? coverageMerger.merge(coverageFiles: coverageFiles)
                     if self.configuration.verbose {
                         print("🙈 [\(Date().description)] Node \(source.node.address) took \(CFAbsoluteTimeGetCurrent() - start)s for coverage merge {\(runnerIndex)}".magenta)
                     }
@@ -203,6 +196,24 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                         try? groupExecuter.rsync(sourcePath: xcResultPath, destinationPath: runnerDestinationPath, on: destinationNode)
 
                         _ = try? groupExecuter.execute("rm -rf '\(xcResultPath)'")
+
+                        if let testCaseResult,
+                           let coverageFile,
+                           self.configuration.testing.extractIndividualTestCoverage {
+                            do {
+                                let pathEquivalence = self.configuration.testing.codeCoveragePathEquivalence
+
+                                let coverageUrl = URL(filePath: coverageFile)
+
+                                let codeCoverageGenerator = CodeCoverageGenerator(configuration: self.configuration, baseUrl: self.baseUrl)
+                                let jsonCoverageSummaryUrl = try codeCoverageGenerator.generateJsonCoverage(executer: groupExecuter, coverageUrl: coverageUrl, summary: true, pathEquivalence: pathEquivalence)
+
+                                let filename = "\(testCaseResult.suite)-\(testCaseResult.name)-\(Int(testCaseResult.startInterval)).json"
+                                _ = try groupExecuter.execute("mv '\(jsonCoverageSummaryUrl.path)' '\(Path.individualCoverage.rawValue)/\(filename)'")
+                            } catch {
+                                print("🆘 failed generating individual code coverage. error: \(error)")
+                            }
+                        }
                     }
                 }
 

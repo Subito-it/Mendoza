@@ -82,6 +82,67 @@ class CodeCoverageCollectionOperation: BaseOperation<Coverage?> {
                 _ = try destinationExecuter.execute("rm -f \(mergedPath)")
             }
 
+            if configuration.testing.extractIndividualTestCoverage {
+                let pathEquivalence = configuration.testing.codeCoveragePathEquivalence
+
+                let coverageFiles = try executer.execute(
+                    "find '\(resultPath)' -type f -name '*.individual_profdata'"
+                ).components(separatedBy: "\n")
+                let operationQueue = OperationQueue()
+                operationQueue.maxConcurrentOperationCount = 10
+
+                _ = try executer.execute(
+                    "mkdir -p '\(resultPath)/\(Environment.individualTestCoveragePath)'")
+
+                let individualCoverageStart = CFAbsoluteTimeGetCurrent()
+                for coverageFile in coverageFiles {
+                    let operationDestinationExecuter = try destinationExecuter.clone()
+                    let operationExecuter = try executer.clone()
+
+                    operationQueue.addOperation {
+                        let localCoverageUrl = Path.temp.url.appendingPathComponent(
+                            "\(UUID().uuidString).profdata")
+                        guard
+                            (try? operationDestinationExecuter.download(
+                                remotePath: coverageFile, localUrl: localCoverageUrl)) != nil
+                        else {
+                            return print("Failed downloading individual coverage file")
+                        }
+
+                        guard
+                            let jsonCoverageUrl =
+                                (try? self.generateJsonCoverage(
+                                    executer: operationExecuter, coverageUrl: localCoverageUrl,
+                                    summary: true, pathEquivalence: pathEquivalence))
+                        else {
+                            return print("Failed generating individual coverage file")
+                        }
+
+                        let filename = URL(filePath: coverageFile).deletingPathExtension()
+                            .lastPathComponent
+                        guard
+                            (try? operationDestinationExecuter.upload(
+                                localUrl: jsonCoverageUrl,
+                                remotePath:
+                                    "\(resultPath)/\(Environment.individualTestCoveragePath)/\(filename).json"
+                            )) != nil
+                        else {
+                            return print("Failed uploading individual coverage file")
+                        }
+                    }
+                }
+
+                operationQueue.waitUntilAllOperationsAreFinished()
+
+                _ = try executer.execute(
+                    "find '\(resultPath)' -type f -name '*.individual_profdata' -exec rm -rf {} \\;"
+                )
+
+                print(
+                    "Individual coverage generation took \(CFAbsoluteTimeGetCurrent() - individualCoverageStart)s"
+                )
+            }
+
             didEnd?(coverage)
         } catch {
             didThrow?(error)

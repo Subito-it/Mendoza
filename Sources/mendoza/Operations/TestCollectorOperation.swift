@@ -44,6 +44,9 @@ class TestCollectorOperation: BaseOperation<[TestCaseResult]> {
                 let logPath = "\(Path.logs.rawValue)/*"
                 try executer.rsync(sourcePath: logPath, destinationPath: destinationPath, include: ["*/", "*.profdata"], exclude: ["*"], on: destinationNode)
 
+                let individualCoveragePath = "\(Path.individualCoverage.rawValue)/*"
+                try executer.rsync(sourcePath: individualCoveragePath, destinationPath: "\(destinationPath)/\(URL(filePath: Path.individualCoverage.rawValue).lastPathComponent)", include: ["*/", "*.json"], exclude: ["*"], on: destinationNode)
+
                 try self.clearDiagnosticReports(executer: executer)
             }
 
