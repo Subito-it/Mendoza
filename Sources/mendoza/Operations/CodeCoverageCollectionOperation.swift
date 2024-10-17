@@ -10,16 +10,12 @@ import Foundation
 class CodeCoverageCollectionOperation: BaseOperation<Coverage?> {
     private lazy var executer: Executer = makeLocalExecuter()
 
-    private let resultDestination: ConfigurationResultDestination
-    private let buildBundleIdentifier: String
-    private let pathEquivalence: String?
+    private let configuration: Configuration
     private let baseUrl: URL
     private let timestamp: String
 
-    init(resultDestination: ConfigurationResultDestination, buildBundleIdentifier: String, pathEquivalence: String?, baseUrl: URL, timestamp: String) {
-        self.resultDestination = resultDestination
-        self.buildBundleIdentifier = buildBundleIdentifier
-        self.pathEquivalence = pathEquivalence
+    init(configuration: Configuration, baseUrl: URL, timestamp: String) {
+        self.configuration = configuration
         self.baseUrl = baseUrl
         self.timestamp = timestamp
     }
@@ -30,6 +26,7 @@ class CodeCoverageCollectionOperation: BaseOperation<Coverage?> {
         do {
             didStart?()
 
+            let resultDestination = configuration.resultDestination
             let destinationNode = resultDestination.node
 
             let logger = ExecuterLogger(name: "\(type(of: self))", address: destinationNode.address)
