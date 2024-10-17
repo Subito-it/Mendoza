@@ -34,9 +34,11 @@ class CodeCoverageCollectionOperation: BaseOperation<Coverage?> {
 
             let resultPath = "\(resultDestination.path)/\(timestamp)"
 
+            let coverageFiles = try executer.execute("find '\(resultPath)' -type f -name '*.profdata'").components(separatedBy: "\n")
+
             var coverage: Coverage? = nil
-            let coverageMerger = CodeCoverageMerger(executer: destinationExecuter, searchPath: resultPath)
-            if let mergedPath = try coverageMerger.merge() {
+            let coverageMerger = CodeCoverageMerger(executer: destinationExecuter)
+            if let mergedPath = try coverageMerger.merge(coverageFiles: coverageFiles) {
                 let localCoverageUrl = Path.temp.url.appendingPathComponent("\(UUID().uuidString).profdata")
                 try destinationExecuter.download(remotePath: mergedPath, localUrl: localCoverageUrl)
 

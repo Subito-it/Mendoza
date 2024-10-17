@@ -168,10 +168,22 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
 
                     // We need to progressively merge coverage results since everytime we launch a test a brand new coverage file is created
                     let searchPath = Path.logs.url.appendingPathComponent(testRunner.id).path
-                    let coverageMerger = CodeCoverageMerger(executer: executer, searchPath: searchPath)
+
+                    let coverageFiles = try findCoverageFilePaths(executer: executer, coveragePath: searchPath)
+
+                    if let testCaseResult, configuration.testing.extractIndividualTestCoverage {
+                        if coverageFiles.count == 1 {
+                            let coverageFilename = "\(testCaseResult.suite).\(testCaseResult.name).\(Int(testCaseResult.startInterval)).individual_profdata"
+                            _ = try executer.execute("cp '\(coverageFiles[0])' '\(Path.individualCoverage.rawValue)/\(coverageFilename)'")
+                        } else if coverageFiles.count > 1 {
+                            print("🆘 Multiple coverage files found!")
+                        }
+                    }
+
+                    let coverageMerger = CodeCoverageMerger(executer: executer)
 
                     let start = CFAbsoluteTimeGetCurrent()
-                    _ = try? coverageMerger.merge()
+                    _ = try? coverageMerger.merge(coverageFiles: coverageFiles)
                     if self.configuration.verbose {
                         print("🙈 [\(Date().description)] Node \(source.node.address) took \(CFAbsoluteTimeGetCurrent() - start)s for coverage merge {\(runnerIndex)}".magenta)
                     }
@@ -231,6 +243,10 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                 }
             }
         }
+    }
+
+    private func findCoverageFilePaths(executer: Executer, coveragePath: String) throws -> [String] {
+        try executer.execute("find '\(coveragePath)' -type f -name '*.profdata'").components(separatedBy: "\n")
     }
 
     override func cancel() {

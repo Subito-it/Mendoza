@@ -9,16 +9,12 @@ import Foundation
 
 class CodeCoverageMerger {
     private let executer: Executer
-    private let searchPath: String
 
-    init(executer: Executer, searchPath: String) {
+    init(executer: Executer) {
         self.executer = executer
-        self.searchPath = searchPath
     }
 
-    func merge() throws -> String? {
-        let coverageFiles = try findCoverageFilePaths(coveragePath: searchPath)
-
+    func merge(coverageFiles: [String]) throws -> String? {
         guard coverageFiles.count > 0, let coverageUrl = URL(string: coverageFiles[0])?.deletingLastPathComponent() else {
             return nil
         }
@@ -48,9 +44,5 @@ class CodeCoverageMerger {
         }
 
         return coverageDestinationPath
-    }
-
-    private func findCoverageFilePaths(coveragePath: String) throws -> [String] {
-        try executer.execute("find '\(coveragePath)' -type f -name '*.profdata'").components(separatedBy: "\n")
     }
 }
