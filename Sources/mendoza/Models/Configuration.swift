@@ -63,6 +63,7 @@ extension Configuration {
         let alwaysRebootSimulators: Bool
         let autodeleteSlowDevices: Bool
         let codeCoveragePathEquivalence: String?
+        let extractIndividualTestCoverage: Bool
         let clearDerivedDataOnCompilationFailure: Bool
         let skipResultMerge: Bool
     }
