@@ -64,6 +64,7 @@ extension Configuration {
         let autodeleteSlowDevices: Bool
         let codeCoveragePathEquivalence: String?
         let extractIndividualTestCoverage: Bool
+        let extractTestCoveredFiles: Bool
         let clearDerivedDataOnCompilationFailure: Bool
         let skipResultMerge: Bool
     }
