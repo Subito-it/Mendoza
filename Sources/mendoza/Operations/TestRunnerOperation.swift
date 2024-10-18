@@ -199,7 +199,7 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
 
                         if let testCaseResult,
                            let coverageFile,
-                           self.configuration.testing.extractIndividualTestCoverage {
+                           (self.configuration.testing.extractIndividualTestCoverage || self.configuration.testing.extractTestCoveredFiles) {
                             do {
                                 let pathEquivalence = self.configuration.testing.codeCoveragePathEquivalence
 
@@ -208,8 +208,15 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                                 let codeCoverageGenerator = CodeCoverageGenerator(configuration: self.configuration, baseUrl: self.baseUrl)
                                 let jsonCoverageSummaryUrl = try codeCoverageGenerator.generateJsonCoverage(executer: groupExecuter, coverageUrl: coverageUrl, summary: true, pathEquivalence: pathEquivalence)
 
-                                let filename = "\(testCaseResult.suite)-\(testCaseResult.name)-\(Int(testCaseResult.startInterval)).json"
-                                _ = try groupExecuter.execute("mv '\(jsonCoverageSummaryUrl.path)' '\(Path.individualCoverage.rawValue)/\(filename)'")
+                                if self.configuration.testing.extractTestCoveredFiles {
+                                    let filename = "\(testCaseResult.suite)-\(testCaseResult.name)-\(Int(testCaseResult.startInterval)).json"
+                                    _ = try groupExecuter.execute("mendoza mendoza extract_files_coverage '\(jsonCoverageSummaryUrl.path)' '\(Path.testFileCoverage.rawValue)/\(filename)'")
+                                }
+
+                                if self.configuration.testing.extractIndividualTestCoverage {
+                                    let filename = "\(testCaseResult.suite)-\(testCaseResult.name)-\(Int(testCaseResult.startInterval)).json"
+                                    _ = try groupExecuter.execute("mv '\(jsonCoverageSummaryUrl.path)' '\(Path.individualCoverage.rawValue)/\(filename)'")
+                                }
                             } catch {
                                 print("🆘 failed generating individual code coverage. error: \(error)")
                             }
