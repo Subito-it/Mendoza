@@ -10,18 +10,14 @@ import Foundation
 class TestCollectorOperation: BaseOperation<[TestCaseResult]> {
     var testCaseResults: [TestCaseResult]?
 
-    private let resultDestination: ConfigurationResultDestination
-    private let nodes: [Node]
-    private lazy var pool: ConnectionPool = makeConnectionPool(sources: nodes)
+    private let configuration: Configuration
+    private lazy var pool: ConnectionPool = makeConnectionPool(sources: configuration.nodes)
 
-    private let mergeResults: Bool
     private let destinationPath: String
     private let productNames: [String]
 
-    init(resultDestination: ConfigurationResultDestination, nodes: [Node], mergeResults: Bool, destinationPath: String, productNames: [String]) {
-        self.resultDestination = resultDestination
-        self.nodes = nodes
-        self.mergeResults = mergeResults
+    init(configuration: Configuration, destinationPath: String, productNames: [String]) {
+        self.configuration = configuration
         self.destinationPath = destinationPath
         self.productNames = productNames
     }
@@ -32,7 +28,7 @@ class TestCollectorOperation: BaseOperation<[TestCaseResult]> {
         do {
             didStart?()
 
-            let destinationNode = resultDestination.node
+            let destinationNode = configuration.resultDestination.node
 
             guard var testCaseResults = testCaseResults else { fatalError("💣 Required field `testCaseResults` not set") }
 
@@ -44,8 +40,10 @@ class TestCollectorOperation: BaseOperation<[TestCaseResult]> {
                 let logPath = "\(Path.logs.rawValue)/*"
                 try executer.rsync(sourcePath: logPath, destinationPath: destinationPath, include: ["*/", "*.profdata"], exclude: ["*"], on: destinationNode)
 
-                let individualCoveragePath = "\(Path.individualCoverage.rawValue)/*"
-                try executer.rsync(sourcePath: individualCoveragePath, destinationPath: "\(destinationPath)/\(URL(filePath: Path.individualCoverage.rawValue).lastPathComponent)", include: ["*/", "*.json"], exclude: ["*"], on: destinationNode)
+                if configuration.testing.extractIndividualTestCoverage {
+                    let path = "\(Path.individualCoverage.rawValue)/*"
+                    try executer.rsync(sourcePath: path, destinationPath: "\(destinationPath)/\(URL(filePath: Path.individualCoverage.rawValue).lastPathComponent)", include: ["*/", "*.json"], exclude: ["*"], on: destinationNode)
+                }
 
                 try self.clearDiagnosticReports(executer: executer)
             }
@@ -62,7 +60,7 @@ class TestCollectorOperation: BaseOperation<[TestCaseResult]> {
             }
             _ = try executer.execute(moveCommands.joined(separator: "; "))
 
-            if mergeResults {
+            if !configuration.testing.skipResultMerge {
                 try mergeResults(destinationNode: destinationNode, destinationPath: destinationPath, destinationName: Environment.xcresultFilename)
 
                 let totalResults = testCaseResults.count

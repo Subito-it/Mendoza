@@ -91,7 +91,7 @@ class Test {
         let processKillerOperation = ProcessKillerOperation(nodes: uniqueNodes)
         let distributeTestBundleOperation = DistributeTestBundleOperation(nodes: uniqueNodes)
         let testRunnerOperation = TestRunnerOperation(configuration: configuration, baseUrl: gitBaseUrl, destinationPath: resultDestinationPath, testTarget: targets.test.name, productNames: productNames)
-        let testCollectorOperation = TestCollectorOperation(resultDestination: configuration.resultDestination, nodes: configuration.nodes, mergeResults: !configuration.testing.skipResultMerge, destinationPath: resultDestinationPath, productNames: productNames)
+        let testCollectorOperation = TestCollectorOperation(configuration: configuration, destinationPath: resultDestinationPath, productNames: productNames)
 
         let codeCoverageCollectionOperation = CodeCoverageCollectionOperation(configuration: configuration, baseUrl: gitBaseUrl, timestamp: timestamp)
         let cleanupOperation = CleanupOperation(resultDestination: configuration.resultDestination, timestamp: timestamp)
