@@ -199,7 +199,8 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
 
                         if let testCaseResult,
                            let coverageFile,
-                           (self.configuration.testing.extractIndividualTestCoverage || self.configuration.testing.extractTestCoveredFiles) {
+                           self.configuration.testing.extractIndividualTestCoverage || self.configuration.testing.extractTestCoveredFiles
+                        {
                             do {
                                 let pathEquivalence = self.configuration.testing.codeCoveragePathEquivalence
 

@@ -119,7 +119,7 @@ class TestCommand: Command {
                                             killSimulatorProcesses: killSimulatorProcesses.value,
                                             alwaysRebootSimulators: alwaysRebootSimulators.value,
                                             autodeleteSlowDevices: autodeleteSlowDevices.value,
-                                            codeCoveragePathEquivalence: codeCoveragePathEquivalence.value, 
+                                            codeCoveragePathEquivalence: codeCoveragePathEquivalence.value,
                                             extractIndividualTestCoverage: extractIndividualTestCoverage.value,
                                             extractTestCoveredFiles: extractTestCoveredFiles.value,
                                             clearDerivedDataOnCompilationFailure: clearDerivedDataOnCompilationFailure.value,

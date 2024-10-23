@@ -1,6 +1,6 @@
 //
-//  File.swift
-//  
+//  CodeCoverageGenerator.swift
+//
 //
 //  Created by Tomas Camin on 17/10/24.
 //
@@ -91,5 +91,4 @@ class CodeCoverageGenerator {
 
         return cmd
     }
-
 }
