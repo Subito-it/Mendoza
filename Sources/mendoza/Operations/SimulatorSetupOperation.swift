@@ -136,7 +136,7 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
                 _ = try? queueProxy.enableXcode13Workarounds(on: simulator)
                 queueProxy.disableSlideToType(on: simulator)
                 _ = try? queueProxy.disablePasswordAutofill(on: simulator)
-                
+
                 #if DEBUG
                     Swift.print("Booted \(simulator.id)")
                 #endif
@@ -306,14 +306,14 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
         if loadedSettings?.ScreenConfigurations == nil {
             try simulatorProxy.gracefullyQuit()
             try simulatorProxy.launch()
-            
-            for _ in 0..<5 {
+
+            for _ in 0 ..< 5 {
                 Thread.sleep(forTimeInterval: 5.0)
                 loadedSettings = try simulatorProxy.loadSimulatorSettings()
                 if loadedSettings != nil {
                     break
                 }
-            }            
+            }
         }
         if let keys = loadedSettings?.ScreenConfigurations?.keys {
             loadedScreenIdentifier = Array(keys).last ?? ""

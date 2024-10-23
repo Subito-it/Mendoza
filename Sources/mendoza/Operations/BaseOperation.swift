@@ -149,7 +149,7 @@ class BaseOperation<Output: Any>: Operation, StartingOperation, EndingOperation,
 }
 
 enum Path: String, CaseIterable {
-    case base, build, testBundle, logs, results, temp
+    case base, build, testBundle, logs, results, temp, coverage, individualCoverage, testFileCoverage
 
     var rawValue: String {
         switch self {
@@ -159,6 +159,9 @@ enum Path: String, CaseIterable {
         case .logs: return Path.base.rawValue.appending("/logs")
         case .results: return Path.base.rawValue.appending("/results")
         case .temp: return Path.base.rawValue.appending("/tmp")
+        case .coverage: return Path.base.rawValue.appending("/coverage")
+        case .individualCoverage: return Path.base.rawValue.appending("/individual_coverage")
+        case .testFileCoverage: return Path.base.rawValue.appending("/test_file_coverage")
         }
     }
 

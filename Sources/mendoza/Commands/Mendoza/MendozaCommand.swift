@@ -102,6 +102,43 @@ class MendozaCommand: Command {
             }
 
             return true
+        case "extract_files_coverage":
+            guard let parameters = parameters.value?.filter({ !$0.isEmpty }), parameters.count == 2 else {
+                return false
+            }
+
+            do {
+                let sourcePath = parameters[0]
+                let destinationPath = parameters[1]
+
+                let json = try JSONSerialization.jsonObject(with: Data(contentsOf: URL(fileURLWithPath: sourcePath))) as? [String: Any]
+                let data = json?["data"] as? [[String: Any]]
+                let firstData = data?.first
+                let files = firstData?["files"] as? [[String: Any]]
+
+                guard let files else { return false }
+
+                var coveredFiles = [String]()
+                for file in files {
+                    let filename = file["filename"] as? String
+                    let summary = file["summary"] as? [String: Any]
+                    let lines = summary?["lines"] as? [String: Any]
+                    let coveredLines = lines?["covered"] as? Int
+
+                    guard let filename, let coveredLines else { continue }
+
+                    if coveredLines > 0 {
+                        coveredFiles.append(filename)
+                    }
+                }
+
+                let destinationData = try JSONEncoder().encode(coveredFiles)
+                try destinationData.write(to: URL(filePath: destinationPath))
+
+                return true
+            } catch {
+                return false
+            }
         default:
             return false
         }

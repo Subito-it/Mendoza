@@ -57,7 +57,6 @@ class Test {
         let resultDestinationPath = "\(configuration.resultDestination.path)/\(timestamp)/\(Environment.resultFoldername)".pathExpandingTilde()
 
         let filePatterns = configuration.building.filePatterns
-        let codeCoveragePathEquivalence = configuration.testing.codeCoveragePathEquivalence
         let clearDerivedDataOnCompilationFailure = configuration.testing.clearDerivedDataOnCompilationFailure
 
         guard let device = configuration.device else {
@@ -91,13 +90,13 @@ class Test {
         let simulatorSetupOperation = SimulatorSetupOperation(buildBundleIdentifier: configuration.building.buildBundleIdentifier, testBundleIdentifier: configuration.building.testBundleIdentifier, nodes: uniqueNodes, device: device, alwaysRebootSimulators: configuration.testing.alwaysRebootSimulators, verbose: configuration.verbose)
         let processKillerOperation = ProcessKillerOperation(nodes: uniqueNodes)
         let distributeTestBundleOperation = DistributeTestBundleOperation(nodes: uniqueNodes)
-        let testRunnerOperation = TestRunnerOperation(configuration: configuration, destinationPath: resultDestinationPath, testTarget: targets.test.name, productNames: productNames)
-        let testCollectorOperation = TestCollectorOperation(resultDestination: configuration.resultDestination, nodes: configuration.nodes, mergeResults: !configuration.testing.skipResultMerge, destinationPath: resultDestinationPath, productNames: productNames)
+        let testRunnerOperation = TestRunnerOperation(configuration: configuration, baseUrl: gitBaseUrl, destinationPath: resultDestinationPath, testTarget: targets.test.name, productNames: productNames)
+        let testCollectorOperation = TestCollectorOperation(configuration: configuration, destinationPath: resultDestinationPath, productNames: productNames)
 
-        let codeCoverageCollectionOperation = CodeCoverageCollectionOperation(resultDestination: configuration.resultDestination, buildBundleIdentifier: configuration.building.buildBundleIdentifier, pathEquivalence: codeCoveragePathEquivalence, baseUrl: gitBaseUrl, timestamp: timestamp)
+        let codeCoverageCollectionOperation = CodeCoverageCollectionOperation(configuration: configuration, baseUrl: gitBaseUrl, timestamp: timestamp)
         let cleanupOperation = CleanupOperation(resultDestination: configuration.resultDestination, timestamp: timestamp)
         let simulatorTearDownOperation = SimulatorTearDownOperation(nodes: uniqueNodes, verbose: configuration.verbose)
-        let tearDownOperation = TearDownOperation(resultDestination: configuration.resultDestination, nodes: configuration.nodes, git: gitStatus, timestamp: timestamp, mergeResults: !configuration.testing.skipResultMerge, autodeleteSlowDevices: configuration.testing.autodeleteSlowDevices, plugin: tearDownPlugin)
+        let tearDownOperation = TearDownOperation(configuration: configuration, git: gitStatus, timestamp: timestamp, plugin: tearDownPlugin)
 
         var operations: [RunOperation] =
             [initialSetupOperation,

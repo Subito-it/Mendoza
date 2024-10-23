@@ -10,31 +10,24 @@ import Foundation
 class TearDownOperation: BaseOperation<Void> {
     var testSessionResult: TestSessionResult?
 
-    private lazy var pool: ConnectionPool = makeConnectionPool(sources: nodes)
-
-    private let resultDestination: ConfigurationResultDestination
-    private let nodes: [Node]
+    private lazy var pool: ConnectionPool = makeConnectionPool(sources: configuration.nodes)
 
     private let timestamp: String
-    private let mergeResults: Bool
     private let git: GitStatus?
     private lazy var executer: Executer? = {
-        let destinationNode = resultDestination.node
+        let destinationNode = configuration.resultDestination.node
 
         let logger = ExecuterLogger(name: "\(type(of: self))", address: destinationNode.address)
         return try? destinationNode.makeExecuter(logger: logger, environment: nodesEnvironment[destinationNode.address] ?? [:])
     }()
 
-    private let autodeleteSlowDevices: Bool
     private let plugin: TearDownPlugin
+    private let configuration: Configuration
 
-    init(resultDestination: ConfigurationResultDestination, nodes: [Node], git: GitStatus?, timestamp: String, mergeResults: Bool, autodeleteSlowDevices: Bool, plugin: TearDownPlugin) {
-        self.resultDestination = resultDestination
-        self.nodes = nodes
+    init(configuration: Configuration, git: GitStatus?, timestamp: String, plugin: TearDownPlugin) {
+        self.configuration = configuration
         self.git = git
         self.timestamp = timestamp
-        self.mergeResults = mergeResults
-        self.autodeleteSlowDevices = autodeleteSlowDevices
         self.plugin = plugin
         super.init()
         loggers.insert(plugin.logger)
@@ -57,11 +50,13 @@ class TearDownOperation: BaseOperation<Void> {
             try writeJsonTestSuiteResult(executer: executer)
             try writeHtmlExecutionGraph(executer: executer)
             try writeGitInfo(executer: executer)
+            try writeConfigurationSummary(executer: executer)
+
             let infoPlistPath: String
-            if mergeResults {
-                infoPlistPath = "\(resultDestination.path)/\(timestamp)/\(Environment.resultFoldername)/\(Environment.xcresultFilename)/Info.plist"
+            if !configuration.testing.skipResultMerge {
+                infoPlistPath = "\(configuration.resultDestination.path)/\(timestamp)/\(Environment.resultFoldername)/\(Environment.xcresultFilename)/Info.plist"
             } else {
-                infoPlistPath = "\(resultDestination.path)/\(timestamp)/\(Environment.resultFoldername)/\(Environment.xcresultFirstUnmergedFilename)/Info.plist"
+                infoPlistPath = "\(configuration.resultDestination.path)/\(timestamp)/\(Environment.resultFoldername)/\(Environment.xcresultFirstUnmergedFilename)/Info.plist"
             }
             try writeResultBundleInfoPlist(executer: executer, infoPlistPath: infoPlistPath)
 
@@ -71,7 +66,7 @@ class TearDownOperation: BaseOperation<Void> {
                 }
             }
 
-            if autodeleteSlowDevices {
+            if configuration.testing.autodeleteSlowDevices {
                 try? deleteSlowDevices()
             }
 
@@ -110,7 +105,7 @@ class TearDownOperation: BaseOperation<Void> {
         guard var repeatedTestCases = testSessionResult?.retriedTests else { return }
         repeatedTestCases = repeatedTestCases.sorted(by: { $0.description < $1.description })
 
-        let destinationPath = "\(resultDestination.path)/\(timestamp)/\(Environment.htmlRepeatedTestSummaryFilename)"
+        let destinationPath = "\(configuration.resultDestination.path)/\(timestamp)/\(Environment.htmlRepeatedTestSummaryFilename)"
 
         var content = "<h2>Result - repeated tests</h2>\n"
 
@@ -136,7 +131,7 @@ class TearDownOperation: BaseOperation<Void> {
         guard var repeatedTestCases = testSessionResult?.retriedTests else { return }
         repeatedTestCases = repeatedTestCases.sorted(by: { $0.description < $1.description })
 
-        let destinationPath = "\(resultDestination.path)/\(timestamp)/\(Environment.jsonRepeatedTestSummaryFilename)"
+        let destinationPath = "\(configuration.resultDestination.path)/\(timestamp)/\(Environment.jsonRepeatedTestSummaryFilename)"
 
         let encoder = JSONEncoder()
         encoder.outputFormatting = .prettyPrinted
@@ -156,7 +151,7 @@ class TearDownOperation: BaseOperation<Void> {
         var testCaseResults = testSessionResult.passedTests + testSessionResult.failedTests
         testCaseResults = testCaseResults.sorted(by: { $0.description < $1.description })
 
-        let destinationPath = "\(resultDestination.path)/\(timestamp)/\(Environment.htmlTestSummaryFilename)"
+        let destinationPath = "\(configuration.resultDestination.path)/\(timestamp)/\(Environment.htmlTestSummaryFilename)"
 
         var content = "<h2>Result</h2>\n"
 
@@ -185,7 +180,7 @@ class TearDownOperation: BaseOperation<Void> {
         var testCaseResults = testSessionResult.passedTests + testSessionResult.failedTests
         testCaseResults = testCaseResults.sorted(by: { $0.description < $1.description })
 
-        let destinationPath = "\(resultDestination.path)/\(timestamp)/\(Environment.jsonTestSummaryFilename)"
+        let destinationPath = "\(configuration.resultDestination.path)/\(timestamp)/\(Environment.jsonTestSummaryFilename)"
 
         let encoder = JSONEncoder()
         encoder.outputFormatting = .prettyPrinted
@@ -202,7 +197,7 @@ class TearDownOperation: BaseOperation<Void> {
     private func writeJsonTestSuiteResult(executer: Executer) throws {
         guard let testSessionResult = testSessionResult else { return }
 
-        let destinationPath = "\(resultDestination.path)/\(timestamp)/\(Environment.jsonSuiteResultFilename)"
+        let destinationPath = "\(configuration.resultDestination.path)/\(timestamp)/\(Environment.jsonSuiteResultFilename)"
 
         let encoder = JSONEncoder()
         encoder.outputFormatting = .prettyPrinted
@@ -218,7 +213,7 @@ class TearDownOperation: BaseOperation<Void> {
     private func writeHtmlExecutionGraph(executer: Executer) throws {
         guard let testSessionResult = testSessionResult else { return }
 
-        let destinationPath = "\(resultDestination.path)/\(timestamp)/\(Environment.htmlExecutionGraphFilename)"
+        let destinationPath = "\(configuration.resultDestination.path)/\(timestamp)/\(Environment.htmlExecutionGraphFilename)"
 
         let encoder = JSONEncoder()
         encoder.outputFormatting = .prettyPrinted
@@ -239,11 +234,26 @@ class TearDownOperation: BaseOperation<Void> {
     private func writeGitInfo(executer: Executer) throws {
         guard let git = git else { return }
 
-        let destinationPath = "\(resultDestination.path)/\(timestamp)/\(Environment.jsonGitSummaryFilename)"
+        let destinationPath = "\(configuration.resultDestination.path)/\(timestamp)/\(Environment.jsonGitSummaryFilename)"
 
         let encoder = JSONEncoder()
         encoder.outputFormatting = .prettyPrinted
         guard let contentData = try? encoder.encode(git) else {
+            throw Error("Failed writing json git data")
+        }
+
+        let tempUrl = Path.temp.url.appendingPathComponent("\(UUID().uuidString).json")
+
+        try contentData.write(to: tempUrl)
+        try executer.upload(localUrl: tempUrl, remotePath: destinationPath)
+    }
+
+    private func writeConfigurationSummary(executer: Executer) throws {
+        let destinationPath = "\(configuration.resultDestination.path)/\(timestamp)/\(Environment.configurationSummaryFilename)"
+
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = .prettyPrinted
+        guard let contentData = try? encoder.encode(configuration) else {
             throw Error("Failed writing json git data")
         }
 

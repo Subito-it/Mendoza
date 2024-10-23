@@ -14,6 +14,7 @@ enum Environment {
     static let htmlTestSummaryFilename = "test_result.html"
     static let jsonTestSummaryFilename = "test_result.json"
     static let jsonGitSummaryFilename = "git_info.json"
+    static let configurationSummaryFilename = "mendoza_configuration.json"
     static let htmlRepeatedTestSummaryFilename = "repeated_test_result.html"
     static let jsonRepeatedTestSummaryFilename = "repeated_test_result.json"
     static let jsonSuiteResultFilename = "test_details.json"
@@ -23,5 +24,6 @@ enum Environment {
     static let coverageFilename = "coverage.json"
     static let coverageSummaryFilename = "coverage-summary.json"
     static let coverageHtmlFilename = "coverage.html"
+    static let individualTestCoveragePath = "individual_coverage"
     static let resultFoldername = "results"
 }
