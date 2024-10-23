@@ -96,7 +96,7 @@ class Test {
         let codeCoverageCollectionOperation = CodeCoverageCollectionOperation(configuration: configuration, baseUrl: gitBaseUrl, timestamp: timestamp)
         let cleanupOperation = CleanupOperation(resultDestination: configuration.resultDestination, timestamp: timestamp)
         let simulatorTearDownOperation = SimulatorTearDownOperation(nodes: uniqueNodes, verbose: configuration.verbose)
-        let tearDownOperation = TearDownOperation(resultDestination: configuration.resultDestination, nodes: configuration.nodes, git: gitStatus, timestamp: timestamp, mergeResults: !configuration.testing.skipResultMerge, autodeleteSlowDevices: configuration.testing.autodeleteSlowDevices, plugin: tearDownPlugin)
+        let tearDownOperation = TearDownOperation(configuration: configuration, git: gitStatus, timestamp: timestamp, plugin: tearDownPlugin)
 
         var operations: [RunOperation] =
             [initialSetupOperation,
