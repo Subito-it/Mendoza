@@ -50,6 +50,8 @@ class TearDownOperation: BaseOperation<Void> {
             try writeJsonTestSuiteResult(executer: executer)
             try writeHtmlExecutionGraph(executer: executer)
             try writeGitInfo(executer: executer)
+            try writeConfigurationSummary(executer: executer)
+
             let infoPlistPath: String
             if !configuration.testing.skipResultMerge {
                 infoPlistPath = "\(configuration.resultDestination.path)/\(timestamp)/\(Environment.resultFoldername)/\(Environment.xcresultFilename)/Info.plist"
@@ -237,6 +239,21 @@ class TearDownOperation: BaseOperation<Void> {
         let encoder = JSONEncoder()
         encoder.outputFormatting = .prettyPrinted
         guard let contentData = try? encoder.encode(git) else {
+            throw Error("Failed writing json git data")
+        }
+
+        let tempUrl = Path.temp.url.appendingPathComponent("\(UUID().uuidString).json")
+
+        try contentData.write(to: tempUrl)
+        try executer.upload(localUrl: tempUrl, remotePath: destinationPath)
+    }
+
+    private func writeConfigurationSummary(executer: Executer) throws {
+        let destinationPath = "\(configuration.resultDestination.path)/\(timestamp)/\(Environment.configurationSummaryFilename)"
+
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = .prettyPrinted
+        guard let contentData = try? encoder.encode(configuration) else {
             throw Error("Failed writing json git data")
         }
 
