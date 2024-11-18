@@ -111,9 +111,12 @@ class CodeCoverageCollectionOperation: BaseOperation<Coverage?> {
 
                         guard
                             let jsonCoverageUrl =
-                                (try? self.generateJsonCoverage(
-                                    executer: operationExecuter, coverageUrl: localCoverageUrl,
-                                    summary: true, pathEquivalence: pathEquivalence))
+                            (try? self.codeCoverageGenerator.generateJsonCoverage(
+                                executer: operationExecuter,
+                                coverageUrl: localCoverageUrl,
+                                summary: true,
+                                pathEquivalence: pathEquivalence
+                            ))
                         else {
                             return print("Failed generating individual coverage file")
                         }
