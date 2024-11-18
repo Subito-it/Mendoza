@@ -14,7 +14,8 @@ class CodeCoverageCollectionOperation: BaseOperation<Coverage?> {
     private let baseUrl: URL
     private let timestamp: String
     private lazy var codeCoverageGenerator = CodeCoverageGenerator(
-        configuration: configuration, baseUrl: baseUrl)
+        configuration: configuration, baseUrl: baseUrl
+    )
 
     init(configuration: Configuration, baseUrl: URL, timestamp: String) {
         self.configuration = configuration
@@ -33,7 +34,8 @@ class CodeCoverageCollectionOperation: BaseOperation<Coverage?> {
 
             let logger = ExecuterLogger(name: "\(type(of: self))", address: destinationNode.address)
             let destinationExecuter = try destinationNode.makeExecuter(
-                logger: logger, environment: nodesEnvironment[destinationNode.address] ?? [:])
+                logger: logger, environment: nodesEnvironment[destinationNode.address] ?? [:]
+            )
 
             let resultPath = "\(resultDestination.path)/\(timestamp)"
 
@@ -51,28 +53,31 @@ class CodeCoverageCollectionOperation: BaseOperation<Coverage?> {
                 let pathEquivalence = configuration.testing.codeCoveragePathEquivalence
                 let jsonCoverageUrl = try codeCoverageGenerator.generateJsonCoverage(
                     executer: executer, coverageUrl: localCoverageUrl, summary: false,
-                    pathEquivalence: pathEquivalence)
+                    pathEquivalence: pathEquivalence
+                )
                 let jsonCoverageSummaryUrl = try codeCoverageGenerator.generateJsonCoverage(
                     executer: executer, coverageUrl: localCoverageUrl, summary: true,
-                    pathEquivalence: pathEquivalence)
+                    pathEquivalence: pathEquivalence
+                )
                 let htmlCoverageSummaryUrl = try codeCoverageGenerator.generateHtmlCoverage(
                     executer: executer, coverageUrl: localCoverageUrl,
-                    pathEquivalence: pathEquivalence)
+                    pathEquivalence: pathEquivalence
+                )
 
                 try destinationExecuter.upload(
                     localUrl: jsonCoverageSummaryUrl,
                     remotePath:
-                        "\(resultPath)/\(Environment.resultFoldername)/\(Environment.coverageSummaryFilename)"
+                    "\(resultPath)/\(Environment.resultFoldername)/\(Environment.coverageSummaryFilename)"
                 )
                 try destinationExecuter.upload(
                     localUrl: jsonCoverageUrl,
                     remotePath:
-                        "\(resultPath)/\(Environment.resultFoldername)/\(Environment.coverageFilename)"
+                    "\(resultPath)/\(Environment.resultFoldername)/\(Environment.coverageFilename)"
                 )
                 try destinationExecuter.upload(
                     localUrl: htmlCoverageSummaryUrl,
                     remotePath:
-                        "\(resultPath)/\(Environment.resultFoldername)/\(Environment.coverageHtmlFilename)"
+                    "\(resultPath)/\(Environment.resultFoldername)/\(Environment.coverageHtmlFilename)"
                 )
 
                 if let coverageData = try? Data(contentsOf: jsonCoverageSummaryUrl) {
@@ -104,7 +109,8 @@ class CodeCoverageCollectionOperation: BaseOperation<Coverage?> {
                             "\(UUID().uuidString).profdata")
                         guard
                             (try? operationDestinationExecuter.download(
-                                remotePath: coverageFile, localUrl: localCoverageUrl)) != nil
+                                remotePath: coverageFile, localUrl: localCoverageUrl
+                            )) != nil
                         else {
                             return print("Failed downloading individual coverage file")
                         }
@@ -127,7 +133,7 @@ class CodeCoverageCollectionOperation: BaseOperation<Coverage?> {
                             (try? operationDestinationExecuter.upload(
                                 localUrl: jsonCoverageUrl,
                                 remotePath:
-                                    "\(resultPath)/\(Environment.individualTestCoveragePath)/\(filename).json"
+                                "\(resultPath)/\(Environment.individualTestCoveragePath)/\(filename).json"
                             )) != nil
                         else {
                             return print("Failed uploading individual coverage file")
