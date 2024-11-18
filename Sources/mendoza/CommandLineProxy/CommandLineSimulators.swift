@@ -94,17 +94,17 @@ extension CommandLineProxy {
 
         func disableSimulatorBezel() throws -> Bool {
             var updates = [Bool]()
-            try updates.append(updateSimulatorDefaultsIfNeeded(key: "FloatingNameMode", value: 3))
-            try updates.append(updateSimulatorDefaultsIfNeeded(key: "ShowChrome", value: false))
+            try updates.append(updateSimulatorDefaults(key: "FloatingNameMode", value: 3))
+            try updates.append(updateSimulatorDefaults(key: "ShowChrome", value: false))
             return updates.contains(true)
         }
 
         func enablePasteboardWorkaround() throws -> Bool {
-            try updateSimulatorDefaultsIfNeeded(key: "PasteboardAutomaticSync", value: false)
+            try updateSimulatorDefaults(key: "PasteboardAutomaticSync", value: false)
         }
 
         func enableLowQualityGraphicOverrides() throws -> Bool {
-            try updateSimulatorDefaultsIfNeeded(key: "GraphicsQualityOverride", value: 10)
+            try updateSimulatorDefaults(key: "GraphicsQualityOverride", value: 10)
         }
 
         func enableXcode13Workarounds(on simulator: Simulator) throws -> Bool {
@@ -369,20 +369,14 @@ extension CommandLineProxy {
             "~/Library/Developer/CoreSimulator/Devices/\(simulator.id)/data/Library/Preferences"
         }
 
-        private func updateSimulatorDefaultsIfNeeded(key: String, value: Bool) throws -> Bool {
-            if try executer.execute("defaults read com.apple.iphonesimulator \(key) 2>/dev/null || true") != (value ? "1" : "0") {
-                _ = try executer.execute("defaults write com.apple.iphonesimulator \(key) -bool \(value ? "true" : "false")")
-                return true
-            }
+        private func updateSimulatorDefaults(key: String, value: Bool) throws -> Bool {
+            _ = try executer.execute("defaults write com.apple.iphonesimulator \(key) -bool \(value ? "true" : "false")")
 
             return false
         }
 
-        private func updateSimulatorDefaultsIfNeeded(key: String, value: Int) throws -> Bool {
-            if try executer.execute("defaults read com.apple.iphonesimulator \(key) 2>/dev/null || true") != value.description {
-                _ = try executer.execute("defaults write com.apple.iphonesimulator \(key) \(value)")
-                return true
-            }
+        private func updateSimulatorDefaults(key: String, value: Int) throws -> Bool {
+            _ = try executer.execute("defaults write com.apple.iphonesimulator \(key) \(value)")
 
             return false
         }
