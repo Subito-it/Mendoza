@@ -34,7 +34,3 @@
 --modifierorder public,override
 --xcodeindentation enabled
 --disable redundantObjc,wrapMultilineStatementBraces
-
---exclude Pods
---exclude Modules/External
-
