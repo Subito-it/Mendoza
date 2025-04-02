@@ -40,6 +40,7 @@ class TestCommand: Command {
     let xcresultBlobThresholdKB = Argument<Int>(name: "size", kind: .named(short: nil, long: "xcresult_blob_threshold_kb"), optional: true, help: "Delete data blobs larger than the specified threshold")
     let excludeNodes = Argument<String>(name: "nodes", kind: .named(short: nil, long: "exclude_nodes"), optional: true, help: "Specify which nodes (by name or address) specified in the configuration should be excluded from the dispatch. Accepts comma separated values. Default: ''")
     let killSimulatorProcesses = Flag(short: nil, long: "kill_sim_procs", help: "Automatically kill Simulator's CPU intensive processes, see https://github.com/biscuitehh/yeetd")
+    let keepBuildFolderOnFailure = Flag(short: nil, long: "keep_build_folder_on_failure", help: "Keep build folder on failure")
 
     let projectPath = Argument<URL>(name: "path", kind: .named(short: nil, long: "project"), optional: false, help: "The path to the .xcworkspace or .xcodeproj to build")
     let scheme = Argument<String>(name: "name", kind: .named(short: nil, long: "scheme"), optional: false, help: "The scheme to build")
@@ -59,6 +60,13 @@ class TestCommand: Command {
             test.didFail = { [weak self] in self?.handleError($0) }
             try test.run()
         } catch {
+            if keepBuildFolderOnFailure.value {
+                let executer = LocalExecuter()
+                let uuid = UUID().uuidString
+                let destinationPath = "\(Path.base.rawValue)-\(uuid)"
+                _ = try? executer.execute("mv '\(Path.base.rawValue)' '\(destinationPath)'")
+                print("Keeping logs at \(destinationPath)")
+            }
             handleError(error)
         }
 
