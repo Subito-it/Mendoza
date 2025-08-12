@@ -253,11 +253,11 @@ extension TestExecuter {
             return .testStart
         }
 
-        let passFailRegex = #"Test Case '-\[\#(testTarget)\.(.*)\]' (passed|failed) \((.*) seconds\)"#
+        let passFailRegex = #"Test Case '-\[\#(testTarget)\.(.*)\]' (passed|failed|skipped) \((.*) seconds\)"#
         if let tests = try? line.capturedGroups(withRegexString: passFailRegex), tests.count == 3 {
             let duration = Double(tests[2]) ?? -1
 
-            if tests[1] == "passed" {
+            if ["skipped", "passed"].contains(tests[1]) {
                 return .testPassed(duration: duration)
             } else if tests[1] == "failed" {
                 return .testFailed(duration: duration)
