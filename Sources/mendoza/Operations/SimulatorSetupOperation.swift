@@ -62,7 +62,7 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
                 }
 
                 if rebootRequired.contains(true) || self.alwaysRebootSimulators {
-                    print("Rebooting simulators")
+                    print("♻️ Rebooting simulators @ \(executer.address)")
 
                     try? proxy.shutdownAll() // Always shutting down simulators is the safest way to workaround unexpected Simulator.app hangs
                     try proxy.gracefullyQuit()
@@ -119,6 +119,9 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
     private func bootSimulators(node: Node, simulators: [Simulator]) throws {
         let bootQueue = OperationQueue()
         
+        let numberFormatter = NumberFormatter()
+        numberFormatter.decimalSeparator = "."
+
         /// Workaround for iOS 26.0
         /// When booting in parallel simulators some get stuck on black screen.
         /// Apparently booting them serially seems work at the moment.
@@ -128,14 +131,21 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
             let logger = ExecuterLogger(name: "\(type(of: self))-AsyncBoot", address: node.address)
             addLogger(logger)
 
+            let deviceVersion = numberFormatter.number(from: simulator.device.runtime)?.floatValue ?? 0.0
+
             let queueExecuter = try node.makeExecuter(logger: logger, environment: nodesEnvironment[node.address] ?? [:])
             let queueProxy = CommandLineProxy.Simulators(executer: queueExecuter, verbose: verbose)
 
-            bootQueue.addOperation {
+            let operationBlock: () -> Void = {
                 #if DEBUG
-                    Swift.print("Booting \(simulator.id)")
+                Swift.print("\(Date.now.formatted(date: .numeric, time: .complete)) - Booting \(simulator.name) (\(simulator.id)) @ \(node.address)")
                 #endif
-                try? queueProxy.bootSynchronously(simulator: simulator)
+
+                if deviceVersion >= 26.0 {
+                    try? queueProxy.bootSynchronouslyWithiOS26Workaround(simulator: simulator)
+                } else {
+                    try? queueProxy.bootSynchronously(simulator: simulator)
+                }
 
                 queueProxy.enableXcode11ReleaseNotesWorkarounds(on: simulator)
                 _ = try? queueProxy.enableXcode13Workarounds(on: simulator)
@@ -143,10 +153,19 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
                 _ = try? queueProxy.disablePasswordAutofill(on: simulator)
 
                 #if DEBUG
-                    Swift.print("Booted \(simulator.id)")
+                Swift.print("\(Date.now.formatted(date: .numeric, time: .complete)) - Booted  \(simulator.name) (\(simulator.id)) @ \(node.address)")
                 #endif
 
                 try? logger.dump()
+            }
+
+            if deviceVersion >= 26.0 {
+                /// Workaround for iOS 26.0 Beta 6
+                /// When booting in parallel simulators some get stuck on black screen.
+                /// Apparently booting them serially seems work at the moment.
+                operationBlock()
+            } else {
+                bootQueue.addOperation(operationBlock)
             }
         }
         bootQueue.waitUntilAllOperationsAreFinished()
