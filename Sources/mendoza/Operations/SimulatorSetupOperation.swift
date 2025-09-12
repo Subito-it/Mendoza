@@ -118,6 +118,11 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
 
     private func bootSimulators(node: Node, simulators: [Simulator]) throws {
         let bootQueue = OperationQueue()
+        
+        /// Workaround for iOS 26.0
+        /// When booting in parallel simulators some get stuck on black screen.
+        /// Apparently booting them serially seems work at the moment.
+        bootQueue.maxConcurrentOperationCount = 1 
 
         for simulator in simulators {
             let logger = ExecuterLogger(name: "\(type(of: self))-AsyncBoot", address: node.address)
