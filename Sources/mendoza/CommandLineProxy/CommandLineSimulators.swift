@@ -145,6 +145,16 @@ extension CommandLineProxy {
             }
         }
 
+        func disableSafariMenuOnboarding(on simulator: Simulator) {
+            let numberFormatter = NumberFormatter()
+            numberFormatter.decimalSeparator = "."
+            let deviceVersion = numberFormatter.number(from: simulator.device.runtime)?.floatValue ?? 0.0
+            
+            if deviceVersion >= 26.0 {
+                _ = try? executer.execute(#"xcrun simctl spawn '"# + simulator.id + #"' defaults write com.apple.mobilesafari WBSOnboardingStatesDefaultsKeyV0.2 -dict "CustomizeStartPage" -int 1 "EnableCloudSync" -int 1 "EnableHighlights" -int 2 "ExtensionsDiscovery" -int 1 "SetDefaultBrowser" -int 2 "TipForMoreButton" -int 3"#)
+            }
+        }
+
         func updateLanguage(on simulator: Simulator, language: String?, locale: String?) throws -> Bool {
             let path = "\(simulatorSettingsPath(for: simulator))/.GlobalPreferences.plist"
 
