@@ -90,7 +90,7 @@ end
 def fetch_source(url)
   archive_path = "#{$DESTINATION_PATH}/#{File.basename(url)}"
 
-  unless File.exists?(archive_path)
+  unless File.exist?(archive_path)
     content = URI.open(url).read
     File.write(archive_path, content)
   end
