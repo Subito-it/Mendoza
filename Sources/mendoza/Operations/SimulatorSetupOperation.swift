@@ -150,6 +150,9 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
                 queueProxy.enableXcode11ReleaseNotesWorkarounds(on: simulator)
                 _ = try? queueProxy.enableXcode13Workarounds(on: simulator)
                 queueProxy.disableSlideToType(on: simulator)
+                if deviceVersion >= 26.0 {
+                    queueProxy.disableSafari26NewMenuOnboarding(on: simulator)
+                }
                 _ = try? queueProxy.disablePasswordAutofill(on: simulator)
 
                 #if DEBUG

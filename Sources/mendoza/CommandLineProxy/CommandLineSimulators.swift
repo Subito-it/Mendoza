@@ -145,6 +145,19 @@ extension CommandLineProxy {
             }
         }
 
+        func disableSafari26NewMenuOnboarding(on simulator: Simulator) {
+            // These settings are hot loaded no reboot of the device is necessary
+            _ = try? executer.execute("""
+            xcrun simctl spawn '\(simulator.id)' defaults write com.apple.mobilesafari defaults write com.apple.mobilesafari 'WBSOnboardingStatesDefaultsKeyV0.2' -dict \
+              "CustomizeStartPage" -int 1 \
+              "EnableCloudSync" -int 1 \
+              "EnableHighlights" -int 2 \
+              "ExtensionsDiscovery" -int 1 \
+              "SetDefaultBrowser" -int 2 \
+              "TipForMoreButton" -int 3"
+            """)
+        }
+
         func updateLanguage(on simulator: Simulator, language: String?, locale: String?) throws -> Bool {
             let path = "\(simulatorSettingsPath(for: simulator))/.GlobalPreferences.plist"
 
