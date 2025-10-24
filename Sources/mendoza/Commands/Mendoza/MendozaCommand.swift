@@ -118,17 +118,18 @@ class MendozaCommand: Command {
 
                 guard let files else { return false }
 
-                var coveredFiles = [String]()
+                var coveredFiles = [[String: Double]]()
                 for file in files {
                     let filename = file["filename"] as? String
                     let summary = file["summary"] as? [String: Any]
                     let lines = summary?["lines"] as? [String: Any]
                     let coveredLines = lines?["covered"] as? Int
+                    let percent = lines?["percent"] as? Double
 
-                    guard let filename, let coveredLines else { continue }
+                    guard let filename, let coveredLines, let percent else { continue }
 
                     if coveredLines > 0 {
-                        coveredFiles.append(filename)
+                        coveredFiles.append([filename: percent])
                     }
                 }
 
