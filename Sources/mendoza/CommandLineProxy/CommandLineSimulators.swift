@@ -145,6 +145,19 @@ extension CommandLineProxy {
             }
         }
 
+        func disableSafari26NewMenuOnboarding(on simulator: Simulator) {
+            // These settings are hot loaded no reboot of the device is necessary
+            _ = try? executer.execute("""
+            xcrun simctl spawn '\(simulator.id)' defaults write com.apple.mobilesafari defaults write com.apple.mobilesafari 'WBSOnboardingStatesDefaultsKeyV0.2' -dict \
+              "CustomizeStartPage" -int 1 \
+              "EnableCloudSync" -int 1 \
+              "EnableHighlights" -int 2 \
+              "ExtensionsDiscovery" -int 1 \
+              "SetDefaultBrowser" -int 2 \
+              "TipForMoreButton" -int 3"
+            """)
+        }
+
         func updateLanguage(on simulator: Simulator, language: String?, locale: String?) throws -> Bool {
             let path = "\(simulatorSettingsPath(for: simulator))/.GlobalPreferences.plist"
 
@@ -321,6 +334,31 @@ extension CommandLineProxy {
 
         func waitForBoot(simulator: Simulator) throws {
             _ = try executer.execute("xcrun simctl bootstatus '\(simulator.id)'")
+        }
+
+        func bootSynchronouslyWithiOS26Workaround(simulator: Simulator) throws {
+            let maxRetries = 3
+            var bootSuccess = false
+
+            for retry in 0 ... maxRetries {
+                do {
+                    print("🎬 Booting simulator \(simulator.name) @ \(executer.address) [\(retry)/\(maxRetries)]")
+                    // * boot and synchronously wait for device to boot (https://gist.github.com/keith/33d3e28de4217f3baecde15357bfe5f6)
+                    // * sometimes the simulator gets stuck in a booting state, so we use a timeout to avoid infinite waiting
+                    let timeout = 30 + (retry * 15)
+                    let bootExecutionOutput = try executer.capture("timeout \(timeout) xcrun simctl bootstatus '\(simulator.id)' -b")
+                    bootSuccess = bootExecutionOutput.status == 0
+                    guard bootSuccess else {
+                        throw Error("⏰ Failed to boot simulator \(simulator.name) in \(timeout)")
+                    }
+                    print("✅ Booted simulator \(simulator.name) @ \(executer.address)")
+                    return Thread.sleep(forTimeInterval: 5.0)
+                } catch {
+                    print("⚠️ Failed to boot simulator \(simulator.name) @ \(executer.address) with error: \(error). Force shutdown!")
+                    try? shutdown(simulator: simulator)
+                }
+            }
+            Thread.sleep(forTimeInterval: 5.0)
         }
 
         func bootSynchronously(simulator: Simulator) throws {
