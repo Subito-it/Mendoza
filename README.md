@@ -11,13 +11,13 @@ A snapshot of a session running on 8 concurrent nodes (each running 2 simulators
 <img src='md/running.png' width='724'>
 
 
-| | Features |
-:---: | --- |
-🏃‍♀️ | Makes UI Test execution super fast! |
-👨🏻‍💻 | Written in Swift  |
-🔌 | Supports plugins (written in Swift!) |
-🔍 | Wide set of result formats |
-🤖 | Supports both iOS and macOS projects |
+|       | Features                             |
+| :---: | ------------------------------------ |
+|   🏃‍♀️   | Makes UI Test execution super fast!  |
+|   👨🏻‍💻   | Written in Swift                     |
+|   🔌   | Supports plugins (written in Swift!) |
+|   🔍   | Wide set of result formats           |
+|   🤖   | Supports both iOS and macOS projects |
 
 While the tool is particularly designed for remote execution it enhances local execution as well.
 
@@ -232,7 +232,7 @@ It is suggested that nodes are configured as follows:
 
 ## SSH MaxSessions
 
-Set `MaxSessions` to 100 in /etc/ssh/sshd_config
+Set `MaxSessions` to 200 in /etc/ssh/sshd_config. You can check how many sessions are used by running `sudo lsof -nPiTCP:22 -sTCP:ESTABLISHED | grep mendoza | wc -l`
 
 ## Increase maxfiles
 
