@@ -333,6 +333,31 @@ extension CommandLineProxy {
             _ = try executer.execute("xcrun simctl bootstatus '\(simulator.id)'")
         }
 
+        func bootSynchronouslyWithiOS26Workaround(simulator: Simulator) throws {
+            let maxRetries = 3
+            var bootSuccess = false
+
+            for retry in 0 ... maxRetries {
+                do {
+                    print("🎬 Booting simulator \(simulator.name) @ \(executer.address) [\(retry)/\(maxRetries)]")
+                    // * boot and synchronously wait for device to boot (https://gist.github.com/keith/33d3e28de4217f3baecde15357bfe5f6)
+                    // * sometimes the simulator gets stuck in a booting state, so we use a timeout to avoid infinite waiting
+                    let timeout = 30 + (retry * 15)
+                    let bootExecutionOutput = try executer.capture("timeout \(timeout) xcrun simctl bootstatus '\(simulator.id)' -b")
+                    bootSuccess = bootExecutionOutput.status == 0
+                    guard bootSuccess else {
+                        throw Error("⏰ Failed to boot simulator \(simulator.name) in \(timeout)")
+                    }
+                    print("✅ Booted simulator \(simulator.name) @ \(executer.address)")
+                    return Thread.sleep(forTimeInterval: 5.0)
+                } catch {
+                    print("⚠️ Failed to boot simulator \(simulator.name) @ \(executer.address) with error: \(error). Force shutdown!")
+                    try? shutdown(simulator: simulator)
+                }
+            }
+            Thread.sleep(forTimeInterval: 5.0)
+        }
+
         func bootSynchronously(simulator: Simulator) throws {
             // https://gist.github.com/keith/33d3e28de4217f3baecde15357bfe5f6
             // boot and synchronously wait for device to boot
