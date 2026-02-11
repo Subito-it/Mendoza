@@ -144,12 +144,12 @@ extension CommandLineProxy {
                 _ = try? executer.execute("xcrun simctl spawn '\(simulator.id)' defaults write com.apple.keyboard.preferences DidShowContinuousPathIntroduction -bool true")
             }
         }
-        
+
         func disableMultilingualKeyboardTip(on simulator: Simulator) {
             let numberFormatter = NumberFormatter()
             numberFormatter.decimalSeparator = "."
             let deviceVersion = numberFormatter.number(from: simulator.device.runtime)?.floatValue ?? 0.0
-            
+
             if deviceVersion >= 26.0 {
                 // These settings are hot loaded no reboot of the device is necessary
                 _ = try? executer.execute("xcrun simctl spawn '\(simulator.id)' defaults write com.apple.keyboard.preferences MultilingualKeyboardTip -bool true")
@@ -348,8 +348,44 @@ extension CommandLineProxy {
             // https://gist.github.com/keith/33d3e28de4217f3baecde15357bfe5f6
             // boot and synchronously wait for device to boot
             _ = try executer.execute("xcrun simctl bootstatus '\(simulator.id)' -b || true")
-
+            
             Thread.sleep(forTimeInterval: 5.0)
+
+            try waitForSimulatorReady(simulator: simulator)
+        }
+
+        private func waitForSimulatorReady(simulator: Simulator, timeout: TimeInterval = 30.0) throws {
+            // Plist files that are modified after boot and need to exist before we can update them.
+            // These files are created during simulator boot on iOS 15+.
+            // com.apple.suggestions.plist is the last one to be created, so once it exists all others should too.
+            let requiredPaths = [
+                // Modified by enableXcode13Workarounds (created last during boot)
+                "~/Library/Developer/CoreSimulator/Devices/\(simulator.id)/data/Library/Preferences/com.apple.suggestions.plist",
+                // Modified by disablePasswordAutofill/enablePasswordAutofill
+                "~/Library/Developer/CoreSimulator/Devices/\(simulator.id)/data/Containers/Shared/SystemGroup/systemgroup.com.apple.configurationprofiles/Library/ConfigurationProfiles/UserSettings.plist",
+                "~/Library/Developer/CoreSimulator/Devices/\(simulator.id)/data/Library/UserConfigurationProfiles/EffectiveUserSettings.plist",
+                "~/Library/Developer/CoreSimulator/Devices/\(simulator.id)/data/Library/UserConfigurationProfiles/PublicInfo/PublicEffectiveUserSettings.plist",
+            ]
+
+            try waitForPaths(paths: requiredPaths, timeout: timeout)
+        }
+
+        private func waitForPaths(paths: [String], timeout: TimeInterval) throws {
+            let startTime = Date()
+            var missingPaths = [String]()
+            while Date().timeIntervalSince(startTime) < timeout {
+                missingPaths = paths.filter { path in
+                    (try? executer.execute("ls '\(path)' &>/dev/null")) == nil
+                }
+
+                if missingPaths.isEmpty {
+                    return
+                }
+
+                Thread.sleep(forTimeInterval: 5.0)
+            }
+
+            throw Error("Timed out waiting for simulator paths to be ready. Missing: \(missingPaths.joined(separator: ", "))", logger: executer.logger)
         }
 
         func loadSimulatorSettings() throws -> Simulators.Settings {

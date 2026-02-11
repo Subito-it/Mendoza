@@ -75,10 +75,6 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
                     try proxy.launch()
                 }
 
-                if rebootRequired.contains(true) || self.alwaysRebootSimulators {
-                    Thread.sleep(forTimeInterval: 5 * Double(nodeSimulators.count))
-                }
-
                 self.syncQueue.sync { [unowned self] in
                     self.simulators += nodeSimulators.map { (simulator: $0, node: source.node) }
                 }
