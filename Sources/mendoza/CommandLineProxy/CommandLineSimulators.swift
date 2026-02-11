@@ -114,6 +114,14 @@ extension CommandLineProxy {
         }
 
         func disablePasswordAutofill(on simulator: Simulator) throws -> Bool {
+            try updatePasswordAutofill(on: simulator, enabled: false)
+        }
+
+        func enablePasswordAutofill(on simulator: Simulator) throws -> Bool {
+            try updatePasswordAutofill(on: simulator, enabled: true)
+        }
+
+        private func updatePasswordAutofill(on simulator: Simulator, enabled: Bool) throws -> Bool {
             let paths = [
                 "~/Library/Developer/CoreSimulator/Devices/\(simulator.id)/data/Containers/Shared/SystemGroup/systemgroup.com.apple.configurationprofiles/Library/ConfigurationProfiles/UserSettings.plist",
                 "~/Library/Developer/CoreSimulator/Devices/\(simulator.id)/data/Library/UserConfigurationProfiles/EffectiveUserSettings.plist",
@@ -122,7 +130,7 @@ extension CommandLineProxy {
 
             var updates = [Bool]()
             for path in paths {
-                try updates.append(updatePlistIfNeeded(path: path, key: "restrictedBool.allowPasswordAutoFill.value", value: false))
+                try updates.append(updatePlistIfNeeded(path: path, key: "restrictedBool.allowPasswordAutoFill.value", value: enabled))
             }
 
             return updates.contains(true)
@@ -160,7 +168,7 @@ extension CommandLineProxy {
             let numberFormatter = NumberFormatter()
             numberFormatter.decimalSeparator = "."
             let deviceVersion = numberFormatter.number(from: simulator.device.runtime)?.floatValue ?? 0.0
-            
+
             if deviceVersion >= 26.0 {
                 _ = try? executer.execute(#"xcrun simctl spawn '"# + simulator.id + #"' defaults write com.apple.mobilesafari WBSOnboardingStatesDefaultsKeyV0.2 -dict "CustomizeStartPage" -int 1 "EnableCloudSync" -int 1 "EnableHighlights" -int 2 "ExtensionsDiscovery" -int 1 "SetDefaultBrowser" -int 2 "TipForMoreButton" -int 3"#)
             }
