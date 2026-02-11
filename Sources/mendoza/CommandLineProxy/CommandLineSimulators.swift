@@ -144,6 +144,17 @@ extension CommandLineProxy {
                 _ = try? executer.execute("xcrun simctl spawn '\(simulator.id)' defaults write com.apple.keyboard.preferences DidShowContinuousPathIntroduction -bool true")
             }
         }
+        
+        func disableMultilingualKeyboardTip(on simulator: Simulator) {
+            let numberFormatter = NumberFormatter()
+            numberFormatter.decimalSeparator = "."
+            let deviceVersion = numberFormatter.number(from: simulator.device.runtime)?.floatValue ?? 0.0
+            
+            if deviceVersion >= 26.0 {
+                // These settings are hot loaded no reboot of the device is necessary
+                _ = try? executer.execute("xcrun simctl spawn '\(simulator.id)' defaults write com.apple.keyboard.preferences MultilingualKeyboardTip -bool true")
+            }
+        }
 
         func disableSafariMenuOnboarding(on simulator: Simulator) {
             let numberFormatter = NumberFormatter()
