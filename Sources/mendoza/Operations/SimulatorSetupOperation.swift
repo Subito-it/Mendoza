@@ -40,6 +40,7 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
             didStart?()
 
             try pool.execute { executer, source in
+                try self.deleteAllSimulatorsIfDiskSpaceLow(executer: executer, node: source.node)
                 let proxy = CommandLineProxy.Simulators(executer: executer, verbose: self.verbose)
 
                 try proxy.checkIfRuntimeInstalled(self.device.runtime, nodeAddress: source.node.address)
@@ -151,6 +152,27 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
         }
 
         return concurrentTestRunners
+    }
+
+    private func deleteAllSimulatorsIfDiskSpaceLow(executer: Executer, node: Node) throws {
+        var totalSimulators: Int
+        switch node.concurrentTestRunners {
+        case let .manual(count) where count > 0: // swiftlint:disable:this empty_count
+            totalSimulators = Int(count)
+        default:
+            totalSimulators = try physicalCPUs(executer: executer, node: node) / 2
+        }
+        totalSimulators = max(1, totalSimulators)
+
+        let requiredSpaceGiB = 4 * totalSimulators // 4 GiB per simulator
+
+        let availableString = try executer.execute("df -g / | awk 'NR==2 {print $4}'")
+        guard let availableSpaceGiB = Double(availableString.trimmingCharacters(in: .whitespacesAndNewlines)) else { return }
+
+        if availableSpaceGiB < Double(requiredSpaceGiB) {
+            print("Low disk space (\(Int(availableSpaceGiB))GiB available, \(requiredSpaceGiB)GiB required). Deleting all simulators on \(node.address).")
+            _ = try? executer.execute("xcrun simctl delete all")
+        }
     }
 
     private func shutdownSimulatorOnXcodeVersionMismatch(executer: Executer, node: Node) throws -> Bool {
