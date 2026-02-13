@@ -295,7 +295,7 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
 
         settings.CurrentDeviceUDID = nil
 
-        let connectHardwareKeyboardFlag = false
+        let connectHardwareKeyboardFlag = true
 
         settings.AllowFullscreenMode = false
         settings.PasteboardAutomaticSync = false
