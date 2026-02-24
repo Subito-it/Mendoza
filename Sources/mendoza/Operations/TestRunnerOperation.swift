@@ -186,8 +186,10 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                     }
 
                     // Save individual test coverage profdata before merging (if individual coverage extraction is enabled)
+                    // Only extract coverage for successful tests - failed tests may have incomplete/invalid profdata
                     var individualCoverageFile: String?
                     if let testCaseResult = testCaseResult,
+                       testCaseResult.status == .passed,
                        let newCoverageFile = newCoverageFile,
                        self.configuration.testing.extractIndividualTestCoverage || self.configuration.testing.extractTestCoveredFiles {
                         let filename = "\(testCaseResult.suite)-\(testCaseResult.name)-\(Int(testCaseResult.startInterval)).profdata"
