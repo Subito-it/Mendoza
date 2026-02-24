@@ -326,14 +326,23 @@ private extension TestRunnerOperation {
             // Under certain failures xcodebuild does not produce an .xcresult
             return nil
         }
-        guard testResults.count == 1 else { throw Error("Too many test results found", logger: executer.logger) }
+
+        // In crash/retry scenarios, xcodebuild may create multiple .xcresult bundles.
+        // Clean up older bundles and return the most recent one.
+        if testResults.count > 1 {
+            for olderResult in testResults.dropFirst() {
+                _ = try? executer.execute("rm -rf '\(olderResult.path)'")
+            }
+        }
 
         return testResult
     }
 
     func findTestResultsUrl(executer: Executer, testRunner: TestRunner) throws -> [URL] {
         let resultPath = Path.logs.url.appendingPathComponent(testRunner.id).path
-        let testResults = (try? executer.execute("find '\(resultPath)' -type d -name '*.xcresult'").components(separatedBy: "\n")) ?? []
+        // Sort by modification time (most recent first) to handle crash scenarios where
+        // xcodebuild may create multiple .xcresult bundles
+        let testResults = (try? executer.execute("find '\(resultPath)' -type d -name '*.xcresult' -exec stat -f '%m %N' {} \\; | sort -rn | cut -d' ' -f2-").components(separatedBy: "\n")) ?? []
 
         return testResults.filter { $0.isEmpty == false }.map { URL(fileURLWithPath: $0) }
     }
