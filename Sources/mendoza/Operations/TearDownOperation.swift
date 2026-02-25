@@ -41,33 +41,36 @@ class TearDownOperation: BaseOperation<Void> {
 
             guard let executer = executer else { fatalError("💣 Failed making executer") }
 
-            logTestsResult()
+            let hasTestResults = testSessionResult?.totalTestCount ?? 0 > 0
+            if hasTestResults {
+                logTestsResult()
 
-            try writeHtmlRepeatedTestResultSummary(executer: executer)
-            try writeJsonRepeatedTestResultSummary(executer: executer)
-            try writeHtmlTestResultSummary(executer: executer)
-            try writeJsonTestResultSummary(executer: executer)
-            try writeJsonTestSuiteResult(executer: executer)
-            try writeHtmlExecutionGraph(executer: executer)
-            try writeGitInfo(executer: executer)
-            try writeConfigurationSummary(executer: executer)
+                try writeHtmlRepeatedTestResultSummary(executer: executer)
+                try writeJsonRepeatedTestResultSummary(executer: executer)
+                try writeHtmlTestResultSummary(executer: executer)
+                try writeJsonTestResultSummary(executer: executer)
+                try writeJsonTestSuiteResult(executer: executer)
+                try writeHtmlExecutionGraph(executer: executer)
+                try writeGitInfo(executer: executer)
+                try writeConfigurationSummary(executer: executer)
 
-            let infoPlistPath: String
-            if !configuration.testing.skipResultMerge {
-                infoPlistPath = "\(configuration.resultDestination.path)/\(timestamp)/\(Environment.resultFoldername)/\(Environment.xcresultFilename)/Info.plist"
-            } else {
-                infoPlistPath = "\(configuration.resultDestination.path)/\(timestamp)/\(Environment.resultFoldername)/\(Environment.xcresultFirstUnmergedFilename)/Info.plist"
+                let infoPlistPath: String
+                if !configuration.testing.skipResultMerge {
+                    infoPlistPath = "\(configuration.resultDestination.path)/\(timestamp)/\(Environment.resultFoldername)/\(Environment.xcresultFilename)/Info.plist"
+                } else {
+                    infoPlistPath = "\(configuration.resultDestination.path)/\(timestamp)/\(Environment.resultFoldername)/\(Environment.xcresultFirstUnmergedFilename)/Info.plist"
+                }
+                try writeResultBundleInfoPlist(executer: executer, infoPlistPath: infoPlistPath)
+
+                if configuration.testing.autodeleteSlowDevices {
+                    try? deleteSlowDevices()
+                }
             }
-            try writeResultBundleInfoPlist(executer: executer, infoPlistPath: infoPlistPath)
 
             try pool.execute { executer, source in
                 if AddressType(node: source.node) == .remote {
                     _ = try? executer.execute("rm -rf '\(Path.base.rawValue)'")
                 }
-            }
-
-            if configuration.testing.autodeleteSlowDevices {
-                try? deleteSlowDevices()
             }
 
             if plugin.isInstalled {
