@@ -40,7 +40,7 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
     }()
 
     init(configuration: Configuration, baseUrl: URL, destinationPath: String, testTarget: String, productNames: [String]) {
-        testExecuterBuilder = { executer, testCase, node, testRunner, runnerIndex in
+        self.testExecuterBuilder = { executer, testCase, node, testRunner, runnerIndex in
             TestExecuter(executer: executer, testCase: testCase, testTarget: testTarget, building: configuration.building, testing: configuration.testing, node: node, testRunner: testRunner, runnerIndex: runnerIndex, verbose: configuration.verbose)
         }
 
@@ -168,15 +168,41 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                         }
                     }
 
-                    // We need to progressively merge coverage results since everytime we launch a test a brand new coverage file is created
-                    let searchPath = Path.logs.url.appendingPathComponent(testRunner.id).path
+                    // Coverage handling has two goals:
+                    // 1. Extract individual test coverage: save the profdata from just this test for per-test coverage reports
+                    // 2. Progressive merge: merge all profdata files incrementally to avoid a slow final merge
+                    //
+                    // xcodebuild creates a new .profdata file for each test. Previously merged files have UUID names.
+                    // We identify the new file (non-UUID named), copy it for individual coverage, then merge all files.
 
+                    let searchPath = Path.logs.url.appendingPathComponent(testRunner.id).path
                     let coverageFiles = try findCoverageFilePaths(executer: executer, coveragePath: searchPath)
 
-                    let coverageMerger = CodeCoverageMerger(executer: executer)
+                    // Find the newly created profdata from xcodebuild (non-UUID named file)
+                    // UUID-named files are from previous merges, so exclude them to find the new one
+                    let newCoverageFile = coverageFiles.first { path in
+                        let filename = URL(fileURLWithPath: path).deletingPathExtension().lastPathComponent
+                        return UUID(uuidString: filename) == nil
+                    }
 
+                    // Save individual test coverage profdata before merging (if individual coverage extraction is enabled)
+                    // Only extract coverage for successful tests - failed tests may have incomplete/invalid profdata
+                    var individualCoverageFile: String?
+                    if let testCaseResult = testCaseResult,
+                       testCaseResult.status == .passed,
+                       let newCoverageFile = newCoverageFile,
+                       self.configuration.testing.extractIndividualTestCoverage || self.configuration.testing.extractTestCoveredFiles {
+                        let filename = "\(testCaseResult.suite)-\(testCaseResult.name)-\(Int(testCaseResult.startInterval)).profdata"
+                        let individualPath = "\(searchPath)/\(filename)"
+                        _ = try? executer.execute("cp '\(newCoverageFile)' '\(individualPath)'")
+                        individualCoverageFile = individualPath
+                    }
+
+                    // Progressive merge: merge all profdata files to reduce work at the end of execution.
+                    // Without this, merging hundreds of profdata files at the end would be extremely slow.
+                    let coverageMerger = CodeCoverageMerger(executer: executer)
                     let start = CFAbsoluteTimeGetCurrent()
-                    let coverageFile = try? coverageMerger.merge(coverageFiles: coverageFiles)
+                    _ = try? coverageMerger.merge(coverageFiles: coverageFiles)
                     if self.configuration.verbose {
                         print("🙈 [\(Date().description)] Node \(source.node.address) took \(CFAbsoluteTimeGetCurrent() - start)s for coverage merge {\(runnerIndex)}".magenta)
                     }
@@ -197,14 +223,13 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
 
                         _ = try? groupExecuter.execute("rm -rf '\(xcResultPath)'")
 
+                        // Generate individual test coverage from the isolated profdata (not the merged cumulative one)
                         if let testCaseResult,
-                           let coverageFile,
-                           self.configuration.testing.extractIndividualTestCoverage || self.configuration.testing.extractTestCoveredFiles
-                        {
+                           let individualCoverageFile,
+                           self.configuration.testing.extractIndividualTestCoverage || self.configuration.testing.extractTestCoveredFiles {
                             do {
                                 let pathEquivalence = self.configuration.testing.codeCoveragePathEquivalence
-
-                                let coverageUrl = URL(filePath: coverageFile)
+                                let coverageUrl = URL(filePath: individualCoverageFile)
 
                                 let codeCoverageGenerator = CodeCoverageGenerator(configuration: self.configuration, baseUrl: self.baseUrl)
                                 let jsonCoverageSummaryUrl = try codeCoverageGenerator.generateJsonCoverage(executer: groupExecuter, coverageUrl: coverageUrl, summary: true, pathEquivalence: pathEquivalence)
@@ -218,6 +243,9 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                                     let filename = "\(testCaseResult.suite)-\(testCaseResult.name)-\(Int(testCaseResult.startInterval)).json"
                                     _ = try groupExecuter.execute("mv '\(jsonCoverageSummaryUrl.path)' '\(Path.individualCoverage.rawValue)/\(filename)'")
                                 }
+
+                                // Clean up the individual profdata file after processing
+                                _ = try? groupExecuter.execute("rm -f '\(individualCoverageFile)'")
                             } catch {
                                 print("🆘 failed generating individual code coverage. error: \(error)")
                             }
@@ -298,14 +326,23 @@ private extension TestRunnerOperation {
             // Under certain failures xcodebuild does not produce an .xcresult
             return nil
         }
-        guard testResults.count == 1 else { throw Error("Too many test results found", logger: executer.logger) }
+
+        // In crash/retry scenarios, xcodebuild may create multiple .xcresult bundles.
+        // Clean up older bundles and return the most recent one.
+        if testResults.count > 1 {
+            for olderResult in testResults.dropFirst() {
+                _ = try? executer.execute("rm -rf '\(olderResult.path)'")
+            }
+        }
 
         return testResult
     }
 
     func findTestResultsUrl(executer: Executer, testRunner: TestRunner) throws -> [URL] {
         let resultPath = Path.logs.url.appendingPathComponent(testRunner.id).path
-        let testResults = (try? executer.execute("find '\(resultPath)' -type d -name '*.xcresult'").components(separatedBy: "\n")) ?? []
+        // Sort by modification time (most recent first) to handle crash scenarios where
+        // xcodebuild may create multiple .xcresult bundles
+        let testResults = (try? executer.execute("find '\(resultPath)' -type d -name '*.xcresult' -exec stat -f '%m %N' {} \\; | sort -rn | cut -d' ' -f2-").components(separatedBy: "\n")) ?? []
 
         return testResults.filter { $0.isEmpty == false }.map { URL(fileURLWithPath: $0) }
     }

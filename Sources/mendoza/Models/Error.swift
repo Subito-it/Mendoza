@@ -15,12 +15,12 @@ struct Error: LocalizedError {
 
     init(_ description: String, logger: ExecuterLogger? = nil) {
         self.description = Self.truncate(description)
-        didLogError = (logger != nil)
+        self.didLogError = (logger != nil)
         logger?.log(exception: description)
     }
 
     private static func truncate(_ text: String) -> String {
-        let truncateSize = 8192
+        let truncateSize = 8_192
         let head = String(text.prefix(truncateSize))
         let tail = String(text.suffix(min(truncateSize, max(0, text.count - truncateSize))))
 
@@ -30,4 +30,10 @@ struct Error: LocalizedError {
             return head
         }
     }
+}
+
+/// Error thrown when no test cases are found to execute.
+/// This is not a failure condition - it allows early termination of the pipeline.
+struct NoTestCasesFoundError: LocalizedError {
+    var errorDescription: String? { "No test cases found to execute" }
 }

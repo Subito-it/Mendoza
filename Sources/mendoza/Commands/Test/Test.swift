@@ -24,9 +24,9 @@ class Test {
         self.configuration = configuration
         self.pluginUrl = pluginUrl
 
-        eventPlugin = EventPlugin(baseUrl: pluginUrl, plugin: configuration.plugins)
+        self.eventPlugin = EventPlugin(baseUrl: pluginUrl, plugin: configuration.plugins)
 
-        timestamp = Test.currentTimestamp()
+        self.timestamp = Test.currentTimestamp()
     }
 
     func run() throws {
@@ -165,12 +165,22 @@ class Test {
 
         operations.compactMap { $0 as? ThrowingOperation & LoggedOperation }.forEach { [unowned self] op in
             op.didThrow = { opError in
+                // Handle NoTestCasesFoundError gracefully - not a failure, just early termination
+                if opError is NoTestCasesFoundError {
+                    print("\nℹ️  No test cases found to execute\n".yellow)
+                    self.cancelOperation(operations)
+                    let noTestsTearDownOperation = TearDownOperation(configuration: self.configuration, git: gitStatus, timestamp: self.timestamp, plugin: tearDownPlugin)
+                    noTestsTearDownOperation.testSessionResult = testSessionResult
+                    noTestsTearDownOperation.main()
+                    return
+                }
+
                 if (opError as? Error)?.didLogError == false {
                     op.logger.log(exception: opError.localizedDescription)
                 }
 
                 print("\n💣 \(op.className.components(separatedBy: ".").last ?? op.className) did throw exception, see session logs for details on what went wrong\n")
-                if opError.localizedDescription.count < 2000 {
+                if opError.localizedDescription.count < 2_000 {
                     print(opError.localizedDescription)
                 }
 

@@ -9,7 +9,9 @@ import Foundation
 
 extension CommandLineProxy {
     class Simulators {
-        var settingsPath: String { "\(executer.homePath)/Library/Preferences/com.apple.iphonesimulator.plist" }
+        var settingsPath: String {
+            "\(executer.homePath)/Library/Preferences/com.apple.iphonesimulator.plist"
+        }
 
         private var executer: Executer
         private let verbose: Bool
@@ -353,10 +355,15 @@ extension CommandLineProxy {
         }
 
         func bootSynchronously(simulator: Simulator) throws {
-            // https://gist.github.com/keith/33d3e28de4217f3baecde15357bfe5f6
-            // boot and synchronously wait for device to boot
-            _ = try executer.execute("xcrun simctl bootstatus '\(simulator.id)' -b || true")
-            
+            /*
+             // https://gist.github.com/keith/33d3e28de4217f3baecde15357bfe5f6
+             // boot and synchronously wait for device to boot
+             _ = try executer.execute("xcrun simctl bootstatus '\(simulator.id)' -b || true")
+             */
+
+            // Given that we added the waitForSimulatorReady we can use the async boot
+            try boot(simulator: simulator)
+
             Thread.sleep(forTimeInterval: 5.0)
 
             try waitForSimulatorReady(simulator: simulator)

@@ -43,7 +43,7 @@ class TestExtractionOperation: BaseOperation<[TestCase]> {
             }
 
             guard !testCases.isEmpty else {
-                throw Error("❌  No test cases found.\n\nMendoza did look into the following files but found no subclasses of XCTestCase:\n\(targetTestFiles.map(\.path).joined(separator: "\n"))".red.bold)
+                throw NoTestCasesFoundError()
             }
 
             print("\nℹ️  Will execute \(testCases.count) tests\n".magenta)
