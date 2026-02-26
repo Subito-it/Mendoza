@@ -37,8 +37,7 @@ class TestExecuter {
          node: Node,
          testRunner: TestRunner,
          runnerIndex: Int,
-         verbose: Bool)
-    {
+         verbose: Bool) {
         self.executer = executer
         self.testCase = testCase
         self.testTarget = testTarget
@@ -51,9 +50,9 @@ class TestExecuter {
 
         switch XcodeProject.SDK(rawValue: building.sdk)! {
         case .ios:
-            xcodebuildDestination = "platform=iOS Simulator,id=\(testRunner.id)"
+            self.xcodebuildDestination = "platform=iOS Simulator,id=\(testRunner.id)"
         case .macos:
-            xcodebuildDestination = "platform=OS X,arch=x86_64"
+            self.xcodebuildDestination = "platform=OS X,arch=x86_64"
         }
     }
 
