@@ -23,8 +23,13 @@ class TestExecuter {
 
     private let verbose: Bool
 
-    private var timer: Timer?
-    private var lastStdOutputUpdateTimeInterval: TimeInterval = 0
+    private var timerSource: DispatchSourceTimer?
+    private let timerQueue = DispatchQueue(label: "com.mendoza.stdoutTimeout")
+    private var _lastStdOutputUpdateTimeInterval: TimeInterval = 0
+    private var lastStdOutputUpdateTimeInterval: TimeInterval {
+        get { timerQueue.sync { _lastStdOutputUpdateTimeInterval } }
+        set { timerQueue.sync { _lastStdOutputUpdateTimeInterval = newValue } }
+    }
 
     private var testCaseStartTimeInterval: TimeInterval = 0
     private var previewCompletionBlock: ((TestCaseResult) -> Void)?
@@ -37,7 +42,8 @@ class TestExecuter {
          node: Node,
          testRunner: TestRunner,
          runnerIndex: Int,
-         verbose: Bool) {
+         verbose: Bool)
+    {
         self.executer = executer
         self.testCase = testCase
         self.testTarget = testTarget
@@ -79,8 +85,7 @@ class TestExecuter {
         var output = ""
         var testResult: TestCaseResult?
 
-        startStdOutTimeoutHandler()
-        defer { timer?.invalidate() }
+        defer { stopStdOutTimeoutHandler() }
 
         let result = try? testWithoutBuilding(executer: executer)
         output = result?.output ?? ""
@@ -102,25 +107,43 @@ class TestExecuter {
     }
 
     private func startStdOutTimeoutHandler() {
-        if let maximumStdOutIdleTime = testing.maximumStdOutIdleTime {
-            lastStdOutputUpdateTimeInterval = CFAbsoluteTimeGetCurrent()
-            timer = Timer.scheduledTimer(withTimeInterval: 10, repeats: true) { [weak self] _ in
-                guard let self = self else { return }
-                if CFAbsoluteTimeGetCurrent() - self.lastStdOutputUpdateTimeInterval > TimeInterval(maximumStdOutIdleTime) {
-                    if let simulator = self.testRunner as? Simulator, let localExecuter = try? self.executer.clone() {
-                        self.print("⏰", "no stdout updates for more than \(maximumStdOutIdleTime)s, stopping test", color: { $0.red })
+        guard let maximumStdOutIdleTime = testing.maximumStdOutIdleTime else { return }
 
-                        // Terminating the app will make the test fail
-                        let proxy = CommandLineProxy.Simulators(executer: localExecuter, verbose: self.verbose)
-                        try? proxy.terminateApp(identifier: self.building.buildBundleIdentifier, on: simulator)
-                        try? proxy.terminateApp(identifier: self.building.testBundleIdentifier, on: simulator)
-                        if self.verbose {
-                            self.print("⏰", "did terminate application", color: { $0.yellow })
-                        }
-                    }
+        printIfVerbose("⏱️", "stdout timeout enabled (\(maximumStdOutIdleTime)s)", color: { $0.cyan })
+
+        lastStdOutputUpdateTimeInterval = CFAbsoluteTimeGetCurrent()
+
+        let source = DispatchSource.makeTimerSource(queue: timerQueue)
+        source.schedule(deadline: .now() + 1, repeating: 1.0)
+        source.setEventHandler { [weak self] in
+            guard let self = self else { return }
+
+            let idleTime = CFAbsoluteTimeGetCurrent() - self.lastStdOutputUpdateTimeInterval
+            if idleTime > TimeInterval(maximumStdOutIdleTime) {
+                // Cancel timer immediately to prevent multiple firings
+                self.stopStdOutTimeoutHandler()
+
+                guard let simulator = self.testRunner as? Simulator,
+                      let localExecuter = try? self.executer.clone() else { return }
+
+                self.print("⏰", "no stdout updates for more than \(maximumStdOutIdleTime)s, stopping test", color: { $0.red })
+
+                // Terminating the app will make the test fail
+                let proxy = CommandLineProxy.Simulators(executer: localExecuter, verbose: self.verbose)
+                try? proxy.terminateApp(identifier: self.building.buildBundleIdentifier, on: simulator)
+                try? proxy.terminateApp(identifier: self.building.testBundleIdentifier, on: simulator)
+                if self.verbose {
+                    self.print("⏰", "did terminate application", color: { $0.yellow })
                 }
             }
         }
+        source.resume()
+        timerSource = source
+    }
+
+    private func stopStdOutTimeoutHandler() {
+        timerSource?.cancel()
+        timerSource = nil
     }
 
     private func print(_ prefix: String, _ txt: String, color: (String) -> String = { $0.magenta }) {
@@ -143,8 +166,12 @@ private enum XcodebuildLineEvent {
     case noSpaceOnDevice
     case testTimedOut
 
-    var isTestPassed: Bool { switch self { case .testPassed: return true; default: return false } } // swiftlint:disable:this switch_case_alignment
-    var isTestCrashed: Bool { switch self { case .testCrashed: return true; default: return false } } // swiftlint:disable:this switch_case_alignment
+    var isTestPassed: Bool {
+        switch self { case .testPassed: return true; default: return false }
+    } // swiftlint:disable:this switch_case_alignment
+    var isTestCrashed: Bool {
+        switch self { case .testCrashed: return true; default: return false }
+    } // swiftlint:disable:this switch_case_alignment
 }
 
 extension TestExecuter {
@@ -177,6 +204,7 @@ extension TestExecuter {
                 switch event {
                 case .testStart:
                     testCaseStartTimeInterval = CFAbsoluteTimeGetCurrent()
+                    self.startStdOutTimeoutHandler()
 
                     self.printIfVerbose("🛫", "\(testCase.description) started", color: { $0.yellow })
                 case .testPassed:
