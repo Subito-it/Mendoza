@@ -25,11 +25,13 @@ class TestExecuter {
 
     private var timerSource: DispatchSourceTimer?
     private let timerQueue = DispatchQueue(label: "com.mendoza.stdoutTimeout")
+    private let syncQueue = DispatchQueue(label: "com.mendoza.stdoutTimeout.sync")
     private var _lastStdOutputUpdateTimeInterval: TimeInterval = 0
     private var lastStdOutputUpdateTimeInterval: TimeInterval {
-        get { timerQueue.sync { _lastStdOutputUpdateTimeInterval } }
-        set { timerQueue.sync { _lastStdOutputUpdateTimeInterval = newValue } }
+        get { syncQueue.sync { _lastStdOutputUpdateTimeInterval } }
+        set { syncQueue.sync { _lastStdOutputUpdateTimeInterval = newValue } }
     }
+    private var didTriggerTimeout = false
 
     private var testCaseStartTimeInterval: TimeInterval = 0
     private var previewCompletionBlock: ((TestCaseResult) -> Void)?
@@ -116,12 +118,13 @@ class TestExecuter {
         let source = DispatchSource.makeTimerSource(queue: timerQueue)
         source.schedule(deadline: .now() + 1, repeating: 1.0)
         source.setEventHandler { [weak self] in
-            guard let self = self else { return }
+            guard let self = self, !self.didTriggerTimeout else { return }
 
             let idleTime = CFAbsoluteTimeGetCurrent() - self.lastStdOutputUpdateTimeInterval
             if idleTime > TimeInterval(maximumStdOutIdleTime) {
-                // Cancel timer immediately to prevent multiple firings
-                self.stopStdOutTimeoutHandler()
+                // Mark as triggered to prevent multiple firings
+                self.didTriggerTimeout = true
+                source.cancel()
 
                 guard let simulator = self.testRunner as? Simulator,
                       let localExecuter = try? self.executer.clone() else { return }
