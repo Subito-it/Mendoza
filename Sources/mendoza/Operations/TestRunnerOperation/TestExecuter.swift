@@ -31,6 +31,13 @@ class TestExecuter {
         get { syncQueue.sync { _lastStdOutputUpdateTimeInterval } }
         set { syncQueue.sync { _lastStdOutputUpdateTimeInterval = newValue } }
     }
+
+    private var _stdOutIdleTimes: [TimeInterval] = []
+    private var stdOutIdleTimes: [TimeInterval] {
+        get { syncQueue.sync { _stdOutIdleTimes } }
+        set { syncQueue.sync { _stdOutIdleTimes = newValue } }
+    }
+
     private var didTriggerTimeout = false
 
     private var testCaseStartTimeInterval: TimeInterval = 0
@@ -101,7 +108,7 @@ class TestExecuter {
             let startInterval: TimeInterval = CFAbsoluteTimeGetCurrent()
             let endInterval: TimeInterval = startInterval
 
-            testResult = TestCaseResult(node: node.address, runnerName: testRunner.name, runnerIdentifier: testRunner.id, xcResultPath: "", suite: testCase.suite, name: testCase.name, status: .failed, startInterval: startInterval, endInterval: endInterval)
+            testResult = TestCaseResult(node: node.address, runnerName: testRunner.name, runnerIdentifier: testRunner.id, xcResultPath: "", suite: testCase.suite, name: testCase.name, status: .failed, startInterval: startInterval, endInterval: endInterval, averageStdOutIdleTime: nil, maxStdOutIdleTime: nil)
             previewCompletionBlock(testResult!)
         }
 
@@ -110,8 +117,6 @@ class TestExecuter {
 
     private func startStdOutTimeoutHandler() {
         guard let maximumStdOutIdleTime = testing.maximumStdOutIdleTime else { return }
-
-        printIfVerbose("⏱️", "stdout timeout enabled (\(maximumStdOutIdleTime)s)", color: { $0.cyan })
 
         lastStdOutputUpdateTimeInterval = CFAbsoluteTimeGetCurrent()
 
@@ -195,8 +200,19 @@ extension TestExecuter {
 
         var parsedProgress = ""
         var partialProgress = ""
-        let progressHandler: ((String) -> Void) = { [unowned self] progress in
-            self.lastStdOutputUpdateTimeInterval = CFAbsoluteTimeGetCurrent()
+        let progressHandler: ((String) -> Void) = { [weak self] progress in
+            guard let self else { return }
+
+            // Only collect idle times after test has started
+            if testCaseStartTimeInterval > 0 {
+                let currentTime = CFAbsoluteTimeGetCurrent()
+                let lastUpdate = self.lastStdOutputUpdateTimeInterval
+                if lastUpdate > 0 {
+                    let idleTime = currentTime - lastUpdate
+                    self.stdOutIdleTimes.append(idleTime)
+                }
+                self.lastStdOutputUpdateTimeInterval = currentTime
+            }
 
             parsedProgress += progress
             partialProgress += progress
@@ -211,12 +227,18 @@ extension TestExecuter {
 
                     self.printIfVerbose("🛫", "\(testCase.description) started", color: { $0.yellow })
                 case .testPassed:
-                    let result = TestCaseResult(node: self.node.address, runnerName: self.testRunner.name, runnerIdentifier: self.testRunner.id, xcResultPath: "-", suite: self.testCase.suite, name: self.testCase.name, status: .passed, startInterval: testCaseStartTimeInterval, endInterval: CFAbsoluteTimeGetCurrent())
+                    let idleTimes = self.stdOutIdleTimes
+                    let avgIdleTime = idleTimes.isEmpty ? nil : idleTimes.reduce(0, +) / Double(idleTimes.count)
+                    let maxIdleTime = idleTimes.max()
+                    let result = TestCaseResult(node: self.node.address, runnerName: self.testRunner.name, runnerIdentifier: self.testRunner.id, xcResultPath: "-", suite: self.testCase.suite, name: self.testCase.name, status: .passed, startInterval: testCaseStartTimeInterval, endInterval: CFAbsoluteTimeGetCurrent(), averageStdOutIdleTime: avgIdleTime, maxStdOutIdleTime: maxIdleTime)
                     previewCompletionBlock?(result); previewCompletionBlock = nil // call preview at most once
 
                     testCaseResult = result
                 case .testFailed, .testCrashed, .testTimedOut:
-                    let result = TestCaseResult(node: self.node.address, runnerName: self.testRunner.name, runnerIdentifier: self.testRunner.id, xcResultPath: "-", suite: self.testCase.suite, name: self.testCase.name, status: .failed, startInterval: testCaseStartTimeInterval, endInterval: CFAbsoluteTimeGetCurrent())
+                    let idleTimes = self.stdOutIdleTimes
+                    let avgIdleTime = idleTimes.isEmpty ? nil : idleTimes.reduce(0, +) / Double(idleTimes.count)
+                    let maxIdleTime = idleTimes.max()
+                    let result = TestCaseResult(node: self.node.address, runnerName: self.testRunner.name, runnerIdentifier: self.testRunner.id, xcResultPath: "-", suite: self.testCase.suite, name: self.testCase.name, status: .failed, startInterval: testCaseStartTimeInterval, endInterval: CFAbsoluteTimeGetCurrent(), averageStdOutIdleTime: avgIdleTime, maxStdOutIdleTime: maxIdleTime)
                     previewCompletionBlock?(result); previewCompletionBlock = nil // call preview at most once
 
                     testCaseResult = result

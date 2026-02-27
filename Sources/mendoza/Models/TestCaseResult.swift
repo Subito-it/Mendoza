@@ -23,6 +23,8 @@ struct TestCaseResult: Codable, CustomStringConvertible, Hashable {
     var status: Status
     var startInterval: TimeInterval
     var endInterval: TimeInterval
+    var averageStdOutIdleTime: TimeInterval?
+    var maxStdOutIdleTime: TimeInterval?
 
     var description: String { "\(testCaseIdentifier) (\(Int(endInterval - startInterval)) seconds)" }
     var testCaseIdentifier: String { "\(suite)/\(name)" }
@@ -30,7 +32,7 @@ struct TestCaseResult: Codable, CustomStringConvertible, Hashable {
 
 extension TestCaseResult: DefaultInitializable {
     static func defaultInit() -> TestCaseResult {
-        TestCaseResult(node: "", runnerName: "", runnerIdentifier: "", xcResultPath: "", suite: "", name: "", status: .passed, startInterval: 0.0, endInterval: 0.0)
+        TestCaseResult(node: "", runnerName: "", runnerIdentifier: "", xcResultPath: "", suite: "", name: "", status: .passed, startInterval: 0.0, endInterval: 0.0, averageStdOutIdleTime: nil, maxStdOutIdleTime: nil)
     }
 }
 
