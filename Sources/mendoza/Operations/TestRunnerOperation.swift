@@ -8,27 +8,23 @@
 import Foundation
 
 class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
-    // An array of TestCases sorted from the longest to the shortest estimated execution time
     var sortedTestCases: [TestCase]?
     var testRunners: [(testRunner: TestRunner, node: Node, idle: Bool)]?
 
     private let configuration: Configuration
-    private let baseUrl: URL
 
+    private let syncQueue = DispatchQueue(label: String(describing: TestRunnerOperation.self))
     private var testCasesCount = 0
     private var testCasesCompletedCount = 0
 
-    private let testExecuterBuilder: (Executer, TestCase, Node, TestRunner, Int) -> TestExecuter
+    private lazy var testQueue: TestQueue = .init(
+        testCases: sortedTestCases ?? [],
+        maxRetryCount: configuration.testing.failingTestsRetryCount ?? 0
+    )
 
-    private let productNames: [String]
-    private let syncQueue = DispatchQueue(label: String(describing: TestRunnerOperation.self))
-    private var retryCountMap = NSCountedSet()
-    private var retryCount: Int { // access only from syncQueue
-        retryCountMap.reduce(0) { $0 + retryCountMap.count(for: $1) }
-    }
-
-    private let destinationPath: String
-
+    private let resultHandler: TestResultHandler
+    private let testCaseExecutor: TestCaseExecutor
+    private let diagnosticReporter: DiagnosticReporter
     private let postExecutionQueue = ThreadQueue()
 
     private lazy var pool: ConnectionPool<TestRunner> = {
@@ -40,21 +36,55 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
     }()
 
     init(configuration: Configuration, baseUrl: URL, destinationPath: String, testTarget: String, productNames: [String]) {
-        self.testExecuterBuilder = { executer, testCase, node, testRunner, runnerIndex in
-            TestExecuter(executer: executer, testCase: testCase, testTarget: testTarget, building: configuration.building, testing: configuration.testing, node: node, testRunner: testRunner, runnerIndex: runnerIndex, verbose: configuration.verbose)
+        self.configuration = configuration
+
+        let testExecuterBuilder: TestCaseExecutor.TestExecuterBuilder = { executer, testCase, node, testRunner, runnerIndex in
+            TestExecuter(
+                executer: executer,
+                testCase: testCase,
+                testTarget: testTarget,
+                building: configuration.building,
+                testing: configuration.testing,
+                node: node,
+                testRunner: testRunner,
+                runnerIndex: runnerIndex,
+                verbose: configuration.verbose
+            )
         }
 
-        self.configuration = configuration
-        self.baseUrl = baseUrl
+        self.resultHandler = TestResultHandler(verbose: configuration.verbose)
 
-        self.productNames = productNames
-        self.destinationPath = destinationPath
-    }
+        let xcResultHandler = XCResultHandler(xcresultBlobThresholdKB: configuration.testing.xcresultBlobThresholdKB)
+        let outputAnalyzer = OutputAnalyzer()
+        let coverageHandler = CoverageHandler(verbose: configuration.verbose)
+        let simulatorRecovery = SimulatorRecovery(verbose: configuration.verbose)
+        self.diagnosticReporter = DiagnosticReporter(productNames: productNames)
+        let postExecutionHandler = PostExecutionHandler(
+            configuration: configuration,
+            baseUrl: baseUrl,
+            destinationPath: destinationPath
+        )
 
-    enum State {
-        case execute(TestCase)
-        case waitingCompletion // no new tests to execute, but waiting for potential retries of tests running on other active runners runners to complete
-        case allRunnersCompleted // all runners completed, disptach ended
+        // Temporary placeholder for addLogger - will be set after super.init
+        var addLoggerClosure: ((ExecuterLogger) -> Void)?
+
+        self.testCaseExecutor = TestCaseExecutor(
+            configuration: configuration,
+            testExecuterBuilder: testExecuterBuilder,
+            xcResultHandler: xcResultHandler,
+            outputAnalyzer: outputAnalyzer,
+            coverageHandler: coverageHandler,
+            simulatorRecovery: simulatorRecovery,
+            postExecutionHandler: postExecutionHandler,
+            postExecutionQueue: postExecutionQueue,
+            addLogger: { logger in addLoggerClosure?(logger) }
+        )
+
+        super.init()
+
+        addLoggerClosure = { [weak self] logger in
+            self?.addLogger(logger)
+        }
     }
 
     override func main() {
@@ -63,16 +93,12 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
         do {
             didStart?()
 
-            var result = [TestCaseResult]()
+            var results = [TestCaseResult]()
 
             testCasesCount = sortedTestCases?.count ?? 0
             guard testCasesCount > 0 else {
-                didEnd?(result)
+                didEnd?(results)
                 return
-            }
-
-            if !result.isEmpty {
-                print("\n\nℹ️  Repeating failing tests".magenta)
             }
 
             try pool.execute { [weak self] executer, source in
@@ -84,216 +110,41 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                 defer { self.syncQueue.sync { self.testRunners?[runnerIndex].idle = true } }
 
                 while true {
-                    var testCase: TestCase!
-                    var allRunnersCompleted = false
+                    let state = self.determineRunnerState(testRunner: testRunner, source: source)
 
-                    self.syncQueue.sync {
-                        if let nextTestCase = self.nextTestCase() {
-                            testCase = nextTestCase
-                        } else {
-                            allRunnersCompleted = self.testRunners?.allSatisfy(\.idle) == true
-                        }
-
-                        if let testRunnerIndex = self.testRunners?.firstIndex(where: { $0.node == source.node && $0.testRunner.id == testRunner.id && $0.testRunner.name == testRunner.name }) {
-                            self.testRunners?[testRunnerIndex].idle = testCase == nil
-                        }
-                    }
-
-                    if testCase == nil {
-                        if allRunnersCompleted {
-                            break
-                        } else {
-                            Thread.sleep(forTimeInterval: 1.0)
-                            continue
-                        }
-                    }
-
-                    var testCaseResult: TestCaseResult?
-
-                    try autoreleasepool {
-                        let testResultsUrls = try self.findTestResultsUrl(executer: executer, testRunner: testRunner)
-                        for path in testResultsUrls.map(\.path) {
-                            guard path.hasPrefix(Path.base.rawValue) else { continue }
-                            _ = try executer.execute("rm -rf '\(path)' || true")
-                        }
-
-                        let testExecuter = self.testExecuterBuilder(executer, testCase, source.node, testRunner, runnerIndex)
-                        var xcodebuildOutput = ""
-                        (xcodebuildOutput, testCaseResult) = try testExecuter.launch { previewTestCaseResult in
-                            self.handleTestCaseResultPreview(previewTestCaseResult, testCase: testCase, runnerIndex: runnerIndex)
-
-                            self.syncQueue.sync { self.testCasesCompletedCount += 1 }
-                        }
-
-                        // Inspect output for failures that require additional
-                        if self.testDidFailLoadingAccessibility(in: xcodebuildOutput) {
-                            self.forceResetSimulator(executer: executer, testRunner: testRunner)
-                        }
-
-                        // xcodebuild returns 0 even on ** TEST EXECUTE FAILED ** when missing
-                        // accessibility permissions or other errors like the bootstrapping once we check in testsDidFailToStart
-                        try self.assertAccessibilityPermissions(in: xcodebuildOutput)
-
-                        if self.testsDidFailBootstrapping(in: xcodebuildOutput) {
-                            Thread.sleep(forTimeInterval: 10.0)
-                        }
-
-                        if self.testDidFailPreflightChecks(in: xcodebuildOutput) {
-                            self.forceResetSimulator(executer: executer, testRunner: testRunner)
-                        }
-
-                        if self.testDidFailBecauseOfDamagedBuild(in: xcodebuildOutput) {
-                            switch AddressType(address: executer.address) {
-                            case .local:
-                                _ = try executer.execute("rm -rf '\(Path.build.rawValue)' || true")
-                                // To be improved
-                                throw Error("Tests failed because of damaged build folder, please try rerunning the build again")
-                            case .remote:
-                                break
+                    switch state {
+                    case .allRunnersCompleted:
+                        return
+                    case .waitingCompletion:
+                        Thread.sleep(forTimeInterval: 1.0)
+                        continue
+                    case let .execute(testCase):
+                        let testCaseResult = try self.testCaseExecutor.execute(
+                            testCase: testCase,
+                            executer: executer,
+                            node: source.node,
+                            testRunner: testRunner,
+                            runnerIndex: runnerIndex,
+                            previewHandler: { [weak self] previewResult in
+                                self?.handleTestCaseResultPreview(previewResult, testCase: testCase, runnerIndex: runnerIndex)
                             }
-                        }
+                        )
 
-                        if let xcResultUrl = try self.findTestResultUrl(executer: executer, testRunner: testRunner) {
-                            // We need to move results because xcodebuild test-without-building shows a weird behaviour not allowing more than 2 xcresults in the same folder.
-                            // Repeatedly performing 'xcodebuild test-without-building' results in older xcresults being deleted
-                            try self.reclaimDiskSpace(executer: executer, path: xcResultUrl.path)
-
-                            let resultUrl = Path.results.url.appendingPathComponent(testRunner.id)
-                            _ = try executer.capture("mkdir -p '\(resultUrl.path)'; mv '\(xcResultUrl.path)' '\(resultUrl.path)'")
-                            testCaseResult?.xcResultPath = resultUrl.appendingPathComponent(xcResultUrl.lastPathComponent).path
-                        }
-
-                        if let testCaseResult = testCaseResult {
-                            self.syncQueue.sync { result += [testCaseResult] }
-                        }
-                    }
-
-                    // Coverage handling has two goals:
-                    // 1. Extract individual test coverage: save the profdata from just this test for per-test coverage reports
-                    // 2. Progressive merge: merge all profdata files incrementally to avoid a slow final merge
-                    //
-                    // xcodebuild creates a new .profdata file for each test. Previously merged files have UUID names.
-                    // We identify the new file (non-UUID named), copy it for individual coverage, then merge all files.
-
-                    let searchPath = Path.logs.url.appendingPathComponent(testRunner.id).path
-                    let coverageFiles = try findCoverageFilePaths(executer: executer, coveragePath: searchPath)
-
-                    // Find the newly created profdata from xcodebuild (non-UUID named file)
-                    // UUID-named files are from previous merges, so exclude them to find the new one
-                    let newCoverageFile = coverageFiles.first { path in
-                        let filename = URL(fileURLWithPath: path).deletingPathExtension().lastPathComponent
-                        return UUID(uuidString: filename) == nil
-                    }
-
-                    // Save individual test coverage profdata before merging (if individual coverage extraction is enabled)
-                    // Only extract coverage for successful tests - failed tests may have incomplete/invalid profdata
-                    var individualCoverageFile: String?
-                    if let testCaseResult = testCaseResult,
-                       testCaseResult.status == .passed,
-                       let newCoverageFile = newCoverageFile,
-                       self.configuration.testing.extractIndividualTestCoverage || self.configuration.testing.extractTestCoveredFiles {
-                        let filename = "\(testCaseResult.suite)-\(testCaseResult.name)-\(Int(testCaseResult.startInterval)).profdata"
-                        let individualPath = "\(searchPath)/\(filename)"
-                        _ = try? executer.execute("cp '\(newCoverageFile)' '\(individualPath)'")
-                        individualCoverageFile = individualPath
-                    }
-
-                    // Progressive merge: merge all profdata files to reduce work at the end of execution.
-                    // Without this, merging hundreds of profdata files at the end would be extremely slow.
-                    let coverageMerger = CodeCoverageMerger(executer: executer)
-                    let start = CFAbsoluteTimeGetCurrent()
-                    _ = try? coverageMerger.merge(coverageFiles: coverageFiles)
-                    if self.configuration.verbose {
-                        print("🙈 [\(Date().description)] Node \(source.node.address) took \(CFAbsoluteTimeGetCurrent() - start)s for coverage merge {\(runnerIndex)}".magenta)
-                    }
-
-                    let destinationNode = self.configuration.resultDestination.node
-
-                    let groupExecuter = try executer.clone()
-                    let logger = ExecuterLogger(name: (executer.logger?.name ?? "") + "-async", address: executer.logger?.address ?? "")
-                    groupExecuter.logger = logger
-
-                    self.addLogger(logger)
-
-                    self.postExecutionQueue.addOperation {
-                        guard let xcResultPath = testCaseResult?.xcResultPath, xcResultPath.hasPrefix(Path.base.rawValue) else { return }
-
-                        let runnerDestinationPath = "\(self.destinationPath)/\(testRunner.id)"
-                        try? groupExecuter.rsync(sourcePath: xcResultPath, destinationPath: runnerDestinationPath, on: destinationNode)
-
-                        _ = try? groupExecuter.execute("rm -rf '\(xcResultPath)'")
-
-                        // Generate individual test coverage from the isolated profdata (not the merged cumulative one)
-                        if let testCaseResult,
-                           let individualCoverageFile,
-                           self.configuration.testing.extractIndividualTestCoverage || self.configuration.testing.extractTestCoveredFiles {
-                            do {
-                                let pathEquivalence = self.configuration.testing.codeCoveragePathEquivalence
-                                let coverageUrl = URL(filePath: individualCoverageFile)
-
-                                let codeCoverageGenerator = CodeCoverageGenerator(configuration: self.configuration, baseUrl: self.baseUrl)
-                                let jsonCoverageSummaryUrl = try codeCoverageGenerator.generateJsonCoverage(executer: groupExecuter, coverageUrl: coverageUrl, summary: true, pathEquivalence: pathEquivalence)
-
-                                if self.configuration.testing.extractTestCoveredFiles {
-                                    let filename = "\(testCaseResult.suite)-\(testCaseResult.name)-\(Int(testCaseResult.startInterval)).json"
-                                    _ = try groupExecuter.execute("mendoza mendoza extract_files_coverage '\(jsonCoverageSummaryUrl.path)' '\(Path.testFileCoverage.rawValue)/\(filename)'")
-                                }
-
-                                if self.configuration.testing.extractIndividualTestCoverage {
-                                    let filename = "\(testCaseResult.suite)-\(testCaseResult.name)-\(Int(testCaseResult.startInterval)).json"
-                                    _ = try groupExecuter.execute("mv '\(jsonCoverageSummaryUrl.path)' '\(Path.individualCoverage.rawValue)/\(filename)'")
-                                }
-
-                                // Clean up the individual profdata file after processing
-                                _ = try? groupExecuter.execute("rm -f '\(individualCoverageFile)'")
-                            } catch {
-                                print("🆘 failed generating individual code coverage. error: \(error)")
-                            }
+                        if let result = testCaseResult {
+                            self.syncQueue.sync { results.append(result) }
                         }
                     }
                 }
 
-                try self.copyDiagnosticReports(executer: executer, testRunner: testRunner)
+                try self.diagnosticReporter.copyDiagnosticReports(executer: executer, testRunner: testRunner)
             }
 
             postExecutionQueue.waitUntilAllOperationsAreFinished()
 
-            didEnd?(result)
+            didEnd?(results)
         } catch {
             didThrow?(error)
         }
-    }
-
-    private func handleTestCaseResultPreview(_ testCaseResult: TestCaseResult, testCase: TestCase, runnerIndex: Int) {
-        syncQueue.sync {
-            switch testCaseResult.status {
-            case .passed:
-                print("✅ \(self.configuration.verbose ? "[\(Date().description)] " : "")\(testCase.description) passed [\(self.testCasesCompletedCount + 1)/\(self.testCasesCount)]\(self.retryCount > 0 ? " (\(self.retryCount) retries)" : "") in \(Int(testCaseResult.duration.rounded(.up)))s {\(runnerIndex)}".green)
-            case .failed:
-                print("❌ \(self.configuration.verbose ? "[\(Date().description)] " : "")\(testCase.description) failed [\(self.testCasesCompletedCount + 1)/\(self.testCasesCount)]\(self.retryCount > 0 ? " (\(self.retryCount) retries)" : "") in \(Int(testCaseResult.duration.rounded(.up)))s {\(runnerIndex)}".red)
-
-                let shouldRetryTest = retryCountMap.count(for: testCase) < (configuration.testing.failingTestsRetryCount ?? 0)
-                if shouldRetryTest {
-                    testCasesCount += 1
-                    retryCountMap.add(testCase)
-
-                    if self.sortedTestCases?.isEmpty == true {
-                        self.sortedTestCases?.append(testCase)
-                    } else {
-                        // By inserting at index 1 we make sure that the test will likely be retried on a different simulator
-                        self.sortedTestCases?.insert(testCase, at: 1)
-                    }
-
-                    if configuration.verbose {
-                        print("🔁  Renqueuing (no result) \(testCase), retry count: \(retryCountMap.count(for: testCase))".yellow)
-                    }
-                }
-            }
-        }
-    }
-
-    private func findCoverageFilePaths(executer: Executer, coveragePath: String) throws -> [String] {
-        try executer.execute("find '\(coveragePath)' -type f -name '*.profdata'").components(separatedBy: "\n")
     }
 
     override func cancel() {
@@ -303,102 +154,59 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
         super.cancel()
     }
 
-    private func runnerIndex(for testRunner: TestRunner) -> Int {
-        syncQueue.sync { [unowned self] in self.testRunners?.firstIndex { $0.0.id == testRunner.id && $0.0.name == testRunner.name } ?? 0 }
+    // MARK: - Private
+
+    private enum State {
+        case execute(TestCase)
+        case waitingCompletion
+        case allRunnersCompleted
     }
 
-    private func nextTestCase() -> TestCase? {
-        // This method should be called from syncQueue
-        guard let testCase = sortedTestCases?.first else {
-            return nil
+    private func determineRunnerState(testRunner: TestRunner, source: ConnectionPool<TestRunner>.Source<TestRunner>) -> State {
+        syncQueue.sync {
+            if let testCase = testQueue.dequeue() {
+                updateRunnerIdleState(testRunner: testRunner, source: source, idle: false)
+                return .execute(testCase)
+            }
+
+            updateRunnerIdleState(testRunner: testRunner, source: source, idle: true)
+
+            let allRunnersCompleted = testRunners?.allSatisfy(\.idle) == true
+            return allRunnersCompleted ? .allRunnersCompleted : .waitingCompletion
         }
-
-        sortedTestCases?.removeFirst()
-
-        return testCase
     }
-}
 
-private extension TestRunnerOperation {
-    func findTestResultUrl(executer: Executer, testRunner: TestRunner) throws -> URL? {
-        let testResults = try findTestResultsUrl(executer: executer, testRunner: testRunner)
-        guard let testResult = testResults.first else {
-            // Under certain failures xcodebuild does not produce an .xcresult
-            return nil
+    private func updateRunnerIdleState(testRunner: TestRunner, source: ConnectionPool<TestRunner>.Source<TestRunner>, idle: Bool) {
+        if let index = testRunners?.firstIndex(where: { $0.node == source.node && $0.testRunner.id == testRunner.id && $0.testRunner.name == testRunner.name }) {
+            testRunners?[index].idle = idle
         }
+    }
 
-        // In crash/retry scenarios, xcodebuild may create multiple .xcresult bundles.
-        // Clean up older bundles and return the most recent one.
-        if testResults.count > 1 {
-            for olderResult in testResults.dropFirst() {
-                _ = try? executer.execute("rm -rf '\(olderResult.path)'")
+    private func handleTestCaseResultPreview(_ previewResult: TestCaseResult, testCase: TestCase, runnerIndex: Int) {
+        syncQueue.sync {
+            testCasesCompletedCount += 1
+
+            resultHandler.printStatus(
+                previewResult,
+                testCase: testCase,
+                completedCount: testCasesCompletedCount,
+                totalCount: testCasesCount,
+                retryCount: testQueue.retryCount,
+                runnerIndex: runnerIndex
+            )
+
+            if previewResult.status == .failed {
+                if testQueue.enqueueForRetry(testCase) {
+                    testCasesCount += 1
+                    resultHandler.printRetryEnqueue(testCase, retryCount: testQueue.retryCount(for: testCase))
+                }
             }
         }
-
-        return testResult
     }
 
-    func findTestResultsUrl(executer: Executer, testRunner: TestRunner) throws -> [URL] {
-        let resultPath = Path.logs.url.appendingPathComponent(testRunner.id).path
-        // Sort by modification time (most recent first) to handle crash scenarios where
-        // xcodebuild may create multiple .xcresult bundles
-        let testResults = (try? executer.execute("find '\(resultPath)' -type d -name '*.xcresult' -exec stat -f '%m %N' {} \\; | sort -rn | cut -d' ' -f2-").components(separatedBy: "\n")) ?? []
-
-        return testResults.filter { $0.isEmpty == false }.map { URL(fileURLWithPath: $0) }
-    }
-}
-
-private extension TestRunnerOperation {
-    func copyDiagnosticReports(executer: Executer, testRunner: TestRunner) throws {
-        let testRunnerLogUrl = Path.logs.url.appendingPathComponent(testRunner.id)
-        let destinationPath = testRunnerLogUrl.appendingPathComponent("DiagnosticReports").path
-
-        _ = try executer.execute("mkdir -p '\(destinationPath)'")
-
-        for productName in productNames {
-            let sourcePath = "~/Library/Logs/DiagnosticReports/\(productName)_*"
-            _ = try executer.execute("cp '\(sourcePath)' \(destinationPath) || true")
+    private func runnerIndex(for testRunner: TestRunner) -> Int {
+        syncQueue.sync { [unowned self] in
+            testRunners?.firstIndex { $0.0.id == testRunner.id && $0.0.name == testRunner.name } ?? 0
         }
-    }
-
-    func reclaimDiskSpace(executer: Executer, path: String) throws {
-        guard let xcresultBlobThresholdKB = configuration.testing.xcresultBlobThresholdKB else { return }
-
-        _ = try? executer.execute(#"mendoza mendoza cleaunp_xcresult '\#(path)' \#(xcresultBlobThresholdKB)"#)
-    }
-
-    private func forceResetSimulator(executer: Executer, testRunner: TestRunner) {
-        guard let simulatorExecuter = try? executer.clone() else { return }
-
-        let proxy = CommandLineProxy.Simulators(executer: simulatorExecuter, verbose: true)
-        let simulator = Simulator(id: testRunner.id, name: "Simulator", device: Device.defaultInit())
-
-        // There's no better option than shutting down simulator at this point
-        // xcodebuild will take care to boot simulator again and continue testing
-        try? proxy.shutdown(simulator: simulator)
-    }
-}
-
-private extension TestRunnerOperation {
-    func assertAccessibilityPermissions(in output: String) throws {
-        if output.contains("does not have permission to use Accessibility") {
-            throw Error("Unable to run UI Tests because Xcode Helper does not have permission to use Accessibility. To enable UI testing, go to the Security & Privacy pane in System Preferences, select the Privacy tab, then select Accessibility, and add Xcode Helper to the list of applications allowed to use Accessibility")
-        }
-    }
-
-    func testDidFailPreflightChecks(in output: String) -> Bool {
-        output.contains("Application failed preflight checks")
-    }
-
-    func testsDidFailBootstrapping(in output: String) -> Bool {
-        output.contains("Test runner exited before starting test execution")
-    }
-
-    func testDidFailLoadingAccessibility(in output: String) -> Bool {
-        output.contains("has not loaded accessibility")
-    }
-
-    func testDidFailBecauseOfDamagedBuild(in output: String) -> Bool {
-        output.contains("The application may be damaged or incomplete")
     }
 }

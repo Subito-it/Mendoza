@@ -23,8 +23,22 @@ class TestExecuter {
 
     private let verbose: Bool
 
-    private var timer: Timer?
-    private var lastStdOutputUpdateTimeInterval: TimeInterval = 0
+    private var timerSource: DispatchSourceTimer?
+    private let timerQueue = DispatchQueue(label: "com.mendoza.stdoutTimeout")
+    private let syncQueue = DispatchQueue(label: "com.mendoza.stdoutTimeout.sync")
+    private var _lastStdOutputUpdateTimeInterval: TimeInterval = 0
+    private var lastStdOutputUpdateTimeInterval: TimeInterval {
+        get { syncQueue.sync { _lastStdOutputUpdateTimeInterval } }
+        set { syncQueue.sync { _lastStdOutputUpdateTimeInterval = newValue } }
+    }
+
+    private var _stdOutIdleTimes: [TimeInterval] = []
+    private var stdOutIdleTimes: [TimeInterval] {
+        get { syncQueue.sync { _stdOutIdleTimes } }
+        set { syncQueue.sync { _stdOutIdleTimes = newValue } }
+    }
+
+    private var didTriggerTimeout = false
 
     private var testCaseStartTimeInterval: TimeInterval = 0
     private var previewCompletionBlock: ((TestCaseResult) -> Void)?
@@ -51,9 +65,9 @@ class TestExecuter {
 
         switch XcodeProject.SDK(rawValue: building.sdk)! {
         case .ios:
-            xcodebuildDestination = "platform=iOS Simulator,id=\(testRunner.id)"
+            self.xcodebuildDestination = "platform=iOS Simulator,id=\(testRunner.id)"
         case .macos:
-            xcodebuildDestination = "platform=OS X,arch=x86_64"
+            self.xcodebuildDestination = "platform=OS X,arch=x86_64"
         }
     }
 
@@ -80,8 +94,7 @@ class TestExecuter {
         var output = ""
         var testResult: TestCaseResult?
 
-        startStdOutTimeoutHandler()
-        defer { timer?.invalidate() }
+        defer { stopStdOutTimeoutHandler() }
 
         let result = try? testWithoutBuilding(executer: executer)
         output = result?.output ?? ""
@@ -95,7 +108,7 @@ class TestExecuter {
             let startInterval: TimeInterval = CFAbsoluteTimeGetCurrent()
             let endInterval: TimeInterval = startInterval
 
-            testResult = TestCaseResult(node: node.address, runnerName: testRunner.name, runnerIdentifier: testRunner.id, xcResultPath: "", suite: testCase.suite, name: testCase.name, status: .failed, startInterval: startInterval, endInterval: endInterval)
+            testResult = TestCaseResult(node: node.address, runnerName: testRunner.name, runnerIdentifier: testRunner.id, xcResultPath: "", suite: testCase.suite, name: testCase.name, status: .failed, startInterval: startInterval, endInterval: endInterval, averageStdOutIdleTime: nil, maxStdOutIdleTime: nil)
             previewCompletionBlock(testResult!)
         }
 
@@ -103,25 +116,42 @@ class TestExecuter {
     }
 
     private func startStdOutTimeoutHandler() {
-        if let maximumStdOutIdleTime = testing.maximumStdOutIdleTime {
-            lastStdOutputUpdateTimeInterval = CFAbsoluteTimeGetCurrent()
-            timer = Timer.scheduledTimer(withTimeInterval: 10, repeats: true) { [weak self] _ in
-                guard let self = self else { return }
-                if CFAbsoluteTimeGetCurrent() - self.lastStdOutputUpdateTimeInterval > TimeInterval(maximumStdOutIdleTime) {
-                    if let simulator = self.testRunner as? Simulator, let localExecuter = try? self.executer.clone() {
-                        self.print("⏰", "no stdout updates for more than \(maximumStdOutIdleTime)s, stopping test", color: { $0.red })
+        guard let maximumStdOutIdleTime = testing.maximumStdOutIdleTime else { return }
 
-                        // Terminating the app will make the test fail
-                        let proxy = CommandLineProxy.Simulators(executer: localExecuter, verbose: self.verbose)
-                        try? proxy.terminateApp(identifier: self.building.buildBundleIdentifier, on: simulator)
-                        try? proxy.terminateApp(identifier: self.building.testBundleIdentifier, on: simulator)
-                        if self.verbose {
-                            self.print("⏰", "did terminate application", color: { $0.yellow })
-                        }
-                    }
+        lastStdOutputUpdateTimeInterval = CFAbsoluteTimeGetCurrent()
+
+        let source = DispatchSource.makeTimerSource(queue: timerQueue)
+        source.schedule(deadline: .now() + 1, repeating: 1.0)
+        source.setEventHandler { [weak self] in
+            guard let self = self, !self.didTriggerTimeout else { return }
+
+            let idleTime = CFAbsoluteTimeGetCurrent() - self.lastStdOutputUpdateTimeInterval
+            if idleTime > TimeInterval(maximumStdOutIdleTime) {
+                // Mark as triggered to prevent multiple firings
+                self.didTriggerTimeout = true
+                source.cancel()
+
+                guard let simulator = self.testRunner as? Simulator,
+                      let localExecuter = try? self.executer.clone() else { return }
+
+                self.print("⏰", "no stdout updates for more than \(maximumStdOutIdleTime)s, stopping test", color: { $0.red })
+
+                // Terminating the app will make the test fail
+                let proxy = CommandLineProxy.Simulators(executer: localExecuter, verbose: self.verbose)
+                try? proxy.terminateApp(identifier: self.building.buildBundleIdentifier, on: simulator)
+                try? proxy.terminateApp(identifier: self.building.testBundleIdentifier, on: simulator)
+                if self.verbose {
+                    self.print("⏰", "did terminate application", color: { $0.yellow })
                 }
             }
         }
+        source.resume()
+        timerSource = source
+    }
+
+    private func stopStdOutTimeoutHandler() {
+        timerSource?.cancel()
+        timerSource = nil
     }
 
     private func print(_ prefix: String, _ txt: String, color: (String) -> String = { $0.magenta }) {
@@ -144,8 +174,12 @@ private enum XcodebuildLineEvent {
     case noSpaceOnDevice
     case testTimedOut
 
-    var isTestPassed: Bool { switch self { case .testPassed: return true; default: return false } } // swiftlint:disable:this switch_case_alignment
-    var isTestCrashed: Bool { switch self { case .testCrashed: return true; default: return false } } // swiftlint:disable:this switch_case_alignment
+    var isTestPassed: Bool {
+        switch self { case .testPassed: return true; default: return false }
+    } // swiftlint:disable:this switch_case_alignment
+    var isTestCrashed: Bool {
+        switch self { case .testCrashed: return true; default: return false }
+    } // swiftlint:disable:this switch_case_alignment
 }
 
 extension TestExecuter {
@@ -166,8 +200,19 @@ extension TestExecuter {
 
         var parsedProgress = ""
         var partialProgress = ""
-        let progressHandler: ((String) -> Void) = { [unowned self] progress in
-            self.lastStdOutputUpdateTimeInterval = CFAbsoluteTimeGetCurrent()
+        let progressHandler: ((String) -> Void) = { [weak self] progress in
+            guard let self else { return }
+
+            // Only collect idle times after test has started
+            if testCaseStartTimeInterval > 0 {
+                let currentTime = CFAbsoluteTimeGetCurrent()
+                let lastUpdate = self.lastStdOutputUpdateTimeInterval
+                if lastUpdate > 0 {
+                    let idleTime = currentTime - lastUpdate
+                    self.stdOutIdleTimes.append(idleTime)
+                }
+                self.lastStdOutputUpdateTimeInterval = currentTime
+            }
 
             parsedProgress += progress
             partialProgress += progress
@@ -178,15 +223,22 @@ extension TestExecuter {
                 switch event {
                 case .testStart:
                     testCaseStartTimeInterval = CFAbsoluteTimeGetCurrent()
+                    self.startStdOutTimeoutHandler()
 
                     self.printIfVerbose("🛫", "\(testCase.description) started", color: { $0.yellow })
                 case .testPassed:
-                    let result = TestCaseResult(node: self.node.address, runnerName: self.testRunner.name, runnerIdentifier: self.testRunner.id, xcResultPath: "-", suite: self.testCase.suite, name: self.testCase.name, status: .passed, startInterval: testCaseStartTimeInterval, endInterval: CFAbsoluteTimeGetCurrent())
+                    let idleTimes = self.stdOutIdleTimes
+                    let avgIdleTime = idleTimes.isEmpty ? nil : idleTimes.reduce(0, +) / Double(idleTimes.count)
+                    let maxIdleTime = idleTimes.max()
+                    let result = TestCaseResult(node: self.node.address, runnerName: self.testRunner.name, runnerIdentifier: self.testRunner.id, xcResultPath: "-", suite: self.testCase.suite, name: self.testCase.name, status: .passed, startInterval: testCaseStartTimeInterval, endInterval: CFAbsoluteTimeGetCurrent(), averageStdOutIdleTime: avgIdleTime, maxStdOutIdleTime: maxIdleTime)
                     previewCompletionBlock?(result); previewCompletionBlock = nil // call preview at most once
 
                     testCaseResult = result
                 case .testFailed, .testCrashed, .testTimedOut:
-                    let result = TestCaseResult(node: self.node.address, runnerName: self.testRunner.name, runnerIdentifier: self.testRunner.id, xcResultPath: "-", suite: self.testCase.suite, name: self.testCase.name, status: .failed, startInterval: testCaseStartTimeInterval, endInterval: CFAbsoluteTimeGetCurrent())
+                    let idleTimes = self.stdOutIdleTimes
+                    let avgIdleTime = idleTimes.isEmpty ? nil : idleTimes.reduce(0, +) / Double(idleTimes.count)
+                    let maxIdleTime = idleTimes.max()
+                    let result = TestCaseResult(node: self.node.address, runnerName: self.testRunner.name, runnerIdentifier: self.testRunner.id, xcResultPath: "-", suite: self.testCase.suite, name: self.testCase.name, status: .failed, startInterval: testCaseStartTimeInterval, endInterval: CFAbsoluteTimeGetCurrent(), averageStdOutIdleTime: avgIdleTime, maxStdOutIdleTime: maxIdleTime)
                     previewCompletionBlock?(result); previewCompletionBlock = nil // call preview at most once
 
                     testCaseResult = result
