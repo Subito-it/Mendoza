@@ -60,6 +60,7 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
                 for nodeSimulator in nodeSimulators {
                     try rebootRequired.append(proxy.updateLanguage(on: nodeSimulator, language: self.device.language, locale: self.device.locale))
                     try rebootRequired.append(proxy.increaseWatchdogExceptionTimeout(on: nodeSimulator, appBundleIndentifier: self.buildBundleIdentifier, testBundleIdentifier: self.testBundleIdentifier))
+                    try rebootRequired.append(proxy.disablePasswordAutofill(on: nodeSimulator))
                 }
 
                 if rebootRequired.contains(true) || self.alwaysRebootSimulators {
@@ -134,7 +135,6 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
                 queueProxy.disableSlideToType(on: simulator)
                 queueProxy.disableMultilingualKeyboardTip(on: simulator)
                 queueProxy.disableSafariMenuOnboarding(on: simulator)
-                _ = try? queueProxy.disablePasswordAutofill(on: simulator)
 
                 #if DEBUG
                     Swift.print("Booted \(simulator.id)")

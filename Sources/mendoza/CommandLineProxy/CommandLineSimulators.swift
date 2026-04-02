@@ -124,16 +124,20 @@ extension CommandLineProxy {
         }
 
         private func updatePasswordAutofill(on simulator: Simulator, enabled: Bool) throws -> Bool {
-            let paths = [
+            let configProfilePaths = [
                 "~/Library/Developer/CoreSimulator/Devices/\(simulator.id)/data/Containers/Shared/SystemGroup/systemgroup.com.apple.configurationprofiles/Library/ConfigurationProfiles/UserSettings.plist",
                 "~/Library/Developer/CoreSimulator/Devices/\(simulator.id)/data/Library/UserConfigurationProfiles/EffectiveUserSettings.plist",
                 "~/Library/Developer/CoreSimulator/Devices/\(simulator.id)/data/Library/UserConfigurationProfiles/PublicInfo/PublicEffectiveUserSettings.plist",
             ]
 
             var updates = [Bool]()
-            for path in paths {
+            for path in configProfilePaths {
                 try updates.append(updatePlistIfNeeded(path: path, key: "restrictedBool.allowPasswordAutoFill.value", value: enabled))
+                try updates.append(updatePlistIfNeeded(path: path, key: "restrictedBool.allowPasswordAutoFill.ask", value: false))
             }
+
+            let webUIPath = "~/Library/Developer/CoreSimulator/Devices/\(simulator.id)/data/Library/Preferences/com.apple.WebUI.plist"
+            try updates.append(updatePlistIfNeeded(path: webUIPath, key: "AutoFillPasswords", value: enabled))
 
             return updates.contains(true)
         }
