@@ -457,9 +457,18 @@ extension CommandLineProxy {
             return false
         }
 
+        private func createPlistIfNeeded(path: String) throws {
+            let exists = try executer.execute("ls '\(path)' &>/dev/null && echo 'yes' || echo 'no'")
+            if exists == "no" {
+                _ = try executer.execute("mkdir -p \"$(dirname '\(path)')\" && plutil -create xml1 '\(path)'")
+            }
+        }
+
         private func updatePlistIfNeeded(path: String, key: String, value: Bool) throws -> Bool {
             if try executer.execute("ls '\(path)' &>/dev/null && plutil -extract \(key) raw '\(path)' || true") != (value ? "true" : "false") {
-                _ = try? executer.execute("plutil -replace \(key) -bool \(value ? "YES" : "NO") '\(path)'")
+                try createPlistIfNeeded(path: path)
+                try createIntermediateKeysIfNeeded(path: path, key: key)
+                _ = try executer.execute("plutil -replace \(key) -bool \(value ? "YES" : "NO") '\(path)'")
                 return true
             }
 
@@ -468,11 +477,31 @@ extension CommandLineProxy {
 
         private func updatePlistIfNeeded(path: String, key: String, value: Int) throws -> Bool {
             if try executer.execute("ls '\(path)' &>/dev/null && plutil -extract \(key) raw '\(path)' || true") != value.description {
-                _ = try? executer.execute("plutil -replace \(key) -integer \(value.description) '\(path)'")
+                try createPlistIfNeeded(path: path)
+                try createIntermediateKeysIfNeeded(path: path, key: key)
+                _ = try executer.execute("plutil -replace \(key) -integer \(value.description) '\(path)'")
                 return true
             }
 
             return false
+        }
+
+        private func createIntermediateKeysIfNeeded(path: String, key: String) throws {
+            let components = key.components(separatedBy: ".")
+            guard components.count > 1 else { return }
+
+            var currentKey = ""
+            for component in components.dropLast() {
+                if currentKey.isEmpty {
+                    currentKey = component
+                } else {
+                    currentKey += ".\(component)"
+                }
+                let exists = try executer.execute("plutil -extract \(currentKey) raw '\(path)' &>/dev/null && echo 'yes' || echo 'no'")
+                if exists == "no" {
+                    _ = try executer.execute("plutil -insert \(currentKey) -dictionary '\(path)'")
+                }
+            }
         }
     }
 }
