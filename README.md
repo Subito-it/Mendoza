@@ -234,6 +234,10 @@ It is suggested that nodes are configured as follows:
 
 Set `MaxSessions` to 200 in /etc/ssh/sshd_config. You can check how many sessions are used by running `sudo lsof -nPiTCP:22 -sTCP:ESTABLISHED | grep mendoza | wc -l`
 
+## SSH MaxStartups
+
+Set `MaxStartups` to `200:30:300` in /etc/ssh/sshd_config (it is commented out by default, which leaves the low default of `10:30:100`). This is critical on the result destination node: during a run every test node opens a fresh SSH connection to it for each result transfer, and bursts of completing tests can briefly exceed the default unauthenticated-connection limit. When that happens sshd randomly drops connections, silently failing those transfers. Remember to restart sshd after changing the config.
+
 ## Increase maxfiles
 
 `launchctl limit maxfiles 64000 524288`
