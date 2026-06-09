@@ -24,7 +24,8 @@ class TestCaseExecutor {
     private let addLogger: (ExecuterLogger) -> Void
 
     private let asyncLoggersQueue = DispatchQueue(label: "com.subito.mendoza.testCaseExecutor.asyncLoggers")
-    private var asyncLoggers = [String: ExecuterLogger]()
+    private var idleAsyncLoggers = [String: [ExecuterLogger]]()
+    private var asyncLoggerCounts = [String: Int]()
 
     init(
         configuration: Configuration,
@@ -192,32 +193,45 @@ class TestCaseExecutor {
     ) {
         guard let groupExecuter = try? executer.clone() else { return }
 
-        // Up to maxConcurrentOperations post-execution operations run concurrently per
-        // runner. Each would otherwise create its own logger sharing the same "-async"
-        // filename and clobber the others on dump, hiding e.g. failed transfer
-        // exceptions. Reuse a single logger per runner instead; appends are thread-safe.
+        // A logger records strictly alternating start/end events and crashes on dump
+        // if a second operation appends while one is in flight. So each concurrently
+        // running post-execution operation needs its own logger object. To avoid two
+        // loggers sharing a filename (which clobber each other on dump) we hand out
+        // distinct, indexed names and recycle them via a checkout/checkin pool: file
+        // count stays bounded to the actual concurrency instead of one per test case.
+        let baseName = (executer.logger?.name ?? "") + "-async"
         let address = executer.logger?.address ?? ""
-        let loggerName = (executer.logger?.name ?? "") + "-async"
-        let logger = asyncLoggersQueue.sync { () -> ExecuterLogger in
-            if let existing = asyncLoggers[loggerName] {
-                return existing
-            }
-            let created = ExecuterLogger(name: loggerName, address: address)
-            asyncLoggers[loggerName] = created
-            // Register only on creation; re-adding the same object would make
-            // addLogger prefix its logs onto itself, duplicating every entry.
-            addLogger(created)
-            return created
-        }
+        let logger = checkoutAsyncLogger(baseName: baseName, address: address)
         groupExecuter.logger = logger
 
-        postExecutionQueue.addOperation { [postExecutionHandler] in
+        postExecutionQueue.addOperation { [postExecutionHandler, weak self] in
             postExecutionHandler.process(
                 executer: groupExecuter,
                 testRunner: testRunner,
                 testCaseResult: testCaseResult,
                 individualCoverageFile: individualCoverageFile
             )
+            self?.checkinAsyncLogger(logger, baseName: baseName)
+        }
+    }
+
+    private func checkoutAsyncLogger(baseName: String, address: String) -> ExecuterLogger {
+        asyncLoggersQueue.sync {
+            if let reused = idleAsyncLoggers[baseName]?.popLast() {
+                return reused
+            }
+            let index = asyncLoggerCounts[baseName, default: 0] + 1
+            asyncLoggerCounts[baseName] = index
+            let name = index == 1 ? baseName : "\(baseName)-\(index)"
+            let logger = ExecuterLogger(name: name, address: address)
+            addLogger(logger)
+            return logger
+        }
+    }
+
+    private func checkinAsyncLogger(_ logger: ExecuterLogger, baseName: String) {
+        asyncLoggersQueue.sync {
+            idleAsyncLoggers[baseName, default: []].append(logger)
         }
     }
 }
