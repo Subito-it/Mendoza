@@ -23,6 +23,9 @@ class TestCaseExecutor {
     private let postExecutionQueue: ThreadQueue
     private let addLogger: (ExecuterLogger) -> Void
 
+    private let asyncLoggersQueue = DispatchQueue(label: "com.subito.mendoza.testCaseExecutor.asyncLoggers")
+    private var asyncLoggers = [String: ExecuterLogger]()
+
     init(
         configuration: Configuration,
         testExecuterBuilder: @escaping TestExecuterBuilder,
@@ -189,9 +192,24 @@ class TestCaseExecutor {
     ) {
         guard let groupExecuter = try? executer.clone() else { return }
 
-        let logger = ExecuterLogger(name: (executer.logger?.name ?? "") + "-async", address: executer.logger?.address ?? "")
+        // Up to maxConcurrentOperations post-execution operations run concurrently per
+        // runner. Each would otherwise create its own logger sharing the same "-async"
+        // filename and clobber the others on dump, hiding e.g. failed transfer
+        // exceptions. Reuse a single logger per runner instead; appends are thread-safe.
+        let address = executer.logger?.address ?? ""
+        let loggerName = (executer.logger?.name ?? "") + "-async"
+        let logger = asyncLoggersQueue.sync { () -> ExecuterLogger in
+            if let existing = asyncLoggers[loggerName] {
+                return existing
+            }
+            let created = ExecuterLogger(name: loggerName, address: address)
+            asyncLoggers[loggerName] = created
+            // Register only on creation; re-adding the same object would make
+            // addLogger prefix its logs onto itself, duplicating every entry.
+            addLogger(created)
+            return created
+        }
         groupExecuter.logger = logger
-        addLogger(logger)
 
         postExecutionQueue.addOperation { [postExecutionHandler] in
             postExecutionHandler.process(
