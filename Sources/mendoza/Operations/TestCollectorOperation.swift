@@ -36,6 +36,15 @@ class TestCollectorOperation: BaseOperation<[TestCaseResult]> {
             try pool.execute { [unowned self] executer, source in
                 guard testNodes.contains(source.node.address) else { return }
 
+                // Sweep up any xcresult that failed to transfer during the test run.
+                // PostExecutionHandler rsyncs each result to the destination as tests
+                // finish, but keeps the local copy when that transfer fails. Those
+                // leftovers live under Path.results/<runnerId>/; copying the whole tree
+                // preserves the <runnerId>/<basename> layout the merge/rename logic below
+                // matches against.
+                let resultsPath = "\(Path.results.rawValue)/"
+                try executer.rsync(sourcePath: resultsPath, destinationPath: destinationPath, on: destinationNode)
+
                 // Copy code coverage files
                 let logPath = "\(Path.logs.rawValue)/*"
                 try executer.rsync(sourcePath: logPath, destinationPath: destinationPath, include: ["*/", "*.profdata"], exclude: ["*"], on: destinationNode)

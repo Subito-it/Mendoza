@@ -33,9 +33,15 @@ class PostExecutionHandler {
         let destinationNode = configuration.resultDestination.node
         let runnerDestinationPath = "\(destinationPath)/\(testRunner.id)"
 
-        // Sync xcresult to destination node
-        try? executer.rsync(sourcePath: xcResultPath, destinationPath: runnerDestinationPath, on: destinationNode)
-        _ = try? executer.execute("rm -rf '\(xcResultPath)'")
+        // Sync xcresult to destination node. Only delete the local copy once the
+        // transfer succeeds: the destination's sshd can drop connections under load,
+        // and deleting unconditionally would lose the only remaining copy.
+        do {
+            try executer.rsync(sourcePath: xcResultPath, destinationPath: runnerDestinationPath, on: destinationNode)
+            _ = try? executer.execute("rm -rf '\(xcResultPath)'")
+        } catch {
+            executer.logger?.log(exception: "Failed to sync xcresult '\(xcResultPath)' to destination, keeping local copy. Error: \(error.localizedDescription)")
+        }
 
         // Generate individual test coverage if enabled
         generateIndividualCoverage(
