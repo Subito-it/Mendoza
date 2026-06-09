@@ -25,7 +25,10 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
     private let resultHandler: TestResultHandler
     private let testCaseExecutor: TestCaseExecutor
     private let diagnosticReporter: DiagnosticReporter
-    private let postExecutionQueue = ThreadQueue()
+    // Bounded so the per-test result transfers don't open an unbounded burst of
+    // SSH connections to the single result destination, which can exceed its sshd
+    // MaxStartups limit and cause transfers to be silently dropped.
+    private let postExecutionQueue = ThreadQueue(maxConcurrentOperations: 8)
 
     private lazy var pool: ConnectionPool<TestRunner> = {
         guard let sortedTestCases = sortedTestCases else { fatalError("💣 Required field `distributedTestCases` not set") }
