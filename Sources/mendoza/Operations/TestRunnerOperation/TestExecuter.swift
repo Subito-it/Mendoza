@@ -43,6 +43,13 @@ class TestExecuter {
     private var testCaseStartTimeInterval: TimeInterval = 0
     private var previewCompletionBlock: ((TestCaseResult) -> Void)?
 
+    /// True once the test method actually started executing (a `Test Case ... started` line was
+    /// parsed). Distinguishes a genuine test failure from a simulator-level launch failure where
+    /// the test never ran. Only valid to read after `launch(...)` returns.
+    var didStartTest: Bool {
+        testCaseStartTimeInterval > 0
+    }
+
     init(executer: Executer,
          testCase: TestCase,
          testTarget: String,
@@ -51,8 +58,7 @@ class TestExecuter {
          node: Node,
          testRunner: TestRunner,
          runnerIndex: Int,
-         verbose: Bool)
-    {
+         verbose: Bool) {
         self.executer = executer
         self.testCase = testCase
         self.testTarget = testTarget

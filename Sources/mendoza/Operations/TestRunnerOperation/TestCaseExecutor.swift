@@ -13,6 +13,16 @@ class TestCaseExecutor {
     typealias TestExecuterBuilder = (Executer, TestCase, Node, TestRunner, Int) -> TestExecuter
     typealias PreviewHandler = (TestCaseResult) -> Void
 
+    /// Outcome of a single test case execution.
+    struct Outcome {
+        /// The test case result, or nil if execution produced no result.
+        let result: TestCaseResult?
+        /// True when the simulator failed to launch the test runner and the test never started,
+        /// meaning the simulator itself is wedged rather than the test failing. The runner should
+        /// take the simulator out of rotation (quarantine) instead of feeding it more tests.
+        let requiresQuarantine: Bool
+    }
+
     private let configuration: Configuration
     private let testExecuterBuilder: TestExecuterBuilder
     private let xcResultHandler: XCResultHandler
@@ -57,7 +67,7 @@ class TestCaseExecutor {
     ///   - testRunner: The test runner (simulator) to use
     ///   - runnerIndex: Index of the runner for logging
     ///   - previewHandler: Callback invoked when test result is available (before xcresult finalized)
-    /// - Returns: The test case result, or nil if execution failed without producing a result
+    /// - Returns: The execution outcome, including the test result and whether it was an infrastructure failure
     func execute(
         testCase: TestCase,
         executer: Executer,
@@ -65,8 +75,9 @@ class TestCaseExecutor {
         testRunner: TestRunner,
         runnerIndex: Int,
         previewHandler: @escaping PreviewHandler
-    ) throws -> TestCaseResult? {
+    ) throws -> Outcome {
         var testCaseResult: TestCaseResult?
+        var requiresQuarantine = false
 
         try autoreleasepool {
             // Clean up previous test results
@@ -80,7 +91,11 @@ class TestCaseExecutor {
             }
 
             // Analyze output for failures
-            try handleOutputAnalysis(xcodebuildOutput: xcodebuildOutput, executer: executer, testRunner: testRunner)
+            let analysis = try handleOutputAnalysis(xcodebuildOutput: xcodebuildOutput, executer: executer, testRunner: testRunner)
+
+            // A launch-level failure combined with the test never starting means the simulator
+            // itself is wedged, not the test. Signal the runner to quarantine it.
+            requiresQuarantine = analysis.isInfrastructureLaunchFailure && !testExecuter.didStartTest
 
             // Handle xcresult
             testCaseResult = try handleXCResult(
@@ -107,12 +122,13 @@ class TestCaseExecutor {
             )
         }
 
-        return testCaseResult
+        return Outcome(result: testCaseResult, requiresQuarantine: requiresQuarantine)
     }
 
     // MARK: - Private
 
-    private func handleOutputAnalysis(xcodebuildOutput: String, executer: Executer, testRunner: TestRunner) throws {
+    @discardableResult
+    private func handleOutputAnalysis(xcodebuildOutput: String, executer: Executer, testRunner: TestRunner) throws -> OutputAnalyzer.FailureAnalysis {
         let analysis = outputAnalyzer.analyze(xcodebuildOutput)
 
         if analysis.failedLoadingAccessibility {
@@ -132,6 +148,8 @@ class TestCaseExecutor {
         if analysis.damagedBuild {
             try simulatorRecovery.handleDamagedBuild(executer: executer)
         }
+
+        return analysis
     }
 
     private func handleXCResult(

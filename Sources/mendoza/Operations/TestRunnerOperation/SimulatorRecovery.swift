@@ -26,6 +26,25 @@ class SimulatorRecovery {
         try? proxy.shutdown(simulator: simulator)
     }
 
+    /// Boot a simulator back up after it was shut down for quarantine, waiting synchronously until
+    /// it is ready. The simulator is never erased, so the configuration applied during setup
+    /// (locale, keyboard, permissions, ...) is preserved.
+    /// - Returns: true if the simulator was booted back successfully
+    @discardableResult
+    func boot(executer: Executer, testRunner: TestRunner) -> Bool {
+        guard let simulatorExecuter = try? executer.clone() else { return false }
+
+        let proxy = CommandLineProxy.Simulators(executer: simulatorExecuter, verbose: verbose)
+        let simulator = Simulator(id: testRunner.id, name: "Simulator", device: Device.defaultInit())
+
+        do {
+            try proxy.bootSynchronously(simulator: simulator)
+            return true
+        } catch {
+            return false
+        }
+    }
+
     /// Handle damaged build scenario
     /// - Returns: An error if the build folder was damaged and cleaned up
     func handleDamagedBuild(executer: Executer) throws {
