@@ -108,6 +108,8 @@ class ExecuterLogger: Logger, CustomDebugStringConvertible {
     }
 
     func redact(_ input: String) -> String {
+        let ignoreList = syncQueue.sync { self.ignoreList }
+
         var result = input
         for redact in ignoreList {
             result = result.replacingOccurrences(of: redact, with: "~redacted~")
