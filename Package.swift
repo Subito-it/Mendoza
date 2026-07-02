@@ -31,5 +31,9 @@ let package = Package(
                 .product(name: "SourceKittenFramework", package: "SourceKitten"),
             ]
         ),
+        .testTarget(
+            name: "mendozaTests",
+            dependencies: ["mendoza"]
+        ),
     ]
 )

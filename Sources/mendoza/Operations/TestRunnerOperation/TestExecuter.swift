@@ -20,6 +20,7 @@ class TestExecuter {
     private let building: Configuration.Building
     private let testing: Configuration.Testing
     private let xcodebuildDestination: String
+    private let outputParser: XcodebuildOutputParser
 
     private let verbose: Bool
 
@@ -68,6 +69,7 @@ class TestExecuter {
         self.node = node
         self.runnerIndex = runnerIndex
         self.verbose = verbose
+        self.outputParser = XcodebuildOutputParser(testTarget: testTarget)
 
         switch XcodeProject.SDK(rawValue: building.sdk)! {
         case .ios:
@@ -172,22 +174,6 @@ class TestExecuter {
     }
 }
 
-private enum XcodebuildLineEvent {
-    case testStart
-    case testPassed(duration: Double)
-    case testFailed(duration: Double)
-    case testCrashed
-    case noSpaceOnDevice
-    case testTimedOut
-
-    var isTestPassed: Bool {
-        switch self { case .testPassed: return true; default: return false }
-    } // swiftlint:disable:this switch_case_alignment
-    var isTestCrashed: Bool {
-        switch self { case .testCrashed: return true; default: return false }
-    } // swiftlint:disable:this switch_case_alignment
-}
-
 extension TestExecuter {
     private func findTestRun(executer: Executer) throws -> String {
         let testBundlePath = Path.testBundle.rawValue
@@ -223,11 +209,15 @@ extension TestExecuter {
             parsedProgress += progress
             partialProgress += progress
             let lines = partialProgress.components(separatedBy: "\n")
-            let events = lines.compactMap(self.parseXcodebuildOutput)
+            let events = lines.compactMap(self.outputParser.event)
 
             for event in events {
                 switch event {
-                case .testStart:
+                case let .testStart(startedTestCase):
+                    if startedTestCase.name != testCase.name || startedTestCase.suite != testCase.suite {
+                        fatalError("Unexpected test case found! Got \(startedTestCase) expected \(testCase)")
+                    }
+
                     testCaseStartTimeInterval = CFAbsoluteTimeGetCurrent()
                     self.startStdOutTimeoutHandler()
 
@@ -280,80 +270,6 @@ extension TestExecuter {
         }
 
         return #"$(xcode-select -p)/usr/bin/xcodebuild -parallel-testing-enabled NO -disable-concurrent-destination-testing -xctestrun '\#(testRun)' -destination '\#(xcodebuildDestination)' -derivedDataPath '\#(destinationPath)' \#(onlyTesting) -enableCodeCoverage YES -destination-timeout 60 -test-timeouts-enabled YES \#(maxAllowedTestExecutionTimeParameter) test-without-building 2>&1 || true"#
-    }
-
-    private func parseXcodebuildOutput(line: String) -> XcodebuildLineEvent? {
-        let testResultCrashMarker1 = #"Restarting after unexpected exit or crash in (.*)/(.*)\(\)"#
-        let testResultCrashMarker2 = #"\s+(.*)\(\) encountered an error \(Crash:"#
-        let testResultCrashMarker3 = #"Checking for crash reports corresponding to unexpected termination of"#
-        let testResultCrashMarker4 = #"Restarting after unexpected exit, crash, or test timeout in (.*)\.(.*)\(\)"#
-        let testResultTimeoutMarker1 = #"\s+(.*)\(\) encountered an error \(Test runner exited"# // Should be caused by the force reset of simulator
-        let testResultFailureMarker1 = #"^(Testing failed:)$"#
-
-        let testTarget = self.testTarget.replacingOccurrences(of: " ", with: "_")
-
-        let startRegex = #"Test Case '-\[\#(testTarget)\.(.*)\]' started"#
-
-        if line.contains(##"Code=28 "No space left on device""##) {
-            return .noSpaceOnDevice
-        }
-
-        if let tests = try? line.capturedGroups(withRegexString: startRegex), tests.count == 1 {
-            let testCaseName = tests[0].components(separatedBy: " ").last ?? ""
-            let testCaseSuite = tests[0].components(separatedBy: " ").first ?? ""
-
-            let startedTestCase = TestCase(name: testCaseName, suite: testCaseSuite)
-
-            if startedTestCase.name != testCase.name || startedTestCase.suite != testCase.suite {
-                fatalError("Unexpected test case found! Got \(startedTestCase) expected \(testCase)")
-            }
-
-            return .testStart
-        }
-
-        let passFailRegex = #"Test Case '-\[\#(testTarget)\.(.*)\]' (passed|failed|skipped) \((.*) seconds\)"#
-        if let tests = try? line.capturedGroups(withRegexString: passFailRegex), tests.count == 3 {
-            let duration = Double(tests[2]) ?? -1
-
-            if ["skipped", "passed"].contains(tests[1]) {
-                return .testPassed(duration: duration)
-            } else if tests[1] == "failed" {
-                return .testFailed(duration: duration)
-            } else {
-                fatalError("Unexpected test result \(tests[1]). Expecting either 'passed' or 'failed'")
-            }
-        }
-
-        let timeoutRegex = #"Test Case '-\[\#(testTarget)\.(.*)\]' exceeded execution time allowance"#
-        if let tests = try? line.capturedGroups(withRegexString: timeoutRegex), tests.count == 1 {
-            return .testTimedOut
-        }
-
-        if let tests = try? line.capturedGroups(withRegexString: testResultCrashMarker1), tests.count == 2 {
-            return .testCrashed
-        }
-
-        if let tests = try? line.capturedGroups(withRegexString: testResultCrashMarker2), tests.count == 1 {
-            return .testCrashed
-        }
-
-        if line.contains(testResultCrashMarker3) {
-            return .testCrashed
-        }
-
-        if let tests = try? line.capturedGroups(withRegexString: testResultCrashMarker4), tests.count == 2 {
-            return .testCrashed
-        }
-
-        if let tests = try? line.capturedGroups(withRegexString: testResultTimeoutMarker1), tests.count == 1 {
-            return .testFailed(duration: -1)
-        }
-
-        if let tests = try? line.capturedGroups(withRegexString: testResultFailureMarker1), tests.count == 1 {
-            return .testFailed(duration: -1)
-        }
-
-        return nil
     }
 
     private func shouldIgnoreTestExecutionError(_ error: Error) -> Bool {
