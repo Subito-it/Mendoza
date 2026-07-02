@@ -189,5 +189,4 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
 
         return false
     }
-
 }
