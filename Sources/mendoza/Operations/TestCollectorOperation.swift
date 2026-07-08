@@ -81,7 +81,7 @@ class TestCollectorOperation: BaseOperation<[TestCaseResult]> {
                     testCaseResults[index].xcResultPath = Environment.xcresultFilename
                 }
             } else {
-                let results = try executer.execute("find '\(destinationPath)' -type d -name '*.xcresult'").components(separatedBy: "\n")
+                let results = try executer.execute("find '\(destinationPath)' -type d -name '*.xcresult'").components(separatedBy: "\n").filter { !$0.isEmpty }
 
                 let lastTwoPathComponents: (String) -> String = { path in
                     let components = path.components(separatedBy: "/")
@@ -136,7 +136,7 @@ class TestCollectorOperation: BaseOperation<[TestCaseResult]> {
         let mergedDestinationPath = "\(destinationPath)/\(destinationName)"
 
         let executer = try destinationNode.makeExecuter(logger: logger, environment: nodesEnvironment[destinationNode.address] ?? [:])
-        let sourcePaths = try executer.execute("find \(destinationPath) -type d -name '*.xcresult'").components(separatedBy: "\n")
+        let sourcePaths = try executer.execute("find \(destinationPath) -type d -name '*.xcresult'").components(separatedBy: "\n").filter { !$0.isEmpty }
 
         let mergeCmd: (_ sourcePaths: [String], _ destinationPath: String) -> String = { "xcrun xcresulttool merge " + $0.map { "'\($0)'" }.joined(separator: " ") + " --output-path '\($1)' 2>/dev/null" }
 

@@ -174,7 +174,10 @@ extension TearDownOperation {
         guard let git = git else { return }
 
         let uniqueUrl = Path.temp.url.appendingPathComponent("\(UUID().uuidString).plist")
-        try executer.download(remotePath: infoPlistPath, localUrl: uniqueUrl)
+        // When every test fails at the launch/infrastructure level xcodebuild produces no
+        // .xcresult, so no merged bundle (and no Info.plist) exists to annotate. Skip quietly
+        // instead of aborting teardown.
+        guard (try? executer.download(remotePath: infoPlistPath, localUrl: uniqueUrl)) != nil else { return }
 
         guard let data = try? Data(contentsOf: uniqueUrl) else { return }
 
