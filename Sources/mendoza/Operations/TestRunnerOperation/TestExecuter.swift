@@ -161,6 +161,11 @@ class TestExecuter {
         timerSource = source
     }
 
+    /// Disarm the stdout watchdog. Must be called as soon as the test verdict is known: after that
+    /// point xcodebuild is in its post-test phase (finalizing the xcresult, collecting simulator
+    /// diagnostics) where stdout is legitimately silent for far longer than `maximumStdOutIdleTime`.
+    /// Terminating the test runner host during that phase breaks xcodebuild's diagnostics collection,
+    /// which then blocks for its own 600s timeout while holding the runner slot.
     private func stopStdOutTimeoutHandler() {
         timerSource?.cancel()
         timerSource = nil
@@ -227,6 +232,8 @@ extension TestExecuter {
 
                     self.printIfVerbose("🛫", "\(testCase.description) started", color: { $0.yellow })
                 case .testPassed:
+                    self.stopStdOutTimeoutHandler()
+
                     let idleTimes = self.stdOutIdleTimes
                     let avgIdleTime = idleTimes.isEmpty ? nil : idleTimes.reduce(0, +) / Double(idleTimes.count)
                     let maxIdleTime = idleTimes.max()
@@ -235,6 +242,8 @@ extension TestExecuter {
 
                     testCaseResult = result
                 case .testFailed, .testCrashed, .testTimedOut:
+                    self.stopStdOutTimeoutHandler()
+
                     let idleTimes = self.stdOutIdleTimes
                     let avgIdleTime = idleTimes.isEmpty ? nil : idleTimes.reduce(0, +) / Double(idleTimes.count)
                     let maxIdleTime = idleTimes.max()
