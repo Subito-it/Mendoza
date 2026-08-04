@@ -39,7 +39,11 @@ class TestExecuter {
         set { syncQueue.sync { _stdOutIdleTimes = newValue } }
     }
 
-    private var didTriggerTimeout = false
+    private var _didTriggerTimeout = false
+    private var didTriggerTimeout: Bool {
+        get { syncQueue.sync { _didTriggerTimeout } }
+        set { syncQueue.sync { _didTriggerTimeout = newValue } }
+    }
 
     private var testCaseStartTimeInterval: TimeInterval = 0
     private var previewCompletionBlock: ((TestCaseResult) -> Void)?
