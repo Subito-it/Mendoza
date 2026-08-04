@@ -112,6 +112,13 @@ class TestExecuter {
         output = result?.output ?? ""
         testResult = result?.testCaseResult
 
+        // Logged only now that xcodebuild has returned: ExecuterLogger expects strictly alternating
+        // start/end events, so appending an exception while the command is still in flight would
+        // break the pairing when the log is written out.
+        if didTriggerTimeout {
+            executer.logger?.log(exception: "no stdout updates for more than \(testing.maximumStdOutIdleTime ?? 0)s, terminated app on \(testRunner.name)")
+        }
+
         if testResult == nil {
             if verbose {
                 print("🚨", "No test case result for \(testCase.suite)/\(testCase.name)!".red)
