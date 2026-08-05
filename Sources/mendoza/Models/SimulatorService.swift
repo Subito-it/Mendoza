@@ -117,19 +117,30 @@ enum SimulatorServiceCatalog {
         let serviceIDs = services.map(\.id).sorted().joined(separator: ", ")
         return "Groups: \(groupIDs). Services: \(serviceIDs)"
     }
-}
 
-/// Computes the transitions needed to move a simulator from its currently disabled
-/// set to the desired one, scoped to the managed allowlist in both directions.
-///
-/// - Parameters:
-///   - current: labels currently disabled on the device (as read from launchd).
-///   - desired: labels that should end up disabled.
-/// - Returns: labels to disable (want off, is on) and to enable (is off, want on),
-///   both filtered to the managed allowlist and sorted for determinism.
-func serviceDelta(current: Set<String>, desired: Set<String>) -> (toDisable: [String], toEnable: [String]) {
-    let managed = SimulatorServiceCatalog.managed
-    let toDisable = desired.intersection(managed).subtracting(current).sorted()
-    let toEnable = current.intersection(managed).subtracting(desired).sorted()
-    return (toDisable: toDisable, toEnable: toEnable)
+    /// The transitions needed to move a simulator from its currently disabled set to
+    /// the desired one.
+    struct Delta: Equatable {
+        let toDisable: [String]
+        let toEnable: [String]
+
+        var isEmpty: Bool {
+            toDisable.isEmpty && toEnable.isEmpty
+        }
+    }
+
+    /// Computes the delta between the observed disabled set and the desired one, scoped
+    /// to the managed allowlist in both directions: a desired label outside the
+    /// allowlist is never disabled, and an unmanaged label that is already disabled is
+    /// left alone.
+    ///
+    /// - Parameters:
+    ///   - current: labels currently disabled on the device (as read from launchd).
+    ///   - desired: labels that should end up disabled.
+    /// - Returns: labels to disable (want off, is on) and to enable (is off, want on),
+    ///   sorted for determinism.
+    static func delta(current: Set<String>, desired: Set<String>) -> Delta {
+        Delta(toDisable: desired.intersection(managed).subtracting(current).sorted(),
+              toEnable: current.intersection(managed).subtracting(desired).sorted())
+    }
 }

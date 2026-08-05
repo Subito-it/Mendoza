@@ -111,27 +111,33 @@ final class SimulatorServiceTests: XCTestCase {
     }
 
     func testDeltaStockToDesiredDisablesRequested() {
-        let delta = serviceDelta(current: [], desired: ["com.apple.apsd", "com.apple.assistantd"])
+        let delta = SimulatorServiceCatalog.delta(current: [], desired: ["com.apple.apsd", "com.apple.assistantd"])
         XCTAssertEqual(delta.toDisable, ["com.apple.apsd", "com.apple.assistantd"])
         XCTAssertEqual(delta.toEnable, [])
     }
 
     func testDeltaReenablesManagedLabelNoLongerDesired() {
-        let delta = serviceDelta(current: ["com.apple.apsd", "com.apple.assistantd"], desired: ["com.apple.apsd"])
+        let delta = SimulatorServiceCatalog.delta(current: ["com.apple.apsd", "com.apple.assistantd"], desired: ["com.apple.apsd"])
         XCTAssertEqual(delta.toDisable, [])
         XCTAssertEqual(delta.toEnable, ["com.apple.assistantd"])
     }
 
     func testDeltaNoOpWhenConverged() {
-        let delta = serviceDelta(current: ["com.apple.apsd"], desired: ["com.apple.apsd"])
+        let delta = SimulatorServiceCatalog.delta(current: ["com.apple.apsd"], desired: ["com.apple.apsd"])
         XCTAssertEqual(delta.toDisable, [])
         XCTAssertEqual(delta.toEnable, [])
+        XCTAssertTrue(delta.isEmpty)
+    }
+
+    func testDeltaIsNotEmptyWhenATransitionIsNeeded() {
+        XCTAssertFalse(SimulatorServiceCatalog.delta(current: [], desired: ["com.apple.apsd"]).isEmpty)
+        XCTAssertFalse(SimulatorServiceCatalog.delta(current: ["com.apple.apsd"], desired: []).isEmpty)
     }
 
     func testDeltaIgnoresUnmanagedLabelsBothDirections() {
         // An unmanaged label that is disabled must not be re-enabled, and an
         // unmanaged desired label must not be disabled.
-        let delta = serviceDelta(current: ["com.apple.somethingelse"], desired: ["com.apple.anotherunmanaged"])
+        let delta = SimulatorServiceCatalog.delta(current: ["com.apple.somethingelse"], desired: ["com.apple.anotherunmanaged"])
         XCTAssertEqual(delta.toDisable, [])
         XCTAssertEqual(delta.toEnable, [])
     }

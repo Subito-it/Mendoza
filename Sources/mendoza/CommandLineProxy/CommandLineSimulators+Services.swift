@@ -55,9 +55,9 @@ extension CommandLineProxy.Simulators {
         }
 
         let current = try readDisabledServices(on: simulator)
-        let delta = serviceDelta(current: current, desired: desired)
+        let delta = SimulatorServiceCatalog.delta(current: current, desired: desired)
 
-        guard !delta.toDisable.isEmpty || !delta.toEnable.isEmpty else {
+        guard !delta.isEmpty else {
             return false
         }
 
@@ -74,7 +74,7 @@ extension CommandLineProxy.Simulators {
         try bootSynchronously(simulator: simulator)
 
         let afterReboot = try readDisabledServices(on: simulator)
-        let residual = serviceDelta(current: afterReboot, desired: desired)
+        let residual = SimulatorServiceCatalog.delta(current: afterReboot, desired: desired)
         if !residual.toDisable.isEmpty {
             throw Error("Simulator service overrides were not persisted on \(simulator.name) (runtime \(simulator.device.runtime)). Lost: \(residual.toDisable.joined(separator: ", "))", logger: executer.logger)
         }
