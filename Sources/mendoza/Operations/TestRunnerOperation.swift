@@ -39,12 +39,20 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
     /// MaxStartups limit and cause transfers to be silently dropped.
     private let postExecutionQueue = ThreadQueue(maxConcurrentOperations: 8)
 
-    private lazy var pool: ConnectionPool<TestRunner> = {
+    private lazy var pool: ConnectionPool<(index: Int, testRunner: TestRunner)> = {
         guard let sortedTestCases = sortedTestCases else { fatalError("💣 Required field `distributedTestCases` not set") }
         guard let testRunners = testRunners else { fatalError("💣 Required field `testRunner` not set") }
 
-        let input = zip(testRunners, sortedTestCases)
-        return makeConnectionPool(sources: input.map { (node: $0.0.node, value: $0.0.testRunner) })
+        // Each source carries the index of its runner in `testRunners`, assigned once here. Every
+        // read/write of the runner's `idle` flag keys off this index instead of matching on
+        // (id, name), which is not guaranteed unique across nodes (simulator names repeat per node,
+        // and a wedged simulator can have an empty id). A mismatched lookup would leave a runner
+        // stuck at idle=false forever, so the `allRunnersIdle` completion barrier could never
+        // release and every runner thread would spin in `.waitingCompletion`.
+        let input = zip(testRunners, sortedTestCases).enumerated()
+        return makeConnectionPool(sources: input.map { offset, pair in
+            (node: pair.0.node, value: (index: offset, testRunner: pair.0.testRunner))
+        })
     }()
 
     init(configuration: Configuration, baseUrl: URL, destinationPath: String, testTarget: String, productNames: [String]) {
@@ -117,13 +125,13 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
             try pool.execute { [weak self] executer, source in
                 guard let self = self else { return }
 
-                let testRunner = source.value
-                let runnerIndex = self.runnerIndex(for: testRunner)
+                let runnerIndex = source.value.index
+                let testRunner = source.value.testRunner
 
                 defer { self.syncQueue.sync { self.testRunners?[runnerIndex].idle = true } }
 
                 while true {
-                    let state = self.determineRunnerState(testRunner: testRunner, source: source)
+                    let state = self.determineRunnerState(runnerIndex: runnerIndex, testRunner: testRunner)
 
                     switch state {
                     case .allRunnersCompleted:
@@ -133,7 +141,7 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                         continue
                     case .recover:
                         self.simulatorRecovery.boot(executer: executer, testRunner: testRunner)
-                        self.endQuarantine(for: testRunner, source: source, runnerIndex: runnerIndex)
+                        self.endQuarantine(for: testRunner, runnerIndex: runnerIndex, node: source.node)
                         continue
                     case let .execute(testCase):
                         let outcome = try self.testCaseExecutor.execute(
@@ -152,7 +160,7 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                         }
 
                         if outcome.requiresQuarantine {
-                            self.beginQuarantine(for: testRunner, source: source, runnerIndex: runnerIndex, executer: executer)
+                            self.beginQuarantine(for: testRunner, runnerIndex: runnerIndex, node: source.node, executer: executer)
                         }
                     }
                 }
@@ -185,7 +193,7 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
         case allRunnersCompleted
     }
 
-    private func determineRunnerState(testRunner: TestRunner, source: ConnectionPool<TestRunner>.Source<TestRunner>) -> State {
+    private func determineRunnerState(runnerIndex: Int, testRunner: TestRunner) -> State {
         syncQueue.sync {
             // A quarantined runner is idle, so completion can only be declared once the queue is
             // also drained. Otherwise, if every runner were quarantined while tests remain, the
@@ -202,40 +210,34 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
             }
 
             if let testCase = testQueue.dequeue() {
-                updateRunnerIdleState(testRunner: testRunner, source: source, idle: false)
+                testRunners?[runnerIndex].idle = false
                 return .execute(testCase)
             }
 
-            updateRunnerIdleState(testRunner: testRunner, source: source, idle: true)
+            testRunners?[runnerIndex].idle = true
             return .waitingCompletion
         }
     }
 
-    private func beginQuarantine(for testRunner: TestRunner, source: ConnectionPool<TestRunner>.Source<TestRunner>, runnerIndex: Int, executer: Executer) {
+    private func beginQuarantine(for testRunner: TestRunner, runnerIndex: Int, node: Node, executer: Executer) {
         // Take the wedged simulator out of rotation and shut it down. The boot is deferred to the
         // recovery step after the cooldown, by which point the shutdown has completed.
         simulatorRecovery.forceReset(executer: executer, testRunner: testRunner)
 
         syncQueue.sync {
             quarantinedRunners[testRunner.id] = CFAbsoluteTimeGetCurrent()
-            updateRunnerIdleState(testRunner: testRunner, source: source, idle: true)
+            testRunners?[runnerIndex].idle = true
         }
 
-        print("🚧 Quarantined runner \(testRunner.name) on \(source.node.address) after simulator launch failure {\(runnerIndex)}".yellow)
+        print("🚧 Quarantined runner \(testRunner.name) on \(node.address) after simulator launch failure {\(runnerIndex)}".yellow)
     }
 
-    private func endQuarantine(for testRunner: TestRunner, source: ConnectionPool<TestRunner>.Source<TestRunner>, runnerIndex: Int) {
+    private func endQuarantine(for testRunner: TestRunner, runnerIndex: Int, node: Node) {
         syncQueue.sync {
             quarantinedRunners[testRunner.id] = nil
         }
 
-        print("🚧 Recovered runner \(testRunner.name) on \(source.node.address), resuming test execution {\(runnerIndex)}".green)
-    }
-
-    private func updateRunnerIdleState(testRunner: TestRunner, source: ConnectionPool<TestRunner>.Source<TestRunner>, idle: Bool) {
-        if let index = testRunners?.firstIndex(where: { $0.node == source.node && $0.testRunner.id == testRunner.id && $0.testRunner.name == testRunner.name }) {
-            testRunners?[index].idle = idle
-        }
+        print("🚧 Recovered runner \(testRunner.name) on \(node.address), resuming test execution {\(runnerIndex)}".green)
     }
 
     private func handleTestCaseResultPreview(_ previewResult: TestCaseResult, testCase: TestCase, runnerIndex: Int) {
@@ -257,12 +259,6 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                     resultHandler.printRetryEnqueue(testCase, retryCount: testQueue.retryCount(for: testCase))
                 }
             }
-        }
-    }
-
-    private func runnerIndex(for testRunner: TestRunner) -> Int {
-        syncQueue.sync { [unowned self] in
-            testRunners?.firstIndex { $0.0.id == testRunner.id && $0.0.name == testRunner.name } ?? 0
         }
     }
 }
