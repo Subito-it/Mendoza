@@ -20,16 +20,18 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
     private let nodes: [Node]
     let device: Device
     private let alwaysRebootSimulators: Bool
+    private let disabledSimulatorServices: [String]
     let verbose: Bool
     private lazy var pool: ConnectionPool = makeConnectionPool(sources: nodes)
     var cachedScreenResolution: ScreenResolution?
 
-    init(buildBundleIdentifier: String, testBundleIdentifier: String, nodes: [Node], device: Device, alwaysRebootSimulators: Bool, verbose: Bool) {
+    init(buildBundleIdentifier: String, testBundleIdentifier: String, nodes: [Node], device: Device, alwaysRebootSimulators: Bool, disabledSimulatorServices: [String], verbose: Bool) {
         self.buildBundleIdentifier = buildBundleIdentifier
         self.testBundleIdentifier = testBundleIdentifier
         self.nodes = nodes
         self.device = device
         self.alwaysRebootSimulators = alwaysRebootSimulators
+        self.disabledSimulatorServices = disabledSimulatorServices
         self.verbose = verbose
     }
 
@@ -77,6 +79,8 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
                     try proxy.launch()
                 }
 
+                try self.applyDisabledServices(node: source.node, simulators: nodeSimulators)
+
                 self.syncQueue.sync { [unowned self] in
                     self.simulators += nodeSimulators.map { (simulator: $0, node: source.node) }
                 }
@@ -109,9 +113,7 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
 
         let proxy = CommandLineProxy.Simulators(executer: executer, verbose: verbose)
         let rawSimulatorStatus = try proxy.rawSimulatorStatus()
-        let simulators = try simulatorNames.compactMap { try proxy.makeSimulatorIfNeeded(name: $0, device: self.device, cachedSimulatorStatus: rawSimulatorStatus) }
-
-        return simulators
+        return try simulatorNames.compactMap { try proxy.makeSimulatorIfNeeded(name: $0, device: self.device, cachedSimulatorStatus: rawSimulatorStatus) }
     }
 
     private func bootSimulators(node: Node, simulators: [Simulator]) throws {
@@ -144,6 +146,41 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
             }
         }
         bootQueue.waitUntilAllOperationsAreFinished()
+    }
+
+    private func applyDisabledServices(node: Node, simulators: [Simulator]) throws {
+        guard !disabledSimulatorServices.isEmpty else { return }
+
+        let desired = try SimulatorServiceCatalog.resolveLabels(for: disabledSimulatorServices)
+
+        let queue = OperationQueue()
+        let errorLock = NSLock()
+        var firstError: Swift.Error?
+
+        for simulator in simulators {
+            let logger = ExecuterLogger(name: "\(type(of: self))-AsyncServices", address: node.address)
+            addLogger(logger)
+
+            let queueExecuter = try node.makeExecuter(logger: logger, environment: nodesEnvironment[node.address] ?? [:])
+            let queueProxy = CommandLineProxy.Simulators(executer: queueExecuter, verbose: verbose)
+
+            queue.addOperation {
+                do {
+                    try queueProxy.applyDisabledServices(desired, on: simulator)
+                } catch {
+                    errorLock.lock()
+                    firstError = firstError ?? error
+                    errorLock.unlock()
+                }
+
+                try? logger.dump()
+            }
+        }
+        queue.waitUntilAllOperationsAreFinished()
+
+        if let firstError {
+            throw firstError
+        }
     }
 
     private func physicalCPUs(executer: Executer, node _: Node) throws -> Int {

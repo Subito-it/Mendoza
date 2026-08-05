@@ -2,9 +2,9 @@
 import XCTest
 
 final class SimulatorServiceTests: XCTestCase {
-    // Daemons that wedge or deadlock a simulator when disabled. None must ever
-    // appear in the catalog; nanoregistryd in particular hangs every subsequent
-    // simctl call, which would mean a hung node with no useful error.
+    /// Daemons that wedge or deadlock a simulator when disabled. None must ever
+    /// appear in the catalog; nanoregistryd in particular hangs every subsequent
+    /// simctl call, which would mean a hung node with no useful error.
     private let forbiddenLabels: Set<String> = [
         "com.apple.nanoregistryd",
         "com.apple.nanoregistrylaunchd",
@@ -20,12 +20,12 @@ final class SimulatorServiceTests: XCTestCase {
         "com.apple.biomed",
         "com.apple.biomesyncd",
         "com.apple.dmd",
-        "com.apple.donotdisturbd",
+        "com.apple.donotdisturbd"
     ]
 
-    func testEveryLabelMatchesExpectedFormat() {
+    func testEveryLabelMatchesExpectedFormat() throws {
         // Labels are interpolated into shell commands, so they must be well-formed.
-        let regex = try! NSRegularExpression(pattern: #"^com\.apple\.[A-Za-z0-9._-]+$"#)
+        let regex = try NSRegularExpression(pattern: #"^com\.apple\.[A-Za-z0-9._-]+$"#)
         for service in SimulatorServiceCatalog.services {
             let range = NSRange(service.label.startIndex..., in: service.label)
             XCTAssertNotNil(regex.firstMatch(in: service.label, range: range), "Malformed label: \(service.label)")
@@ -85,7 +85,7 @@ final class SimulatorServiceTests: XCTestCase {
             "com.apple.amsengagementd",
             "com.apple.amsondevicestoraged",
             "com.apple.passd",
-            "com.apple.financed",
+            "com.apple.financed"
         ])
     }
 

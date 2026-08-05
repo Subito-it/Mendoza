@@ -64,18 +64,18 @@ enum SimulatorServiceCatalog {
         SimulatorService(id: "newsd", label: "com.apple.newsd", feature: "News"),
         SimulatorService(id: "gamed", label: "com.apple.gamed", feature: "Game Center"),
         SimulatorService(id: "findmylocated", label: "com.apple.findmy.findmylocated", feature: "Find My"),
-        SimulatorService(id: "screentimeagent", label: "com.apple.ScreenTimeAgent", feature: "Screen Time"),
+        SimulatorService(id: "screentimeagent", label: "com.apple.ScreenTimeAgent", feature: "Screen Time")
     ]
 
     static let groups: [SimulatorServiceGroup] = [
         SimulatorServiceGroup(id: "payments", feature: "StoreKit / in-app purchase", serviceIDs: [
-            "storekitd", "itunesstored", "amsaccountsd", "amsengagementd", "amsondevicestoraged", "passd", "financed",
+            "storekitd", "itunesstored", "amsaccountsd", "amsengagementd", "amsondevicestoraged", "passd", "financed"
         ]),
         SimulatorServiceGroup(id: "app-store", feature: "App Store", serviceIDs: ["appstored", "itunesstored"]),
         SimulatorServiceGroup(id: "spotlight", feature: "Spotlight & Settings search", serviceIDs: ["searchd", "searchtoold"]),
         SimulatorServiceGroup(id: "siri", feature: "Siri & speech", serviceIDs: ["assistantd", "corespeechd"]),
         SimulatorServiceGroup(id: "photos", feature: "Photos library & analysis", serviceIDs: ["assetsd", "photoanalysisd"]),
-        SimulatorServiceGroup(id: "widgets", feature: "Widgets & Live Activities", serviceIDs: ["chronod", "liveactivitiesd"]),
+        SimulatorServiceGroup(id: "widgets", feature: "Widgets & Live Activities", serviceIDs: ["chronod", "liveactivitiesd"])
     ]
 
     /// The complete set of labels Mendoza is allowed to disable or enable. Any label
