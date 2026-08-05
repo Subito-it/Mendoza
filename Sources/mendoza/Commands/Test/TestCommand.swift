@@ -40,6 +40,7 @@ class TestCommand: Command {
     let xcresultBlobThresholdKB = Argument<Int>(name: "size", kind: .named(short: nil, long: "xcresult_blob_threshold_kb"), optional: true, help: "Delete data blobs larger than the specified threshold")
     let excludeNodes = Argument<String>(name: "nodes", kind: .named(short: nil, long: "exclude_nodes"), optional: true, help: "Specify which nodes (by name or address) specified in the configuration should be excluded from the dispatch. Accepts comma separated values. Default: ''")
     let killSimulatorProcesses = Flag(short: nil, long: "kill_sim_procs", help: "Automatically kill Simulator's CPU intensive processes, see https://github.com/biscuitehh/yeetd")
+    let disabledSimulatorServices = Argument<String>(name: "services", kind: .named(short: nil, long: "disable_sim_services"), optional: true, help: "Comma separated list of simulator background services to disable to slim down memory usage. Accepts groups or individual services. Requires iOS 18+ (ignored with a warning on older runtimes). \(SimulatorServiceCatalog.helpDescription)")
     let keepBuildFolderOnFailure = Flag(short: nil, long: "keep_build_folder_on_failure", help: "Keep build folder on failure")
 
     let projectPath = Argument<URL>(name: "path", kind: .named(short: nil, long: "project"), optional: false, help: "The path to the .xcworkspace or .xcodeproj to build")
@@ -120,6 +121,9 @@ class TestCommand: Command {
             }
         }
 
+        let disabledServices = disabledSimulatorServices.value?.components(separatedBy: ",").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty } ?? []
+        _ = try SimulatorServiceCatalog.resolveLabels(for: disabledServices) // validate tokens up front
+
         let testing = Configuration.Testing(maximumStdOutIdleTime: maximumStdOutIdleTime.value,
                                             maximumTestExecutionTime: maximumTestExecutionTime.value,
                                             failingTestsRetryCount: failingTestsRetryCount.value,
@@ -131,7 +135,8 @@ class TestCommand: Command {
                                             extractIndividualTestCoverage: extractIndividualTestCoverage.value,
                                             extractTestCoveredFiles: extractTestCoveredFiles.value,
                                             clearDerivedDataOnCompilationFailure: clearDerivedDataOnCompilationFailure.value,
-                                            skipResultMerge: skipResultMerge.value)
+                                            skipResultMerge: skipResultMerge.value,
+                                            disabledSimulatorServices: disabledServices)
 
         let plugins: Configuration.Plugins
         if let pluginsData = pluginCustom.value {

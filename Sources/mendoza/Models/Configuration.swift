@@ -67,6 +67,7 @@ extension Configuration {
         let extractTestCoveredFiles: Bool
         let clearDerivedDataOnCompilationFailure: Bool
         let skipResultMerge: Bool
+        let disabledSimulatorServices: [String]
     }
 }
 
