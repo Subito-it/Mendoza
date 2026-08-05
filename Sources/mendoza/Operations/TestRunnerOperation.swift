@@ -30,9 +30,11 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
     // A simulator that fails to launch the test runner (e.g. "Application failed preflight checks")
     // is wedged at the host level and keeps failing every test routed to it. When that happens we
     // quarantine the runner: shut its simulator down and stop pulling tests onto it. After a cooldown
-    // it is fully cycled (shutdown -> boot) and rejoins. Keyed by runner id, value is the quarantine
+    // it is fully cycled (shutdown -> boot) and rejoins. Keyed by the runner's stable index in
+    // `testRunners` rather than testRunner.id, which is not guaranteed unique (an empty or
+    // duplicate id would let two runners alias the same dictionary entry). Value is the quarantine
     // start time (CFAbsoluteTime).
-    private var quarantinedRunners = [String: TimeInterval]()
+    private var quarantinedRunners = [Int: TimeInterval]()
     private let quarantineCooldown: TimeInterval = 120
     /// Bounded so the per-test result transfers don't open an unbounded burst of
     /// SSH connections to the single result destination, which can exceed its sshd
@@ -204,7 +206,7 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                 return .allRunnersCompleted
             }
 
-            if let quarantineStart = quarantinedRunners[testRunner.id] {
+            if let quarantineStart = quarantinedRunners[runnerIndex] {
                 let elapsed = CFAbsoluteTimeGetCurrent() - quarantineStart
                 return elapsed >= quarantineCooldown ? .recover : .quarantinedWaiting
             }
@@ -225,7 +227,7 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
         simulatorRecovery.forceReset(executer: executer, testRunner: testRunner)
 
         syncQueue.sync {
-            quarantinedRunners[testRunner.id] = CFAbsoluteTimeGetCurrent()
+            quarantinedRunners[runnerIndex] = CFAbsoluteTimeGetCurrent()
             testRunners?[runnerIndex].idle = true
         }
 
@@ -234,7 +236,7 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
 
     private func endQuarantine(for testRunner: TestRunner, runnerIndex: Int, node: Node) {
         syncQueue.sync {
-            quarantinedRunners[testRunner.id] = nil
+            quarantinedRunners[runnerIndex] = nil
         }
 
         print("🚧 Recovered runner \(testRunner.name) on \(node.address), resuming test execution {\(runnerIndex)}".green)
