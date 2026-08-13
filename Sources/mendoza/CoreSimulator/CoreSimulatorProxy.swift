@@ -93,26 +93,43 @@ enum CoreSimulatorProxy {
 
     // MARK: - Device lookup
 
-    private static func device(identifier: String, developerDir: String) -> AnyObject? {
-        guard let bundle = Bundle(path: frameworkPath), bundle.load() else { return nil }
-        guard let contextClass = NSClassFromString("SimServiceContext") as AnyObject? else { return nil }
+    static func device(identifier: String, developerDir: String) -> AnyObject? {
+        devices(developerDir: developerDir).first { device in
+            Self.identifier(of: device)?.caseInsensitiveCompare(identifier) == .orderedSame
+        }
+    }
+
+    /// All devices in the default device set, booted or not.
+    static func devices(developerDir: String) -> [AnyObject] {
+        guard let bundle = Bundle(path: frameworkPath), bundle.load() else { return [] }
+        guard let contextClass = NSClassFromString("SimServiceContext") as AnyObject? else { return [] }
 
         guard let context = contextClass
             .perform(NSSelectorFromString("sharedServiceContextForDeveloperDir:error:"), with: developerDir, with: nil)?
-            .takeUnretainedValue() else { return nil }
+            .takeUnretainedValue() else { return [] }
 
         guard let deviceSet = context
             .perform(NSSelectorFromString("defaultDeviceSetWithError:"), with: nil)?
-            .takeUnretainedValue() else { return nil }
+            .takeUnretainedValue() else { return [] }
 
-        guard let devices = deviceSet
-            .perform(NSSelectorFromString("devices"))?
-            .takeUnretainedValue() as? [AnyObject] else { return nil }
+        return deviceSet.perform(NSSelectorFromString("devices"))?.takeUnretainedValue() as? [AnyObject] ?? []
+    }
 
-        return devices.first { device in
-            let uuid = device.perform(NSSelectorFromString("UDID"))?.takeUnretainedValue() as? NSUUID
-            return uuid?.uuidString.caseInsensitiveCompare(identifier) == .orderedSame
-        }
+    static func identifier(of device: AnyObject) -> String? {
+        (device.perform(NSSelectorFromString("UDID"))?.takeUnretainedValue() as? NSUUID)?.uuidString
+    }
+
+    static func name(of device: AnyObject) -> String? {
+        device.perform(NSSelectorFromString("name"))?.takeUnretainedValue() as? String
+    }
+
+    /// `state` returns a primitive, so it cannot go through `perform` without crashing.
+    /// 3 is `SimDeviceStateBooted`.
+    static func isBooted(_ device: AnyObject) -> Bool {
+        let selector = NSSelectorFromString("state")
+        guard let method = class_getInstanceMethod(object_getClass(device), selector) else { return false }
+        typealias Function = @convention(c) (AnyObject, Selector) -> UInt64
+        return unsafeBitCast(method_getImplementation(method), to: Function.self)(device, selector) == 3
     }
 
     // MARK: - Dynamic invocation
