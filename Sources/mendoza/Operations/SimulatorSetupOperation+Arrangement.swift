@@ -8,83 +8,6 @@
 import Foundation
 
 extension SimulatorSetupOperation {
-    func simulatorsProperlyArranged(executer: Executer, simulators: [Simulator]) throws -> Bool {
-        let simulatorProxy = CommandLineProxy.Simulators(executer: executer, verbose: verbose)
-
-        let settings = try simulatorProxy.loadSimulatorSettings()
-
-        guard settings.ScreenConfigurations?.keys.count == 1 else { return false }
-
-        let screenIdentifier = settings.ScreenConfigurations!.keys.first! // swiftlint:disable:this force_unwrapping
-
-        guard let geometries = settings.DevicePreferences?.values.map(\.SimulatorWindowGeometry) else { return false }
-
-        var screenGeometries = [CommandLineProxy.Simulators.Settings.DevicePreferences.WindowGeometry]()
-        for geometry in geometries {
-            screenGeometries += geometry?.filter { $0.key == screenIdentifier }.map(\.value) ?? []
-        }
-
-        let expectSimulatorLocations = (0 ..< simulators.count).compactMap {
-            try? arrangedSimulatorCenter(index: $0,
-                                         executer: executer,
-                                         device: simulators.first!.device, // swiftlint:disable:this force_unwrapping
-                                         displayMargin: arrangeDisplayMargin,
-                                         totalSimulators: simulators.count,
-                                         maxSimulatorsPerRow: arrangeMaxSimulatorsPerRow)
-        }
-
-        let expectedScaleFactor = try arrangedScaleFactor(executer: executer,
-                                                          device: simulators.first!.device, // swiftlint:disable:this force_unwrapping
-                                                          displayMargin: arrangeDisplayMargin,
-                                                          totalSimulators: simulators.count,
-                                                          maxSimulatorsPerRow: arrangeMaxSimulatorsPerRow)
-
-        for expectSimulatorLocation in expectSimulatorLocations {
-            let matchingGeometry = screenGeometries.first {
-                // {XXX(.X), YYY(.Y)} -> [CGFloat, CGFloat] conversion
-                guard let center = $0.WindowCenter?
-                    .trimmingCharacters(in: CharacterSet(charactersIn: "{}"))
-                    .components(separatedBy: ",")
-                    .compactMap({ Double($0.trimmingCharacters(in: .whitespaces)) })
-                    .map({ CGFloat($0) }),
-                    center.count == 2
-                else {
-                    return false
-                }
-
-                let match1 = abs(center[0] - expectSimulatorLocation.x) <= 2 && abs(center[1] - expectSimulatorLocation.y) <= 2
-                let match2 = abs(center[0] - expectSimulatorLocation.x) <= 2 && abs(center[1] - CGFloat(windowMenubarHeight / 2) - expectSimulatorLocation.y) <= 2
-
-                return match1 || match2
-            }
-            guard let scale = matchingGeometry?.WindowScale else {
-                return false
-            }
-            guard abs(CGFloat(scale) - expectedScaleFactor) < 0.15 else {
-                return false
-            }
-        }
-
-        let resolution = try screenResolution(executer: executer)
-        let simulatorsWindowLocations = try simulatorsWindowLocation(executer: executer)
-
-        for simulatorsWindowLocation in simulatorsWindowLocations {
-            let center1 = CGPoint(x: simulatorsWindowLocation.X + simulatorsWindowLocation.Width / 2,
-                                  y: resolution.height - (simulatorsWindowLocation.Y + (simulatorsWindowLocation.Height + windowMenubarHeight) / 2))
-            let center2 = CGPoint(x: simulatorsWindowLocation.X + simulatorsWindowLocation.Width / 2,
-                                  y: resolution.height - (simulatorsWindowLocation.Y + simulatorsWindowLocation.Height / 2))
-
-            let match1 = expectSimulatorLocations.contains(where: { abs($0.x - center1.x) <= 2 && abs($0.y - center1.y) <= 2 })
-            let match2 = expectSimulatorLocations.contains(where: { abs($0.x - center2.x) <= 2 && abs($0.y - center2.y) <= 2 })
-
-            guard match1 || match2 else {
-                return false
-            }
-        }
-
-        return true
-    }
-
     /// This method arranges the simulators so that the do not overlap. For simplicity they're arranged on a single row
     ///
     /// Resolutions in points
@@ -237,10 +160,5 @@ extension SimulatorSetupOperation {
         let rawResolution = try executer.execute(#"mendoza mendoza screen_point_size"#)
         cachedScreenResolution = try JSONDecoder().decode(ScreenResolution.self, from: Data(rawResolution.utf8))
         return cachedScreenResolution!
-    }
-
-    private func simulatorsWindowLocation(executer: Executer) throws -> [SimulatorWindowLocation] {
-        let rawResolution = try executer.execute(#"mendoza mendoza simulator_locations"#)
-        return try JSONDecoder().decode([SimulatorWindowLocation].self, from: Data(rawResolution.utf8))
     }
 }

@@ -53,11 +53,19 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
 
                 let nodeSimulators = try self.makeSimulators(node: source.node, executer: executer)
 
-                try rebootRequired.append(proxy.deleteSettingsIfNeeded())
-                try rebootRequired.append(proxy.enablePasteboardWorkaround())
-                try rebootRequired.append(proxy.enableLowQualityGraphicOverrides())
-                try rebootRequired.append(proxy.disableSimulatorBezel())
-                try rebootRequired.append(self.updateSimulatorsSettings(executer: executer, simulators: nodeSimulators, arrangeSimulators: true))
+                // On Xcode 27 DeviceHub never shows simulators booted via simctl, so there are no
+                // windows to configure or arrange. These keys are read by Simulator.app itself, so
+                // with no host app attached they have no effect. The one that matters for tests,
+                // ConnectHardwareKeyboard, is applied through CoreSimulator instead.
+                let usesDeviceHub = try proxy.usesDeviceHub()
+
+                if !usesDeviceHub {
+                    try rebootRequired.append(proxy.deleteSettingsIfNeeded())
+                    try rebootRequired.append(proxy.enablePasteboardWorkaround())
+                    try rebootRequired.append(proxy.enableLowQualityGraphicOverrides())
+                    try rebootRequired.append(proxy.disableSimulatorBezel())
+                    try rebootRequired.append(self.updateSimulatorsSettings(executer: executer, simulators: nodeSimulators, arrangeSimulators: true))
+                }
 
                 for nodeSimulator in nodeSimulators {
                     try rebootRequired.append(proxy.updateLanguage(on: nodeSimulator, language: self.device.language, locale: self.device.locale))
@@ -75,7 +83,7 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
                 let bootedSimulators = try proxy.bootedSimulators()
 
                 try self.bootSimulators(node: source.node, simulators: nodeSimulators.filter { !bootedSimulators.contains($0) })
-                if nodeSimulators.count != bootedSimulators.count {
+                if !usesDeviceHub, nodeSimulators.count != bootedSimulators.count {
                     try proxy.launch()
                 }
 
@@ -137,6 +145,9 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
                 queueProxy.disableSlideToType(on: simulator)
                 queueProxy.disableMultilingualKeyboardTip(on: simulator)
                 queueProxy.disableSafariMenuOnboarding(on: simulator)
+
+                // Requires a booted simulator, so it has to happen after bootSynchronously
+                try? queueProxy.applyCoreSimulatorSettings(on: simulator)
 
                 #if DEBUG
                     Swift.print("Booted \(simulator.id)")
@@ -215,11 +226,19 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
     private func shutdownSimulatorOnXcodeVersionMismatch(executer: Executer, node: Node) throws -> Bool {
         let systemPath = try executer.execute("xcode-select -p")
         let path = (nodesEnvironment[node.address]?["DEVELOPER_DIR"]) ?? systemPath
-        if try !(executer.execute("ps aux | grep Simulator.app").contains(path)) {
-            // Launched Simulator is from a different Xcode version
+
+        // DeviceHub.app replaced Simulator.app in Xcode 27. Since DeviceHub lives in
+        // Contents/Applications rather than Contents/Developer/Applications we match on the
+        // Xcode bundle path instead of DEVELOPER_DIR.
+        let xcodePath = path.replacingOccurrences(of: "/Contents/Developer", with: "")
+        let runningSimulatorApps = try executer.execute("ps aux | grep -E 'Simulator\\.app|DeviceHub\\.app' | grep -v grep || true")
+
+        if !runningSimulatorApps.contains(xcodePath) {
+            // Launched simulator app is from a different Xcode version
 
             _ = try? executer.execute("killall -9 com.apple.CoreSimulator.CoreSimulatorService;") // Killing CoreSimulatorService will reset and shutdown all Simulators
             _ = try? executer.execute("killall Simulator")
+            _ = try? executer.execute("killall -9 DeviceHub") // DeviceHub ignores SIGTERM
 
             return true
         }

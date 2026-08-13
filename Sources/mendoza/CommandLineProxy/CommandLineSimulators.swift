@@ -32,7 +32,9 @@ extension CommandLineProxy {
         func reset() throws {
             try gracefullyQuit()
 
-            let commands = ["osascript -e 'quit app \"Simulator.app\"'", // we don't prefix $(xcode-select -p) since another version of the simulator might be running
+            // We don't prefix $(xcode-select -p) since another version of the simulator app might be running
+            let commands = ["osascript -e 'quit app \"Simulator.app\"'",
+                            "osascript -e 'quit app \"DeviceHub.app\"'",
                             "sleep 3"]
             try commands.forEach { _ = try executer.execute("\($0) 2>/dev/null || true") }
         }
@@ -45,7 +47,19 @@ extension CommandLineProxy {
             try commands.forEach { _ = try executer.execute("\($0) 2>/dev/null || true") }
         }
 
+        /// Xcode 27 replaced `Developer/Applications/Simulator.app` with `Contents/Applications/DeviceHub.app`.
+        ///
+        /// DeviceHub is CoreDevice based and only displays simulators it booted itself, it will not
+        /// attach to simulators booted out of band via `simctl` (Apple known issue 176809181).
+        /// This means that on Xcode 27 there's no simulator window to launch, arrange or scale.
+        func usesDeviceHub() throws -> Bool {
+            let developerDir = try executer.execute("xcode-select -p")
+            return try !executer.fileExists(atPath: "\(developerDir)/Applications/Simulator.app")
+        }
+
         func launch() throws {
+            guard try !usesDeviceHub() else { return }
+
             let commands = ["defaults read com.apple.iphonesimulator &>/dev/null", // This (unexpectedly) ensures that settings in ~/Library/Preferences/com.apple.iphonesimulator.plist get reloaded
                             "open -a \"$(xcode-select -p)/Applications/Simulator.app\"",
                             "sleep 3"]

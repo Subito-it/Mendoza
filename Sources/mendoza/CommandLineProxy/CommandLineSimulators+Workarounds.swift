@@ -9,10 +9,7 @@ import Foundation
 
 extension CommandLineProxy.Simulators {
     func disableSimulatorBezel() throws -> Bool {
-        var updates = [Bool]()
-        try updates.append(updateSimulatorDefaults(key: "FloatingNameMode", value: 3))
-        try updates.append(updateSimulatorDefaults(key: "ShowChrome", value: false))
-        return updates.contains(true)
+        try updateSimulatorDefaults(key: "ShowChrome", value: false)
     }
 
     func enablePasteboardWorkaround() throws -> Bool {
@@ -54,6 +51,30 @@ extension CommandLineProxy.Simulators {
         try updates.append(updatePlistIfNeeded(path: webUIPath, key: "AutoFillPasswords", value: enabled))
 
         return updates.contains(true)
+    }
+
+    /// Applies settings that used to live in the `com.apple.iphonesimulator` host plist.
+    ///
+    /// Those keys were read by Simulator.app, which Xcode 27 replaced with DeviceHub. DeviceHub never
+    /// attaches to simulators booted via `simctl`, so the plist is no longer consulted and the
+    /// equivalent CoreSimulator knobs have to be set directly on the device.
+    ///
+    /// Disabling the hardware keyboard is mandatory for e2e tests: without it iOS assumes a physical
+    /// keyboard is attached and never shows the on-screen one, so tests that type into text fields
+    /// fail on unhittable keys.
+    ///
+    /// - Note: Must run on the node owning the simulator, hence the `mendoza mendoza` indirection.
+    ///         Requires a booted simulator.
+    func applyCoreSimulatorSettings(on simulator: Simulator) throws {
+        let developerDir = try executer.execute("xcode-select -p")
+        let settings = ["hardware_keyboard=false", "display_backlight=true"]
+
+        let output = try executer.execute("mendoza mendoza coresimulator '\(simulator.id)' '\(developerDir)' \(settings.joined(separator: " ")) 2>&1 || true")
+
+        if verbose, !output.isEmpty {
+            executer.logger?.log(command: "CoreSimulator settings for \(simulator.id)")
+            executer.logger?.log(output: output, statusCode: 0)
+        }
     }
 
     func enableXcode11ReleaseNotesWorkarounds(on simulator: Simulator) {
