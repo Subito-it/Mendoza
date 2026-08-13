@@ -141,6 +141,15 @@ This command allows to create a plugin template script that will be used during 
 
 Will launch tests as specified in the configuration files.
 
+### Test diagnostics collection
+
+By default Mendoza passes `-collect-test-diagnostics never` to `xcodebuild`, which disables the collection of verbose diagnostics (sysdiagnoses, log archives).
+
+You can opt back in with `--collect_test_diagnostics_on_failure`, but be aware that this has a **significant performance impact on test dispatching**. When a test fails, `xcodebuild` invokes `simctl diagnose` with a 600 seconds timeout, gathering several hundred megabytes of data into the `.xcresult`. This happens *after* the test verdict has already been reported, and the simulator is kept out of rotation for the entire collection: a single failure can therefore idle a simulator for up to 10 minutes, and with retries enabled the cost is paid on every attempt.
+
+Note that when the flag isn't specified `xcodebuild` would otherwise fall back to the value defined in the test plan, so Mendoza always passes the parameter explicitly to keep dispatch times predictable.
+
+Crash reports are collected by Mendoza independently of this setting.
 
 ### Test output
 

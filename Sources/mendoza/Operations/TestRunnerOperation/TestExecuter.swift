@@ -289,7 +289,14 @@ extension TestExecuter {
             maxAllowedTestExecutionTimeParameter = "-maximum-test-execution-time-allowance \(maximumTestExecutionTime)"
         }
 
-        return #"$(xcode-select -p)/usr/bin/xcodebuild -parallel-testing-enabled NO -disable-concurrent-destination-testing -xctestrun '\#(testRun)' -destination '\#(xcodebuildDestination)' -derivedDataPath '\#(destinationPath)' \#(onlyTesting) -enableCodeCoverage YES -destination-timeout 60 -test-timeouts-enabled YES \#(maxAllowedTestExecutionTimeParameter) test-without-building 2>&1 || true"#
+        // Diagnostics collection is opt-in because it is very expensive: xcodebuild shells out to
+        // `simctl diagnose --timeout=600`, which spends minutes gathering a ~280MB sysdiagnose into
+        // the .xcresult *after* the verdict has already been parsed from stdout. The runner slot stays
+        // held for the whole collection, so a single failure can take a simulator out of rotation for
+        // up to 10 minutes. Passing the flag explicitly also overrides whatever the test plan sets.
+        let collectDiagnosticsParameter = "-collect-test-diagnostics \(testing.collectTestDiagnosticsOnFailure ? "on-failure" : "never")"
+
+        return #"$(xcode-select -p)/usr/bin/xcodebuild -parallel-testing-enabled NO -disable-concurrent-destination-testing -xctestrun '\#(testRun)' -destination '\#(xcodebuildDestination)' -derivedDataPath '\#(destinationPath)' \#(onlyTesting) -enableCodeCoverage YES -destination-timeout 60 -test-timeouts-enabled YES \#(collectDiagnosticsParameter) \#(maxAllowedTestExecutionTimeParameter) test-without-building 2>&1 || true"#
     }
 
     private func shouldIgnoreTestExecutionError(_ error: Error) -> Bool {

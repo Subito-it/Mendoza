@@ -42,6 +42,7 @@ class TestCommand: Command {
     let killSimulatorProcesses = Flag(short: nil, long: "kill_sim_procs", help: "Automatically kill Simulator's CPU intensive processes, see https://github.com/biscuitehh/yeetd")
     let disabledSimulatorServices = Argument<String>(name: "services", kind: .named(short: nil, long: "disable_sim_services"), optional: true, help: "Comma separated list of simulator background services to disable to slim down memory usage. Accepts groups or individual services. Requires iOS 18+ (ignored with a warning on older runtimes). \(SimulatorServiceCatalog.helpDescription)")
     let keepBuildFolderOnFailure = Flag(short: nil, long: "keep_build_folder_on_failure", help: "Keep build folder on failure")
+    let collectTestDiagnosticsOnFailure = Flag(short: nil, long: "collect_test_diagnostics_on_failure", help: "Collect verbose xcodebuild diagnostics (sysdiagnose, log archives) when a test fails. ⚠️ Significant performance regression: xcodebuild runs `simctl diagnose` with a 600s timeout after the test verdict is known, writing ~280MB into the .xcresult while the simulator stays out of rotation. Default: diagnostics collection is disabled")
 
     let projectPath = Argument<URL>(name: "path", kind: .named(short: nil, long: "project"), optional: false, help: "The path to the .xcworkspace or .xcodeproj to build")
     let scheme = Argument<String>(name: "name", kind: .named(short: nil, long: "scheme"), optional: false, help: "The scheme to build")
@@ -136,7 +137,8 @@ class TestCommand: Command {
                                             extractTestCoveredFiles: extractTestCoveredFiles.value,
                                             clearDerivedDataOnCompilationFailure: clearDerivedDataOnCompilationFailure.value,
                                             skipResultMerge: skipResultMerge.value,
-                                            disabledSimulatorServices: disabledServices)
+                                            disabledSimulatorServices: disabledServices,
+                                            collectTestDiagnosticsOnFailure: collectTestDiagnosticsOnFailure.value)
 
         let plugins: Configuration.Plugins
         if let pluginsData = pluginCustom.value {

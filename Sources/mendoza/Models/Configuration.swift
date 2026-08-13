@@ -68,6 +68,7 @@ extension Configuration {
         let clearDerivedDataOnCompilationFailure: Bool
         let skipResultMerge: Bool
         let disabledSimulatorServices: [String]
+        let collectTestDiagnosticsOnFailure: Bool
     }
 }
 
