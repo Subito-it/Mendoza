@@ -87,6 +87,13 @@ extension Test {
 
         remoteSetupOperation.addDependency(validationOperation)
 
+        // On a local node both operations target the same `Path.base`, where LocalSetupOperation's
+        // `rm -rf` can land between RemoteSetupOperation's `mkdir` and `touch`. Ordering them avoids
+        // the race; with only remote nodes the paths are distinct and they can still run in parallel.
+        if uniqueNodes.contains(where: { AddressType(node: $0) == .local }) {
+            remoteSetupOperation.addDependency(localSetupOperation)
+        }
+
         testExtractionOperation.addDependency(localSetupOperation)
 
         simulatorSetupOperation.addDependencies([localSetupOperation, remoteSetupOperation])
