@@ -45,16 +45,18 @@ class TestCollectorOperation: BaseOperation<[TestCaseResult]> {
                 let resultsPath = "\(Path.results.rawValue)/"
                 try executer.rsync(sourcePath: resultsPath, destinationPath: destinationPath, on: destinationNode)
 
-                // Copy code coverage files
-                let logPath = "\(Path.logs.rawValue)/*"
+                // Copy code coverage files. Source paths end with a slash rather than a `*`
+                // glob: the glob is expanded by the node's shell and zsh aborts with
+                // `no matches found` when a coverage folder happens to be empty.
+                let logPath = "\(Path.logs.rawValue)/"
                 try executer.rsync(sourcePath: logPath, destinationPath: destinationPath, include: ["*/", "*.profdata"], exclude: ["*"], on: destinationNode)
 
                 if configuration.testing.extractIndividualTestCoverage {
-                    let path = "\(Path.individualCoverage.rawValue)/*"
+                    let path = "\(Path.individualCoverage.rawValue)/"
                     try executer.rsync(sourcePath: path, destinationPath: "\(destinationPath)/\(URL(filePath: Path.individualCoverage.rawValue).lastPathComponent)", include: ["*/", "*.json"], exclude: ["*"], on: destinationNode)
                 }
                 if configuration.testing.extractTestCoveredFiles {
-                    let path = "\(Path.testFileCoverage.rawValue)/*"
+                    let path = "\(Path.testFileCoverage.rawValue)/"
                     try executer.rsync(sourcePath: path, destinationPath: "\(destinationPath)/\(URL(filePath: Path.testFileCoverage.rawValue).lastPathComponent)", include: ["*/", "*.json"], exclude: ["*"], on: destinationNode)
                 }
 
