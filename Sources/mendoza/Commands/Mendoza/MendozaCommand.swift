@@ -111,37 +111,6 @@ class MendozaCommand: Command {
             }
 
             return succeeded
-        case "simulator_windows":
-            // Usage: simulator_windows <developer_dir> [fps=<n>] [scale=<n>]
-            //
-            // Shows every booted simulator in its own window. Needed because DeviceHub, which
-            // replaced Simulator.app in Xcode 27, never displays simulators booted via simctl.
-            // Runs until terminated, so callers should not wait on it.
-            guard let parameters = parameters.value?.filter({ !$0.isEmpty }), let developerDir = parameters.first else {
-                print("Expecting <developer_dir> [fps=<n>] [scale=<n>]")
-                return false
-            }
-
-            var options = [String: Double]()
-            for option in parameters.dropFirst() {
-                let components = option.components(separatedBy: "=")
-                guard components.count == 2, let value = Double(components[1]), ["fps", "scale"].contains(components[0]) else {
-                    print("Unsupported option '\(option)', expecting fps=<n> or scale=<n>")
-                    return false
-                }
-                options[components[0]] = value
-            }
-
-            let fps = options["fps"] ?? 1
-            let scale = options["scale"] ?? 3
-
-            let application = NSApplication.shared
-            let windows = SimulatorWindows(developerDir: developerDir, framesPerSecond: max(0.1, fps), scale: max(1, CGFloat(scale)))
-            application.delegate = windows
-            application.setActivationPolicy(.regular)
-            application.run()
-
-            return true
         case "cleaunp_xcresult":
             guard let parameters = parameters.value?.filter({ !$0.isEmpty }), parameters.count == 2 else {
                 return false
