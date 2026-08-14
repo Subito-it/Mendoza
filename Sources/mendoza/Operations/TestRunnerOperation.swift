@@ -27,14 +27,18 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
     private let simulatorRecovery: SimulatorRecovery
     private let diagnosticReporter: DiagnosticReporter
 
-    // A simulator that fails to launch the test runner (e.g. "Application failed preflight checks")
-    // is wedged at the host level and keeps failing every test routed to it. When that happens we
-    // quarantine the runner: shut its simulator down and stop pulling tests onto it. After a cooldown
-    // it is fully cycled (shutdown -> boot) and rejoins. Keyed by the runner's stable index in
-    // `testRunners` rather than testRunner.id, which is not guaranteed unique (an empty or
-    // duplicate id would let two runners alias the same dictionary entry). Value is the quarantine
-    // start time (CFAbsoluteTime).
+    /// A simulator that fails to launch the test runner (e.g. "Application failed preflight checks")
+    /// is wedged at the host level and keeps failing every test routed to it. When that happens we
+    /// quarantine the runner: shut its simulator down and stop pulling tests onto it. After a cooldown
+    /// it is fully cycled (shutdown -> boot) and rejoins. Keyed by the runner's stable index in
+    /// `testRunners` rather than testRunner.id, which is not guaranteed unique (an empty or
+    /// duplicate id would let two runners alias the same dictionary entry). Value is the quarantine
+    /// start time (CFAbsoluteTime).
     private var quarantinedRunners = [Int: TimeInterval]()
+    /// Runners that left the execution loop, by index in `testRunners`. A runner whose test throws
+    /// exits early while the others keep going, and it will never dequeue again: retry exclusions
+    /// must not wait on it.
+    private var exitedRunners = Set<Int>()
     private let quarantineCooldown: TimeInterval = 120
     /// Bounded so the per-test result transfers don't open an unbounded burst of
     /// SSH connections to the single result destination, which can exceed its sshd
@@ -130,7 +134,12 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                 let runnerIndex = source.value.index
                 let testRunner = source.value.testRunner
 
-                defer { self.syncQueue.sync { self.testRunners?[runnerIndex].idle = true } }
+                defer {
+                    self.syncQueue.sync {
+                        self.testRunners?[runnerIndex].idle = true
+                        self.exitedRunners.insert(runnerIndex)
+                    }
+                }
 
                 while true {
                     let state = self.determineRunnerState(runnerIndex: runnerIndex, testRunner: testRunner)
@@ -211,7 +220,15 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                 return elapsed >= quarantineCooldown ? .recover : .quarantinedWaiting
             }
 
-            if let testCase = testQueue.dequeue() {
+            if let testCase = testQueue.dequeue(for: runnerIndex) {
+                testRunners?[runnerIndex].idle = false
+                return .execute(testCase)
+            }
+
+            // Every queued test case is excluded on this runner's node. If no runner that could
+            // still pick one up is available, nothing will ever dequeue them and all threads would
+            // spin in `.waitingCompletion`, so honor the exclusion only while such a runner exists.
+            if !queueEmpty, !hasRunnerAvailableForQueuedTestCases(excluding: runnerIndex), let testCase = testQueue.dequeueIgnoringExclusions() {
                 testRunners?[runnerIndex].idle = false
                 return .execute(testCase)
             }
@@ -219,6 +236,20 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
             testRunners?[runnerIndex].idle = true
             return .waitingCompletion
         }
+    }
+
+    /// Must be called while holding `syncQueue`. `TestQueue` has its own lock, so querying it here is safe.
+    private func hasRunnerAvailableForQueuedTestCases(excluding runnerIndex: Int) -> Bool {
+        // Busy and quarantined runners count as available: both return for more work later. Runners
+        // that left the loop do not.
+        let otherRunnerIndexes = (testRunners?.indices ?? (0 ..< 0)).filter { $0 != runnerIndex && !exitedRunners.contains($0) }
+        return testQueue.containsTestCase(eligibleForAnyOf: Array(otherRunnerIndexes))
+    }
+
+    private func runnerIndexes(onNodeOf runnerIndex: Int) -> Set<Int> {
+        guard let testRunners = testRunners, testRunners.indices.contains(runnerIndex) else { return [runnerIndex] }
+        let node = testRunners[runnerIndex].node
+        return Set(testRunners.indices.filter { testRunners[$0].node == node })
     }
 
     private func beginQuarantine(for testRunner: TestRunner, runnerIndex: Int, node: Node, executer: Executer) {
@@ -256,7 +287,7 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
             )
 
             if previewResult.status == .failed {
-                if testQueue.enqueueForRetry(testCase) {
+                if testQueue.enqueueForRetry(testCase, excludedRunnerIndexes: runnerIndexes(onNodeOf: runnerIndex)) {
                     testCasesCount += 1
                     resultHandler.printRetryEnqueue(testCase, retryCount: testQueue.retryCount(for: testCase))
                 }
