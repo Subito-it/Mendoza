@@ -13,7 +13,7 @@ class TestCommand: Command {
     let usage: String? = "Dispatch UI tests as specified in the `configuration_file`"
     let help: String? = "Dispatch UI tests"
 
-    let debugPluginsFlag = Flag(short: nil, long: "plugin_debug", help: "Dump plugin invocation commands")
+    let debugPluginsFlag = Flag(short: nil, long: "plugin_debug", help: "Keep a timestamped copy of every plugin invocation's stdin envelope. The last envelope per plugin is always kept regardless of this flag")
     let verboseFlag = Flag(short: nil, long: "verbose", help: "Dump debug messages")
 
     let remoteNodesConfigurationPath = Argument<URL>(name: "path", kind: .named(short: nil, long: "remote_nodes_configuration"), optional: true, help: "Path to remote configuration file containing the list of remote nodes to use and destination path")

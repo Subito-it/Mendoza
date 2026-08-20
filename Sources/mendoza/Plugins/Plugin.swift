@@ -5,210 +5,181 @@
 //  Created by Tomas Camin on 22/01/2019.
 //
 
-import CommonCrypto
 import Foundation
+
+private struct PluginEnvelope<Input: Encodable>: Encodable {
+    let input: Input
+    let data: String?
+    let debug: Bool
+
+    private enum CodingKeys: String, CodingKey {
+        case input, data, debug
+    }
+
+    // Explicit: the synthesized encoding uses encodeIfPresent and would drop `data` when
+    // nil, but the contract is that the key is always present as string | null.
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(input, forKey: .input)
+        try container.encode(data, forKey: .data)
+        try container.encode(debug, forKey: .debug)
+    }
+}
 
 class Plugin<Input: DefaultInitializable, Output: DefaultInitializable> {
     var isInstalled: Bool {
-        guard let baseUrl else { return false }
-        return fileManager.fileExists(atPath: baseUrl.appendingPathComponent(filename).path)
+        installedUrl != nil
     }
 
     let logger: ExecuterLogger
     let plugin: Configuration.Plugins
 
-    private let executer: LocalExecuter
     private let name: String
     private let baseUrl: URL?
-    private var filename: String { "\(name).swift" }
     private let fileManager = FileManager.default
+    private let syncQueue: DispatchQueue
+    private let stdinQueue: DispatchQueue
+    private var runningProcesses = [Process]()
 
-    private let pluginOutputMarker = "# plugin-result"
+    private var installedUrl: URL? {
+        guard let baseUrl else { return nil }
+
+        let url = baseUrl.appendingPathComponent(name)
+        var isDirectory: ObjCBool = false
+        guard fileManager.fileExists(atPath: url.path, isDirectory: &isDirectory), !isDirectory.boolValue else { return nil }
+
+        return url
+    }
 
     init(name: String, baseUrl: URL?, plugin: Configuration.Plugins?) {
-        logger = ExecuterLogger(name: "Plugin-\(name)", address: "localhost")
-        executer = LocalExecuter(logger: logger)
+        self.logger = ExecuterLogger(name: "Plugin-\(name)", address: "localhost")
         self.name = name
         self.baseUrl = baseUrl
         self.plugin = plugin ?? .init()
+        self.syncQueue = DispatchQueue(label: "com.subito.mendoza.plugin.\(name)")
+        self.stdinQueue = DispatchQueue(label: "com.subito.mendoza.plugin.\(name).stdin")
     }
 
     func terminate() {
-        executer.terminate()
+        syncQueue.sync {
+            runningProcesses.forEach { $0.terminate() }
+            runningProcesses.removeAll()
+        }
     }
 
     func run(input: Input) throws -> Output {
-        guard let baseUrl else {
+        guard let executableUrl = installedUrl else {
+            guard Output.self == PluginVoid.self else {
+                throw Error("Plugin `\(name)` is not installed, expected an executable at `\(baseUrl?.path ?? "<unset plugins path>")/\(name)`", logger: logger)
+            }
             return Output.defaultInit()
         }
 
+        guard fileManager.isExecutableFile(atPath: executableUrl.path) else {
+            throw Error("Plugin `\(name)` at `\(executableUrl.path)` is not executable, run `chmod +x '\(executableUrl.path)'`", logger: logger)
+        }
+
+        return try run(envelope: makeEnvelope(input: input), executableUrl: executableUrl)
+    }
+
+    func makeEnvelope(input: Input) throws -> Data {
+        try JSONEncoder().encode(PluginEnvelope(input: input, data: plugin.data, debug: plugin.debug))
+    }
+
+    func run(envelope: Data, executableUrl: URL) throws -> Output {
         let start = CFAbsoluteTimeGetCurrent()
         defer { print("🔌 Plugin \(name) took \(CFAbsoluteTimeGetCurrent() - start)s".magenta) }
 
-        let pluginUrl = baseUrl.appendingPathComponent(filename)
-        // We add a suffix to the pluginname that is based on so that swift-sh has a consistent name for its internal cache
+        let envelopeUrl = dumpEnvelope(envelope)
+        let reproduceHint = envelopeUrl.map { "\nTo reproduce: cat '\($0.path)' | '\(executableUrl.path)'" } ?? ""
 
-        let pluginContent = try String(contentsOf: pluginUrl)
-        let pluginRunUrl = baseUrl.appendingPathComponent("_\(filename)_\(pluginContent.sha256())")
+        let stderrUrl = try makeStderrUrl()
+        defer { try? fileManager.removeItem(at: stderrUrl) }
 
-        if !fileManager.fileExists(atPath: pluginRunUrl.path) {
-            // We should delete all plugins with different pluginContent suffixes
-            // try? fileManager.removeItem(at: pluginRunUrl)
-            try fileManager.copyItem(at: pluginUrl, to: pluginRunUrl)
+        let process = Process()
+        let stdin = Pipe()
+        let stdout = Pipe()
+        process.executableURL = executableUrl
+        process.standardInput = stdin
+        process.standardOutput = stdout
 
-            var runContent = try String(contentsOf: pluginRunUrl)
-            runContent += runnerCode()
+        let stderrHandle = try FileHandle(forWritingTo: stderrUrl)
+        process.standardError = stderrHandle
 
-            try runContent.data(using: .utf8)?.write(to: pluginRunUrl)
+        logger.log(command: "\(executableUrl.path) < envelope (\(envelope.count) bytes)")
+
+        do {
+            try process.run()
+        } catch {
+            throw Error("Failed running plugin `\(name)`: \(error.localizedDescription)", logger: logger)
         }
 
-        let inputString: String
-        if input is PluginVoid {
-            inputString = ""
-        } else {
-            let inputJson = try JSONEncoder().encode(input)
-            inputString = String(data: inputJson, encoding: .utf8)! // swiftlint:disable:this force_unwrapping
+        syncQueue.sync { runningProcesses.append(process) }
+        defer { syncQueue.sync { runningProcesses.removeAll { $0 == process } } }
+
+        // Off the calling thread on purpose: a plugin that ignores stdin, or that writes more
+        // than a pipe buffer to stdout before consuming its input, would deadlock against the
+        // stdout read below. Write failures are expected when a plugin exits early.
+        stdinQueue.async {
+            try? stdin.fileHandleForWriting.write(contentsOf: envelope)
+            try? stdin.fileHandleForWriting.close()
         }
 
-        // Wrap each argument in POSIX single quotes. Inside single quotes the shell treats every
-        // byte literally — no backslash-escape or ANSI-C ($'…') interpretation — so JSON payloads
-        // (with their \", \\, \/ and \n escapes) reach the plugin's argv byte-for-byte. The only
-        // character that can't appear inside a single-quoted string is ' itself, escaped as '\''
-        // (close quote, literal quote, reopen quote).
-        let shellQuote: (String?) -> String = { input in
-            guard let input else { return "''" }
-            return "'" + input.replacingOccurrences(of: "'", with: "'\\''") + "'"
+        let outputData = stdout.fileHandleForReading.readDataToEndOfFile()
+        process.waitUntilExit()
+
+        try? stderrHandle.close()
+        let standardError = (try? String(contentsOf: stderrUrl)).map { $0.trimmingCharacters(in: .whitespacesAndNewlines) } ?? ""
+        let output = String(decoding: outputData, as: UTF8.self)
+
+        logger.log(output: [standardError.isEmpty ? nil : "stderr:\n\(standardError)",
+                            output.isEmpty ? nil : "stdout:\n\(output)"].compactMap { $0 }.joined(separator: "\n\n"),
+                   statusCode: process.terminationStatus)
+
+        guard process.terminationStatus == 0 else {
+            let details = standardError.isEmpty ? "" : "\n\(standardError)"
+            throw Error("Plugin `\(name)` failed with status code \(process.terminationStatus)\(details)\(reproduceHint)", logger: logger)
         }
 
-        let command = "chmod +x \(pluginRunUrl.path); \(pluginRunUrl.path) \(shellQuote(inputString)) \(shellQuote(plugin.data))"
+        guard Output.self != PluginVoid.self else { return Output.defaultInit() }
 
-        if plugin.debug {
-            let timestamp = Int(Date().timeIntervalSince1970)
-            try command.data(using: .utf8)?.write(to: baseUrl.appendingPathComponent(filename + ".debug-\(timestamp)"))
+        guard !outputData.isEmpty else {
+            throw Error("Plugin `\(name)` wrote nothing to stdout, expected a JSON \(Output.self)\(reproduceHint)", logger: logger)
         }
 
         do {
-            if Output.self == PluginVoid.self && !plugin.debug {
-                _ = try executer.execute(command + " &")
-
-                return Output.defaultInit()
-            } else {
-                let output = try executer.capture(command).output
-                guard let result = output.components(separatedBy: pluginOutputMarker).last,
-                      let resultData = result.data(using: .utf8), !resultData.isEmpty,
-                      let ret = try? JSONDecoder().decode(Output.self, from: resultData)
-                else {
-                    throw Error("Failed running plugin `\(filename)`, got \(output)", logger: executer.logger)
-                }
-                if plugin.debug {
-                    print("⚠️ plugin output:\n\(output)")
-                }
-
-                return ret
-            }
+            return try JSONDecoder().decode(Output.self, from: outputData)
         } catch {
-            print(error)
-            throw Error(error.localizedDescription)
+            throw Error("Plugin `\(name)` wrote stdout that cannot be decoded as \(Output.self): \(error.localizedDescription)\nGot: \(output)\(reproduceHint)", logger: logger)
         }
     }
 
-    func writeTemplate() throws {
-        guard let destinationUrl = baseUrl?.appendingPathComponent(filename) else { return }
-
-        var content = [String]()
-
-        content += ["#!/usr/bin/swift", ""]
-        content += ["import Foundation", ""]
-
-        let dependencies: [DefaultInitializable.Type] = [Input.self, Output.self]
-        let reflections = dependencies.flatMap { $0.reflections() }
-        let uniqueSubject = Set(reflections.map(\.subject))
-        let uniqueReflections = uniqueSubject.compactMap { uniqueSubject in reflections.first(where: { reflection in reflection.subject == uniqueSubject }) }.map(\.reflection)
-
-        let dependenciesReflection = uniqueReflections.flatMap { $0.components(separatedBy: "\n") }
-        let dependenciesReflectionComment = dependenciesReflection.map { "// \($0)" }
-        content += dependenciesReflectionComment
-        content += body().components(separatedBy: "\n")
-
-        let data = content.joined(separator: "\n").data(using: .utf8)
-        try data?.write(to: destinationUrl)
-
-        try fileManager.setAttributes([.posixPermissions: 0o777], ofItemAtPath: destinationUrl.path)
+    private func makeStderrUrl() throws -> URL {
+        let url = Path.temp.url.appendingPathComponent("\(name)-\(UUID().uuidString).stderr")
+        try? fileManager.createDirectory(at: Path.temp.url, withIntermediateDirectories: true)
+        guard fileManager.createFile(atPath: url.path, contents: nil) else {
+            throw Error("Failed creating a temporary file to capture `\(name)`'s stderr", logger: logger)
+        }
+        return url
     }
 
-    private func body() -> String {
-        let handleSignature: String
-        switch (Input.self, Output.self) {
-        case (is PluginVoid.Type, is PluginVoid.Type):
-            handleSignature = "func handle(pluginData: String?) {"
-        case (_, is PluginVoid.Type):
-            handleSignature = "func handle(_ input: \(Input.self), pluginData: String?) {"
-        case (is PluginVoid.Type, _):
-            handleSignature = "func handle(pluginData: String?) -> \(Output.self) {"
-        case (_, _):
-            handleSignature = "func handle(_ input: \(Input.self), pluginData: String?) -> \(Output.self) {"
+    /// Always dumps, so that the input of a failing plugin is on disk before anyone knows they
+    /// want it. Returns nil rather than throwing: losing the dump must not fail the run.
+    private func dumpEnvelope(_ envelope: Data) -> URL? {
+        try? fileManager.createDirectory(at: Path.logs.url, withIntermediateDirectories: true)
+
+        let url = Path.logs.url.appendingPathComponent("\(name).envelope.json")
+        // .atomic writes to an auxiliary file and renames, so concurrent invocations of a
+        // shared plugin (EventPlugin) can't interleave into a corrupt file.
+        guard (try? envelope.write(to: url, options: .atomic)) != nil else { return nil }
+        try? fileManager.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
+
+        if plugin.debug {
+            let timestamped = Path.logs.url.appendingPathComponent("\(name).envelope-\(Int(Date().timeIntervalSince1970)).json")
+            try? envelope.write(to: timestamped, options: .atomic)
+            try? fileManager.setAttributes([.posixPermissions: 0o600], ofItemAtPath: timestamped.path)
         }
 
-        return """
-        struct \(name) {
-            \(handleSignature)
-                // write your implementation here
-            }
-        }
-        """
-    }
-
-    private func runnerCode() -> String {
-        var result = ["\n"]
-
-        let dependencies: [DefaultInitializable.Type] = [Input.self, Output.self]
-        let reflections = dependencies.flatMap { $0.reflections() }
-        let uniqueSubject = Set(reflections.map(\.subject))
-        let uniqueReflections = uniqueSubject.compactMap { uniqueSubject in reflections.first(where: { reflection in reflection.subject == uniqueSubject }) }.map(\.reflection)
-
-        let dependenciesReflection = uniqueReflections.flatMap { $0.components(separatedBy: "\n") }
-        result += dependenciesReflection
-
-        result += ["let pluginData = CommandLine.arguments[2]", ""]
-
-        switch (Input.self, Output.self) {
-        case (is PluginVoid.Type, is PluginVoid.Type):
-            result += ["\(name)().handle(pluginData: pluginData)", ""]
-            result += ["print(\"\(pluginOutputMarker)\")"]
-            result += ["print(\"{}\")"]
-        case (_, is PluginVoid.Type):
-            result += ["let inputData = CommandLine.arguments[1].data(using: .utf8)!"]
-            result += ["let input = try! JSONDecoder().decode(\(Input.self).self, from: inputData)", ""]
-
-            result += ["\(name)().handle(input, pluginData: pluginData)", ""]
-            result += ["print(\"\(pluginOutputMarker)\")"]
-            result += ["print(\"{}\")"]
-        case (is PluginVoid.Type, _):
-            result += ["let result = \(name)().handle(pluginData: pluginData)", ""]
-            result += ["print(\"\(pluginOutputMarker)\")"]
-            result += ["print(\"{}\")"]
-        case (_, _):
-            result += ["let inputData = CommandLine.arguments[1].data(using: .utf8)!"]
-            result += ["let input = try! JSONDecoder().decode(\(Input.self).self, from: inputData)", ""]
-
-            result += ["let result = \(name)().handle(input, pluginData: pluginData)", ""]
-            result += ["let outputData = try! JSONEncoder().encode(result)"]
-            result += ["print(\"\(pluginOutputMarker)\")"]
-            result += ["print(String(data: outputData, encoding: .utf8)!)"]
-        }
-
-        return result.joined(separator: "\n")
-    }
-}
-
-private extension String {
-    func sha256() -> String {
-        let data = Data(utf8)
-        var hash = [UInt8](repeating: 0, count: Int(CC_SHA256_DIGEST_LENGTH))
-        data.withUnsafeBytes {
-            _ = CC_SHA256($0.baseAddress, CC_LONG(data.count), &hash)
-        }
-
-        return hash.map { String(format: "%02x", $0) }.joined()
+        return url
     }
 }
