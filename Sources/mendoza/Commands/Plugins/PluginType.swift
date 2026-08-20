@@ -91,7 +91,9 @@ enum PluginType: String, CaseIterable {
         result += ["    #!/usr/bin/env ruby",
                    "    require \"json\"",
                    "",
-                   "    payload = JSON.parse($stdin.read)",
+                   "    # Reading a file when given one keeps the plugin runnable under a debugger,",
+                   "    # whose run configurations cannot redirect stdin. Mendoza only ever uses stdin.",
+                   "    payload = JSON.parse(ARGV[0] ? File.read(ARGV[0]) : $stdin.read)",
                    "    input   = payload[\"input\"]",
                    "    data    = JSON.parse(payload[\"data\"] || \"{}\")",
                    ""]

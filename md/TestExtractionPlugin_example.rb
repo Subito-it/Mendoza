@@ -11,7 +11,9 @@
 require "json"
 require "uri"
 
-payload = JSON.parse($stdin.read)
+# Mendoza always writes the envelope to stdin. Accepting a file path as well lets you run this
+# under a debugger, whose run configurations cannot redirect stdin.
+payload = JSON.parse(ARGV[0] ? File.read(ARGV[0]) : $stdin.read)
 input = payload["input"]
 data = JSON.parse(payload["data"] || "{}")
 

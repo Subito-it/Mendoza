@@ -220,7 +220,9 @@ Three things must be true, or the plugin is silently skipped:
 #!/usr/bin/env ruby
 require "json"
 
-payload = JSON.parse($stdin.read)
+# Mendoza always writes the envelope to stdin. Accepting a file path as well costs one line
+# and makes the plugin runnable under a debugger — see below.
+payload = JSON.parse(ARGV[0] ? File.read(ARGV[0]) : $stdin.read)
 input   = payload["input"]
 data    = JSON.parse(payload["data"] || "{}")
 
@@ -305,7 +307,7 @@ So the loop is:
 # 1. keep a real envelope as a fixture
 cp ./mendoza-replay/TearDownPlugin.20260820-154512.482.json fixtures/teardown.json
 
-# 2. iterate in a second, with your language's own debugger
+# 2. iterate in a second, without Mendoza
 cat fixtures/teardown.json | ./TearDownPlugin
 
 # 3. check Mendoza can actually consume the result
@@ -315,6 +317,32 @@ mendoza plugin exec TearDownPlugin --envelope fixtures/teardown.json --plugins_p
 One file is written per invocation, timestamped to the millisecond, so a plugin invoked repeatedly during a session — like `EventPlugin` — leaves one envelope per event rather than overwriting itself.
 
 Step 3 is worth doing even though step 2 already runs the plugin: `plugin exec` decodes the output into the type Mendoza expects, which catches a plugin whose stdout looks perfectly fine but cannot be consumed — misspelled keys, or a progress line printed before the JSON. Those otherwise only fail during a real session.
+
+### Running a plugin under a debugger
+
+Editors launch a program directly rather than through a shell, so a run configuration cannot redirect a file into stdin. Read the envelope from an argument when one is given, and the problem disappears:
+
+```ruby
+payload = JSON.parse(ARGV[0] ? File.read(ARGV[0]) : $stdin.read)
+```
+
+```python
+payload = json.load(open(sys.argv[1]) if len(sys.argv) > 1 else sys.stdin)
+```
+
+Mendoza always passes the envelope on stdin and never as an argument, so this costs nothing in production and keeps the payload out of `argv`, where it would be subject to the size limit that stdin exists to avoid. With that line in place, debugging is whatever your language already does — point your run configuration at the plugin and pass the fixture path as its argument:
+
+```json
+// .vscode/launch.json
+{
+  "type": "rdbg",
+  "request": "launch",
+  "script": "${workspaceFolder}/plugins/TearDownPlugin",
+  "args": ["${workspaceFolder}/fixtures/teardown.json"]
+}
+```
+
+Breakpoints, stepping and variable inspection then work as usual, with no pipes involved.
 
 Saved envelopes also make plugins unit-testable: commit one as a fixture and assert your plugin's output in your own CI, with no Mendoza involved.
 
