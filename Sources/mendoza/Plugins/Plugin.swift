@@ -34,7 +34,8 @@ class Plugin<Input: DefaultInitializable, Output: DefaultInitializable> {
     let logger: ExecuterLogger
     let plugin: Configuration.Plugins
 
-    private let name: String
+    let name: String
+
     private let baseUrl: URL?
     private let fileManager = FileManager.default
     private let syncQueue: DispatchQueue
@@ -68,6 +69,24 @@ class Plugin<Input: DefaultInitializable, Output: DefaultInitializable> {
     }
 
     func run(input: Input) throws -> Output {
+        try run(envelope: makeEnvelope(input: input))
+    }
+
+    func makeEnvelope(input: Input, prettyPrinted: Bool = false) throws -> Data {
+        let encoder = JSONEncoder()
+        if prettyPrinted {
+            encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        }
+
+        // Empty maps to null so `data` is either a string or absent-as-null, never "". The
+        // usual `payload["data"] || "{}"` idiom needs that: an empty string is truthy in most
+        // languages, so it would survive the fallback and then fail to parse as JSON.
+        let data = plugin.data.isEmpty ? nil : plugin.data
+
+        return try encoder.encode(PluginEnvelope(input: input, data: data, debug: plugin.debug))
+    }
+
+    func run(envelope: Data) throws -> Output {
         guard let executableUrl = installedUrl else {
             guard Output.self == PluginVoid.self else {
                 throw Error("Plugin `\(name)` is not installed, expected an executable at `\(baseUrl?.path ?? "<unset plugins path>")/\(name)`", logger: logger)
@@ -79,14 +98,6 @@ class Plugin<Input: DefaultInitializable, Output: DefaultInitializable> {
             throw Error("Plugin `\(name)` at `\(executableUrl.path)` is not executable, run `chmod +x '\(executableUrl.path)'`", logger: logger)
         }
 
-        return try run(envelope: makeEnvelope(input: input), executableUrl: executableUrl)
-    }
-
-    func makeEnvelope(input: Input) throws -> Data {
-        try JSONEncoder().encode(PluginEnvelope(input: input, data: plugin.data, debug: plugin.debug))
-    }
-
-    func run(envelope: Data, executableUrl: URL) throws -> Output {
         let start = CFAbsoluteTimeGetCurrent()
         defer { print("🔌 Plugin \(name) took \(CFAbsoluteTimeGetCurrent() - start)s".magenta) }
 
