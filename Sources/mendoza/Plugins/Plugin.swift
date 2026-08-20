@@ -70,15 +70,17 @@ class Plugin<Input: DefaultInitializable, Output: DefaultInitializable> {
             inputString = String(data: inputJson, encoding: .utf8)! // swiftlint:disable:this force_unwrapping
         }
 
-        let escape: (String?) -> String = { input in
-            input?
-                .replacingOccurrences(of: "'", with: "’")
-                .replacingOccurrences(of: #"\"#, with: #"\\"#)
-                .replacingOccurrences(of: #"\\/"#, with: #"\/"#)
-                ?? ""
+        // Wrap each argument in POSIX single quotes. Inside single quotes the shell treats every
+        // byte literally — no backslash-escape or ANSI-C ($'…') interpretation — so JSON payloads
+        // (with their \", \\, \/ and \n escapes) reach the plugin's argv byte-for-byte. The only
+        // character that can't appear inside a single-quoted string is ' itself, escaped as '\''
+        // (close quote, literal quote, reopen quote).
+        let shellQuote: (String?) -> String = { input in
+            guard let input else { return "''" }
+            return "'" + input.replacingOccurrences(of: "'", with: "'\\''") + "'"
         }
 
-        let command = "chmod +x \(pluginRunUrl.path); \(pluginRunUrl.path) $'\(escape(inputString))' $'\(escape(plugin.data))'"
+        let command = "chmod +x \(pluginRunUrl.path); \(pluginRunUrl.path) \(shellQuote(inputString)) \(shellQuote(plugin.data))"
 
         if plugin.debug {
             let timestamp = Int(Date().timeIntervalSince1970)
