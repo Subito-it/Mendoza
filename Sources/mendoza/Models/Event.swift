@@ -11,27 +11,13 @@ struct Event: Codable {
     let kind: Kind
     let info: [String: String]
 
-    // Raw values reach EventPlugin as the `kind` field of the stdin envelope: keep them
-    // stable and self-describing rather than positional.
+    /// Raw values reach EventPlugin as the `kind` field of the stdin envelope: keep them
+    /// stable and self-describing rather than positional.
     enum Kind: String, Codable {
         case start, stop
         case startCompiling, stopCompiling
         case startTesting, stopTesting
         case error
-    }
-}
-
-extension Event.Kind: CustomReflectable {
-    var customMirror: Mirror {
-        Mirror(self, children: ["hack": """
-        enum Kind: String, Codable {
-            case start, stop
-            case startCompiling, stopCompiling
-            case startTesting, stopTesting
-            case error
-        }
-
-        """])
     }
 }
 
