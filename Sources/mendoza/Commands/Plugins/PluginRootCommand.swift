@@ -12,7 +12,7 @@ class PluginRootCommand: Command {
     let name: String? = "plugin"
     let usage: String? = "Plugins allow to customize and extend the dispatcher's functionality"
     let help: String? = "Customize and extend the dispatcher's functionality"
-    let subcommands: [Command] = [PluginDescribeCommand(), PluginExecCommand()]
+    let subcommands: [Command] = [PluginDescribeCommand()]
 
     func run() -> Bool {
         true

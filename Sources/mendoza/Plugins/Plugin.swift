@@ -73,10 +73,6 @@ class Plugin<Input: DefaultInitializable, Output: DefaultInitializable> {
         }
     }
 
-    func run(input: Input) throws -> Output {
-        try run(envelope: makeEnvelope(input: input))
-    }
-
     func makeEnvelope(input: Input, prettyPrinted: Bool = false) throws -> Data {
         let encoder = JSONEncoder()
         if prettyPrinted {
@@ -91,7 +87,7 @@ class Plugin<Input: DefaultInitializable, Output: DefaultInitializable> {
         return try encoder.encode(PluginEnvelope(input: input, data: data))
     }
 
-    func run(envelope: Data) throws -> Output {
+    func run(input: Input) throws -> Output {
         guard let executableUrl = installedUrl else {
             guard Output.self == PluginVoid.self else {
                 throw Error("Plugin `\(name)` is not installed, expected an executable at `\(baseUrl?.path ?? "<unset plugins path>")/\(name)`", logger: logger)
@@ -106,6 +102,7 @@ class Plugin<Input: DefaultInitializable, Output: DefaultInitializable> {
         let start = CFAbsoluteTimeGetCurrent()
         defer { print("🔌 Plugin \(name) took \(CFAbsoluteTimeGetCurrent() - start)s".magenta) }
 
+        let envelope = try makeEnvelope(input: input)
         let envelopeUrl = dumpEnvelope(envelope)
         let reproduceHint = envelopeUrl.map { "\nTo reproduce: cat '\($0.path)' | '\(executableUrl.path)'" } ?? ""
 

@@ -53,19 +53,6 @@ enum PluginType: String, CaseIterable {
         }
     }
 
-    /// Replays a captured envelope through the very same code path a test session uses, so a
-    /// plugin's output is validated against the type Mendoza will decode it into.
-    func exec(envelope: Data, baseUrl: URL) throws -> String {
-        switch self {
-        case .testExtraction: return try Self.exec(TestExtractionPlugin(baseUrl: baseUrl), envelope: envelope)
-        case .testSorting: return try Self.exec(TestSortingPlugin(baseUrl: baseUrl), envelope: envelope)
-        case .event: return try Self.exec(EventPlugin(baseUrl: baseUrl), envelope: envelope)
-        case .preCompilation: return try Self.exec(PreCompilationPlugin(baseUrl: baseUrl), envelope: envelope)
-        case .postCompilation: return try Self.exec(PostCompilationPlugin(baseUrl: baseUrl), envelope: envelope)
-        case .tearDown: return try Self.exec(TearDownPlugin(baseUrl: baseUrl), envelope: envelope)
-        }
-    }
-
     private static func describe<Input: DefaultInitializable, Output: DefaultInitializable>(_ plugin: Plugin<Input, Output>) throws -> String {
         let envelope = try plugin.makeEnvelope(input: Input.defaultInit(), prettyPrinted: true)
 
@@ -105,22 +92,4 @@ enum PluginType: String, CaseIterable {
         return result.joined(separator: "\n")
     }
 
-    private static func exec<Input: DefaultInitializable, Output: DefaultInitializable>(_ plugin: Plugin<Input, Output>, envelope: Data) throws -> String {
-        // A pipeline run treats a missing void plugin as a no-op; here it means the user pointed
-        // us at the wrong folder, so say so instead of reporting a success that never happened.
-        guard plugin.isInstalled else {
-            throw Error("No `\(plugin.name)` executable found at the plugins path")
-        }
-
-        let output = try plugin.run(envelope: envelope)
-
-        guard Output.self != PluginVoid.self else {
-            return "✅ \(plugin.name) exited 0 and, as expected for this plugin type, wrote no output."
-        }
-
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-
-        return try "✅ \(plugin.name) output decoded as \(Output.self):\n\(String(decoding: encoder.encode(output), as: UTF8.self))"
-    }
 }

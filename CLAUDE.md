@@ -57,9 +57,6 @@ mendoza configuration init
 
 # Show a plugin's input envelope and expected output
 mendoza plugin describe TearDownPlugin
-
-# Replay a captured envelope through a plugin, without a test session
-mendoza plugin exec TearDownPlugin --envelope ./mendoza-replay/TearDownPlugin.20260820-154512.482.json --plugins_path ./plugins
 ```
 
 ---

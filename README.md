@@ -141,14 +141,6 @@ Prints the JSON envelope a plugin receives on stdin and the output it is expecte
 mendoza plugin describe TearDownPlugin
 ```
 
-## `plugin exec`
-
-Runs a plugin against a saved envelope, without a test session, and decodes its output into the type Mendoza expects. Refer to the [debugging plugins](#Debugging-plugins) paragraph.
-
-```sh
-mendoza plugin exec TearDownPlugin --envelope ./mendoza-replay/TearDownPlugin.20260820-154512.482.json --plugins_path ./plugins
-```
-
 ## `test`
 
 Will launch tests as specified in the configuration files.
@@ -309,14 +301,15 @@ cp ./mendoza-replay/TearDownPlugin.20260820-154512.482.json fixtures/teardown.js
 
 # 2. iterate in a second, without Mendoza
 cat fixtures/teardown.json | ./TearDownPlugin
-
-# 3. check Mendoza can actually consume the result
-mendoza plugin exec TearDownPlugin --envelope fixtures/teardown.json --plugins_path .
 ```
 
 One file is written per invocation, timestamped to the millisecond, so a plugin invoked repeatedly during a session — like `EventPlugin` — leaves one envelope per event rather than overwriting itself.
 
-Step 3 is worth doing even though step 2 already runs the plugin: `plugin exec` decodes the output into the type Mendoza expects, which catches a plugin whose stdout looks perfectly fine but cannot be consumed — misspelled keys, or a progress line printed before the JSON. Those otherwise only fail during a real session.
+For the plugins that return a value, check the shape of what you print as well as the values, since a result Mendoza cannot decode fails the session:
+
+```sh
+cat fixtures/extraction.json | ./TestExtractionPlugin | jq -e 'all(has("name") and has("suite"))'
+```
 
 ### Running a plugin under a debugger
 
