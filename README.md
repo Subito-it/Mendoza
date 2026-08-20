@@ -15,7 +15,7 @@ A snapshot of a session running on 8 concurrent nodes (each running 2 simulators
 | :---: | ------------------------------------ |
 |   🏃‍♀️   | Makes UI Test execution super fast!  |
 |   👨🏻‍💻   | Written in Swift                     |
-|   🔌   | Supports plugins (written in Swift!) |
+|   🔌   | Supports plugins (in any language)   |
 |   🔍   | Wide set of result formats           |
 |   🤖   | Supports both iOS and macOS projects |
 
@@ -133,9 +133,21 @@ The destination node is the node that will be responsible to collect all the res
 
 The credentials and passwords you will be asked during initialization are stored locally in your Keychain (see [configuration file and security](#Configuration-file-and-security) paragraph). This means that if the configuration was generated on a different machine you may be missing those credentials/passwords. The `configuration authentication` command will prompt and store missing credentials/password in your local Keychain.
 
-## `plugin init`
+## `plugin describe`
 
-This command allows to create a plugin template script that will be used during the execution of the tests. Refer to the [plugins](#Plugins) paragraph.
+Prints the JSON envelope a plugin receives on stdin and the output it is expected to write on stdout, together with a minimal starter script. The sample is generated from Mendoza's own types, so it always matches the version of Mendoza you are running.
+
+```sh
+mendoza plugin describe TearDownPlugin
+```
+
+## `plugin exec`
+
+Runs a plugin against a saved envelope, without a test session, and decodes its output into the type Mendoza expects. Refer to the [debugging plugins](#Debugging-plugins) paragraph.
+
+```sh
+mendoza plugin exec TearDownPlugin --envelope /tmp/mendoza/logs/TearDownPlugin.envelope.json --plugins_path ./plugins
+```
 
 ## `test`
 
@@ -171,52 +183,101 @@ If you're interested in seeing the specific actions that made a test fail can ma
 
 Plugins allow to customize various steps of Mendoza's pipeline. This opens up to several optimizations that are stricly related to your own specific workflows. 
 
-A plugin is initialized with the `plugin init` command. The plugin file that is generated contains a struct with a single `handle()` method with a signature that depends on the plugin. The types in the signature are showed as comments above the struct definition.
+A plugin is **any executable file** — Ruby, Python, bash, a compiled binary, anything with a shebang. Mendoza writes a single JSON envelope to its **stdin** and reads the result from its **stdout**, so nodes need nothing installed beyond whatever your plugin itself requires.
+
+| Channel | Carries |
+| --- | --- |
+| **stdin** | one JSON envelope (below) |
+| **stdout** | the result as JSON, or nothing for plugins that return no value |
+| **stderr** | your logs and diagnostics, captured into the session's HTML log |
+| **exit code** | `0` on success. Anything else fails the session, with stderr attached to the error |
+
+The envelope always carries the same three keys:
+
+```json
+{
+  "input": { },
+  "data": "…",
+  "debug": false
+}
+```
+
+- `input` is the plugin's typed input. It is `{}` for plugins that take none.
+- `data` is the `--plugins_data` string, passed verbatim and never parsed by Mendoza. It is `null` when unset.
+- `debug` mirrors the `--plugin_debug` flag.
+
+Run `mendoza plugin describe <name>` to see the exact envelope and expected output for a given plugin.
+
+### Installing a plugin
+
+Three things must be true, or the plugin is silently skipped:
+
+1. the file is named **exactly** after the plugin type, with **no extension**: `TestExtractionPlugin`, `TestSortingPlugin`, `EventPlugin`, `PreCompilationPlugin`, `PostCompilationPlugin`, `TearDownPlugin`
+2. it lives at the folder passed as `--plugins_path` (defaulting to the folder containing your configuration file)
+3. it is executable — `chmod +x`. Mendoza will not set the bit for you, but it will tell you if it is missing
+
+### A complete plugin
+
+```ruby
+#!/usr/bin/env ruby
+require "json"
+
+payload = JSON.parse($stdin.read)
+input   = payload["input"]
+data    = JSON.parse(payload["data"] || "{}")
+
+warn "considering #{input["candidates"].size} files"   # diagnostics go to stderr
+
+tests = decide_tests(input, data)
+
+# stdout is the result, decoded by Mendoza as [TestCase]
+puts JSON.generate(tests.map { |t| { "name" => t.name, "suite" => t.suite } })
+```
+
+Never `print`/`puts` anything but the result: stdout **is** the result.
 
 The following plugins are available:
 
-- `extract`: allows to specify the test methods that should be performed in every test file
-- `sorting`: plugin to add estimated execution time to test cases
-- `event`: plugin to perform actions (e.g. notifications) based on dispatching events
-- `precompilation`: plugin to perform actions before compilation starts
-- `postcompilation`: plugin to perform actions after compilation completes
-- `teardown`: plugin to perform actions at the end of the dispatch process
-
-You should definitely consider using [swift sh](https://github.com/mxcl/swift-sh) if your plugins requires additional dependencies.
+- `TestExtractionPlugin`: allows to specify the test methods that should be performed in every test file
+- `TestSortingPlugin`: plugin to add estimated execution time to test cases
+- `EventPlugin`: plugin to perform actions (e.g. notifications) based on dispatching events
+- `PreCompilationPlugin`: plugin to perform actions before compilation starts
+- `PostCompilationPlugin`: plugin to perform actions after compilation completes
+- `TearDownPlugin`: plugin to perform actions at the end of the dispatch process
 
 
-## extract
+## TestExtractionPlugin
 
 By default test methods will be extracted from all files in the UI testing target. This should work most of the times however in some advanced cases this could not be the desired behaviour, for example if there is some custom tagging to run tests on specific devices (e.g. only iPhone/iPad). This plugin allows to override the default behaviour and put in place a custom implementation
 
-See an example [TestExtractionPlugin.swift](md/TestExtractionPlugin_example.swift).
+See an example [TestExtractionPlugin](md/TestExtractionPlugin_example.rb).
 
 
-## sorting
+## TestSortingPlugin
 
 By default test cases will be executed randomly because Mendoza has no information about the execution time of test cases. Mendoza can significantly improve total execution time of test if you provide an estimate of the execution time of tests.
 
 Using tools like [Cachi](https://github.com/Subito-it/Cachi) you can automatically store and retrieve tests statistics.
 
-See an example [TestSortingPlugin.swift](md/TestSortingPlugin_example.swift).
+See an example [TestSortingPlugin](md/TestSortingPlugin_example.rb).
 
 
-## event
+## EventPlugin
 
 This plugin will be invoked during the different steps of Mendoza's pipeline. You'll be notified when compilation starts/ends, when tests bundles start/end being distributed and so on. Based on these event you could for example send notifications.
 
 
-## precompilation
+## PreCompilationPlugin
 
 Your project might be so heavily customized that you might need to perform some changes to the project before the compilation of the UI testing target begins.
 
 
-## postcompilation
+## PostCompilationPlugin
 
 If you're using a precompilation plugin you might also need a post compilation plugin to restore any change previously made.
 
 
-## teardown
+## TearDownPlugin
 
 This plugin allows to perform custom actions once the test session ends. You'll get some result information as input in order to perform action accoring to the test session outcome
 
@@ -224,9 +285,40 @@ This plugin allows to perform custom actions once the test session ends. You'll 
 
 ## Debugging plugins
 
-The files used by Mendoza internally to execute plugins won't be deleted when you run tests passing the `--plugin_debug` flag. After a test session, in the same folder of your plugins, you'll find 2 additional files: one with the same filename of the plugin but prefixed with an underscore and a file with a _.debug_ extension. The _.debug_ file will invoke the plugin file and pass arguments to it.
+Because a plugin's entire input is one JSON document on stdin, you can replay a real invocation offline instead of running a test session for every change.
 
-An easy way to debug a plugins is to create a new macOS command line tool project in Xcode, copy paste the content of the __Pluginfile.swft_ and add the arguments to the scheme settings. From there you can use Xcode to run an debug the plugin.
+**Every** invocation writes its envelope to `/tmp/mendoza/logs/<PluginName>.envelope.json`, whether or not you passed `--plugin_debug`. That is deliberate: you usually discover you want the input *after* the run that misbehaved, and a `TearDownPlugin` envelope — that session's specific pass/fail/retry set — cannot be reconstructed on demand. When a plugin fails, the error tells you how to replay it:
+
+```
+🔌 TearDownPlugin failed with status code 1
+undefined method `dig' for nil:NilClass (teardown_notify.rb:42)
+To reproduce: cat '/tmp/mendoza/logs/TearDownPlugin.envelope.json' | '/path/to/plugins/TearDownPlugin'
+```
+
+So the loop is:
+
+```sh
+# 1. keep a real envelope (/tmp is periodically cleaned)
+cp /tmp/mendoza/logs/TearDownPlugin.envelope.json fixtures/teardown.json
+
+# 2. iterate in a second, with your language's own debugger
+cat fixtures/teardown.json | ./TearDownPlugin
+
+# 3. check Mendoza can actually consume the result
+mendoza plugin exec TearDownPlugin --envelope fixtures/teardown.json --plugins_path .
+```
+
+Step 3 is worth doing even though step 2 already runs the plugin: `plugin exec` decodes the output into the type Mendoza expects, which catches a plugin whose stdout looks perfectly fine but cannot be consumed — misspelled keys, or a progress line printed before the JSON. Those otherwise only fail during a real session.
+
+Saved envelopes also make plugins unit-testable: commit one as a fixture and assert your plugin's output in your own CI, with no Mendoza involved.
+
+> **NOTE**
+>
+> The envelope contains your `--plugins_data` verbatim, so if that carries tokens or webhook URLs the dump does too. It is written `0600`, but **strip `data` before committing an envelope as a fixture**.
+
+Passing `--plugin_debug` additionally keeps a timestamped copy of every envelope (`<PluginName>.envelope-<timestamp>.json`), which is useful for a plugin invoked repeatedly during a session, like `EventPlugin`.
+
+Anything your plugin writes to stderr is captured in the session logs at `/tmp/mendoza/logs/localhost-Plugin-<PluginName>.html`, even when the plugin succeeds. Note that `EventPlugin` failures are intentionally ignored so that a broken notification cannot fail a test run — for that plugin the HTML log is the only place its diagnostics appear.
 
 
 # Configuration file and security
