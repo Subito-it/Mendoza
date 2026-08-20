@@ -104,6 +104,12 @@ enum PluginType: String, CaseIterable {
     }
 
     private static func exec<Input: DefaultInitializable, Output: DefaultInitializable>(_ plugin: Plugin<Input, Output>, envelope: Data) throws -> String {
+        // A pipeline run treats a missing void plugin as a no-op; here it means the user pointed
+        // us at the wrong folder, so say so instead of reporting a success that never happened.
+        guard plugin.isInstalled else {
+            throw Error("No `\(plugin.name)` executable found at the plugins path")
+        }
+
         let output = try plugin.run(envelope: envelope)
 
         guard Output.self != PluginVoid.self else {
