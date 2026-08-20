@@ -146,7 +146,7 @@ mendoza plugin describe TearDownPlugin
 Runs a plugin against a saved envelope, without a test session, and decodes its output into the type Mendoza expects. Refer to the [debugging plugins](#Debugging-plugins) paragraph.
 
 ```sh
-mendoza plugin exec TearDownPlugin --envelope /tmp/mendoza/logs/TearDownPlugin.envelope.json --plugins_path ./plugins
+mendoza plugin exec TearDownPlugin --envelope ./mendoza-replay/TearDownPlugin.20260820-154512.482.json --plugins_path ./plugins
 ```
 
 ## `test`
@@ -192,19 +192,17 @@ A plugin is **any executable file** — Ruby, Python, bash, a compiled binary, a
 | **stderr** | your logs and diagnostics, captured into the session's HTML log |
 | **exit code** | `0` on success. Anything else fails the session, with stderr attached to the error |
 
-The envelope always carries the same three keys:
+The envelope always carries the same two keys:
 
 ```json
 {
   "input": { },
-  "data": "…",
-  "debug": false
+  "data": "…"
 }
 ```
 
 - `input` is the plugin's typed input. It is `{}` for plugins that take none.
 - `data` is the `--plugins_data` string, passed verbatim and never parsed by Mendoza. It is `null` when unset.
-- `debug` mirrors the `--plugin_debug` flag.
 
 Run `mendoza plugin describe <name>` to see the exact envelope and expected output for a given plugin.
 
@@ -287,19 +285,25 @@ This plugin allows to perform custom actions once the test session ends. You'll 
 
 Because a plugin's entire input is one JSON document on stdin, you can replay a real invocation offline instead of running a test session for every change.
 
-**Every** invocation writes its envelope to `/tmp/mendoza/logs/<PluginName>.envelope.json`, whether or not you passed `--plugin_debug`. That is deliberate: you usually discover you want the input *after* the run that misbehaved, and a `TearDownPlugin` envelope — that session's specific pass/fail/retry set — cannot be reconstructed on demand. When a plugin fails, the error tells you how to replay it:
+**Every** invocation writes its envelope to `<PluginName>.<timestamp>.json`, with no flag required. That is deliberate: you usually discover you want the input *after* the run that misbehaved, and a `TearDownPlugin` envelope — that session's specific pass/fail/retry set — cannot be reconstructed on demand. When a plugin fails, the error tells you how to replay it:
 
 ```
 🔌 TearDownPlugin failed with status code 1
 undefined method `dig' for nil:NilClass (teardown_notify.rb:42)
-To reproduce: cat '/tmp/mendoza/logs/TearDownPlugin.envelope.json' | '/path/to/plugins/TearDownPlugin'
+To reproduce: cat '/tmp/mendoza/logs/TearDownPlugin.20260820-154512.482.json' | '/path/to/plugins/TearDownPlugin'
+```
+
+By default envelopes land in the session logs folder, which is **wiped when the next session starts**. Pass `--plugin_replay_path` to keep them somewhere durable — a folder your CI can archive, or one you can point a debugger at:
+
+```sh
+mendoza test … --plugin_replay_path ./mendoza-replay
 ```
 
 So the loop is:
 
 ```sh
-# 1. keep a real envelope (/tmp is periodically cleaned)
-cp /tmp/mendoza/logs/TearDownPlugin.envelope.json fixtures/teardown.json
+# 1. keep a real envelope as a fixture
+cp ./mendoza-replay/TearDownPlugin.20260820-154512.482.json fixtures/teardown.json
 
 # 2. iterate in a second, with your language's own debugger
 cat fixtures/teardown.json | ./TearDownPlugin
@@ -308,6 +312,8 @@ cat fixtures/teardown.json | ./TearDownPlugin
 mendoza plugin exec TearDownPlugin --envelope fixtures/teardown.json --plugins_path .
 ```
 
+One file is written per invocation, timestamped to the millisecond, so a plugin invoked repeatedly during a session — like `EventPlugin` — leaves one envelope per event rather than overwriting itself.
+
 Step 3 is worth doing even though step 2 already runs the plugin: `plugin exec` decodes the output into the type Mendoza expects, which catches a plugin whose stdout looks perfectly fine but cannot be consumed — misspelled keys, or a progress line printed before the JSON. Those otherwise only fail during a real session.
 
 Saved envelopes also make plugins unit-testable: commit one as a fixture and assert your plugin's output in your own CI, with no Mendoza involved.
@@ -315,8 +321,6 @@ Saved envelopes also make plugins unit-testable: commit one as a fixture and ass
 > **NOTE**
 >
 > The envelope contains your `--plugins_data` verbatim, so if that carries tokens or webhook URLs the dump does too. It is written `0600`, but **strip `data` before committing an envelope as a fixture**.
-
-Passing `--plugin_debug` additionally keeps a timestamped copy of every envelope (`<PluginName>.envelope-<timestamp>.json`), which is useful for a plugin invoked repeatedly during a session, like `EventPlugin`.
 
 Anything your plugin writes to stderr is captured in the session logs at `/tmp/mendoza/logs/localhost-Plugin-<PluginName>.html`, even when the plugin succeeds. Note that `EventPlugin` failures are intentionally ignored so that a broken notification cannot fail a test run — for that plugin the HTML log is the only place its diagnostics appear.
 

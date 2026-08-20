@@ -13,7 +13,7 @@ class TestCommand: Command {
     let usage: String? = "Dispatch UI tests as specified in the `configuration_file`"
     let help: String? = "Dispatch UI tests"
 
-    let debugPluginsFlag = Flag(short: nil, long: "plugin_debug", help: "Keep a timestamped copy of every plugin invocation's stdin envelope. The last envelope per plugin is always kept regardless of this flag")
+    let pluginReplayPath = Argument<URL>(name: "path", kind: .named(short: nil, long: "plugin_replay_path"), optional: true, help: "Folder where every plugin invocation's stdin envelope is written, as `<PluginName>.<timestamp>.json`, for replaying with `mendoza plugin exec`. Default: the session logs folder, which is wiped when the next session starts", autocomplete: .directories)
     let verboseFlag = Flag(short: nil, long: "verbose", help: "Dump debug messages")
 
     let remoteNodesConfigurationPath = Argument<URL>(name: "path", kind: .named(short: nil, long: "remote_nodes_configuration"), optional: true, help: "Path to remote configuration file containing the list of remote nodes to use and destination path")
@@ -140,12 +140,7 @@ class TestCommand: Command {
                                             disabledSimulatorServices: disabledServices,
                                             collectTestDiagnosticsOnFailure: collectTestDiagnosticsOnFailure.value)
 
-        let plugins: Configuration.Plugins
-        if let pluginsData = pluginCustom.value {
-            plugins = Configuration.Plugins(data: pluginsData, debug: debugPluginsFlag.value)
-        } else {
-            plugins = Configuration.Plugins(data: "", debug: false)
-        }
+        let plugins = Configuration.Plugins(data: pluginCustom.value ?? "", replayPath: pluginReplayPath.value?.path)
 
         let resultDestination: ConfigurationResultDestination
         var nodes: [Node]

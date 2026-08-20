@@ -59,7 +59,7 @@ mendoza configuration init
 mendoza plugin describe TearDownPlugin
 
 # Replay a captured envelope through a plugin, without a test session
-mendoza plugin exec TearDownPlugin --envelope /tmp/mendoza/logs/TearDownPlugin.envelope.json --plugins_path ./plugins
+mendoza plugin exec TearDownPlugin --envelope ./mendoza-replay/TearDownPlugin.20260820-154512.482.json --plugins_path ./plugins
 ```
 
 ---
@@ -310,7 +310,7 @@ struct Configuration: Codable {
     let building: Building      // projectPath, scheme, sdk, buildConfiguration
     let testing: Testing        // timeouts, retries, coverage settings
     let device: Device?         // name, runtime, language, locale (iOS only)
-    let plugins: Plugins?       // custom data, debug flag
+    let plugins: Plugins?       // custom data, replay path
     let resultDestination: ConfigurationResultDestination
     let nodes: [Node]
     let verbose: Bool
@@ -346,10 +346,11 @@ Uses SourceKittenFramework to parse Swift source files:
 A plugin is any executable named after the plugin type (no extension, executable bit set) at
 `pluginUrl`. It is run via its own shebang and communicates over standard streams:
 
-1. Encodes `{input, data, debug}` into a single JSON envelope. `input` is `{}` for
+1. Encodes `{input, data}` into a single JSON envelope. `input` is `{}` for
    `PluginVoid` inputs; `data` is null when the plugin data string is empty
-2. Dumps the envelope to `/tmp/mendoza/logs/<name>.envelope.json` (`0600`) on every
-   invocation, so failures are reproducible with `cat envelope | plugin`
+2. Dumps the envelope to `<name>.<timestamp>.json` (`0600`) on every invocation, under
+   `--plugin_replay_path` or the session logs, so failures are reproducible with
+   `cat envelope | plugin`
 3. Spawns the executable directly, writing the envelope to **stdin off-thread** (a plugin
    that ignores stdin, or writes a lot to stdout first, would otherwise deadlock) with
    stderr redirected to a temp file (two pipes drained sequentially deadlock)

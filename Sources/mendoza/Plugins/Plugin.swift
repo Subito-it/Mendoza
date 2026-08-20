@@ -7,13 +7,19 @@
 
 import Foundation
 
+/// Not a static member of Plugin: generic types cannot hold static stored properties.
+private let envelopeTimestampFormatter: DateFormatter = {
+    let formatter = DateFormatter()
+    formatter.dateFormat = "yyyyMMdd-HHmmss.SSS"
+    return formatter
+}()
+
 private struct PluginEnvelope<Input: Encodable>: Encodable {
     let input: Input
     let data: String?
-    let debug: Bool
 
     private enum CodingKeys: String, CodingKey {
-        case input, data, debug
+        case input, data
     }
 
     // Explicit: the synthesized encoding uses encodeIfPresent and would drop `data` when
@@ -22,7 +28,6 @@ private struct PluginEnvelope<Input: Encodable>: Encodable {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(input, forKey: .input)
         try container.encode(data, forKey: .data)
-        try container.encode(debug, forKey: .debug)
     }
 }
 
@@ -83,7 +88,7 @@ class Plugin<Input: DefaultInitializable, Output: DefaultInitializable> {
         // languages, so it would survive the fallback and then fail to parse as JSON.
         let data = plugin.data.isEmpty ? nil : plugin.data
 
-        return try encoder.encode(PluginEnvelope(input: input, data: data, debug: plugin.debug))
+        return try encoder.encode(PluginEnvelope(input: input, data: data))
     }
 
     func run(envelope: Data) throws -> Output {
@@ -177,19 +182,15 @@ class Plugin<Input: DefaultInitializable, Output: DefaultInitializable> {
     /// Always dumps, so that the input of a failing plugin is on disk before anyone knows they
     /// want it. Returns nil rather than throwing: losing the dump must not fail the run.
     private func dumpEnvelope(_ envelope: Data) -> URL? {
-        try? fileManager.createDirectory(at: Path.logs.url, withIntermediateDirectories: true)
+        let directory = plugin.replayPath.map { URL(fileURLWithPath: $0.pathExpandingTilde()) } ?? Path.logs.url
+        try? fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
 
-        let url = Path.logs.url.appendingPathComponent("\(name).envelope.json")
-        // .atomic writes to an auxiliary file and renames, so concurrent invocations of a
-        // shared plugin (EventPlugin) can't interleave into a corrupt file.
+        // Millisecond precision: EventPlugin can fire twice within the same second, and one
+        // invocation overwriting another's envelope would be worse than not keeping it.
+        let url = directory.appendingPathComponent("\(name).\(envelopeTimestampFormatter.string(from: Date())).json")
+
         guard (try? envelope.write(to: url, options: .atomic)) != nil else { return nil }
         try? fileManager.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
-
-        if plugin.debug {
-            let timestamped = Path.logs.url.appendingPathComponent("\(name).envelope-\(Int(Date().timeIntervalSince1970)).json")
-            try? envelope.write(to: timestamped, options: .atomic)
-            try? fileManager.setAttributes([.posixPermissions: 0o600], ofItemAtPath: timestamped.path)
-        }
 
         return url
     }

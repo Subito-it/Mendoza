@@ -9,13 +9,12 @@ final class PluginEnvelopeTests: XCTestCase {
         return try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
     }
 
-    func testCarriesInputDataAndDebug() throws {
-        let plugin = TearDownPlugin(baseUrl: nil, plugin: .init(data: "{\"channel\":\"#ci\"}", debug: true))
+    func testCarriesInputAndData() throws {
+        let plugin = TearDownPlugin(baseUrl: nil, plugin: .init(data: "{\"channel\":\"#ci\"}"))
         let envelope = try envelope(plugin, input: TestSessionResult.defaultInit())
 
-        XCTAssertEqual(Set(envelope.keys), ["input", "data", "debug"])
+        XCTAssertEqual(Set(envelope.keys), ["input", "data"])
         XCTAssertEqual(envelope["data"] as? String, "{\"channel\":\"#ci\"}")
-        XCTAssertEqual(envelope["debug"] as? Bool, true)
         XCTAssertNotNil(envelope["input"] as? [String: Any])
     }
 
@@ -36,6 +35,32 @@ final class PluginEnvelopeTests: XCTestCase {
         let envelope = try envelope(plugin, input: PluginVoid.void)
 
         XCTAssertEqual(try XCTUnwrap(envelope["input"] as? [String: Any]).count, 0)
+    }
+
+    /// --plugin_replay_path exists so envelopes survive somewhere of the caller's choosing: the
+    /// default lands in the session logs, which the next session wipes.
+    func testEnvelopeIsWrittenToTheReplayPath() throws {
+        let root = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent(UUID().uuidString)
+        let plugins = root.appendingPathComponent("plugins")
+        let replay = root.appendingPathComponent("replay")
+        try FileManager.default.createDirectory(at: plugins, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let executable = plugins.appendingPathComponent("PreCompilationPlugin")
+        try "#!/bin/sh\ncat > /dev/null\n".write(to: executable, atomically: true, encoding: .utf8)
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: executable.path)
+
+        let plugin = PreCompilationPlugin(baseUrl: plugins, plugin: .init(replayPath: replay.path))
+        _ = try plugin.run(input: PluginVoid.void)
+
+        let written = try FileManager.default.contentsOfDirectory(atPath: replay.path)
+        XCTAssertEqual(written.count, 1)
+        let name = try XCTUnwrap(written.first)
+        XCTAssertTrue(name.hasPrefix("PreCompilationPlugin."), name)
+        XCTAssertTrue(name.hasSuffix(".json"), name)
+
+        let attributes = try FileManager.default.attributesOfItem(atPath: replay.appendingPathComponent(name).path)
+        XCTAssertEqual(attributes[.posixPermissions] as? Int, 0o600)
     }
 
     func testEventKindIsAStringNotAnOrdinal() throws {

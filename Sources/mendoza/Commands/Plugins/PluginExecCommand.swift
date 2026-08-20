@@ -11,10 +11,10 @@ class PluginExecCommand: Command {
     let usage: String? = """
     Runs a plugin against a captured envelope, without a test session.
     
-    Every invocation dumps its envelope to /tmp/mendoza/logs/<name>.envelope.json, so a plugin
-    that misbehaved during a session can be replayed offline. Copy it elsewhere to keep it:
-    /tmp is periodically cleaned. Piping that file into the plugin yourself runs it; this
-    command additionally decodes the result into the type Mendoza expects, which is what
+    Every invocation dumps its envelope as <name>.<timestamp>.json, under the test command's
+    --plugin_replay_path or, failing that, the session logs folder. So a plugin that misbehaved
+    during a session can be replayed offline. Piping that file into the plugin yourself runs it;
+    this command additionally decodes the result into the type Mendoza expects, which is what
     catches a plugin whose output looks fine but cannot be consumed.
     """
     let help: String? = "Replay a captured envelope through a plugin and validate its output"
@@ -27,7 +27,7 @@ class PluginExecCommand: Command {
     let envelope = Argument<URL>(name: "path",
                                  kind: .named(short: nil, long: "envelope"),
                                  optional: false,
-                                 help: "Path to a JSON envelope, e.g. ~/.mendoza/logs/TearDownPlugin.envelope.json",
+                                 help: "Path to a JSON envelope, e.g. /tmp/mendoza/logs/TearDownPlugin.20260820-154512.482.json",
                                  autocomplete: .files("json"))
     let pluginsPath = Argument<URL>(name: "path",
                                     kind: .named(short: nil, long: "plugins_path"),
