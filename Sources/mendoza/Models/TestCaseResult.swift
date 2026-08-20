@@ -8,6 +8,8 @@
 import Foundation
 
 struct TestCaseResult: Codable, CustomStringConvertible, Hashable {
+    // Encoded into the result-destination report consumed by external tooling, so the raw
+    // values are a published contract: appending is safe, reordering is not.
     enum Status: Int, Codable {
         case passed, failed
     }
