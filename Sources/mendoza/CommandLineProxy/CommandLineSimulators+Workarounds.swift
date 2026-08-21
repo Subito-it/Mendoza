@@ -59,9 +59,9 @@ extension CommandLineProxy.Simulators {
     /// attaches to simulators booted via `simctl`, so the plist is no longer consulted and the
     /// equivalent CoreSimulator knobs have to be set directly on the device.
     ///
-    /// Disabling the hardware keyboard is mandatory for e2e tests: without it iOS assumes a physical
-    /// keyboard is attached and never shows the on-screen one, so tests that type into text fields
-    /// fail on unhittable keys.
+    /// Disabling the hardware keyboard is what makes iOS show the on-screen one: while a hardware
+    /// keyboard is attached the software keyboard stays hidden, so a test that types by tapping its
+    /// keys, rather than setting the field's text directly, finds nothing to hit.
     ///
     /// - Note: Must run on the node owning the simulator, hence the `mendoza mendoza` indirection.
     ///         Requires a booted simulator.
