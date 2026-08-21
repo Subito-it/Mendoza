@@ -443,7 +443,3 @@ Defined in `Path` enum (`Operations/BaseOperation.swift`):
 | `.coverage` | `base/coverage` | Merged coverage |
 | `.individualCoverage` | `base/individual_coverage` | Per-test coverage JSONs |
 | `.testFileCoverage` | `base/test_file_coverage` | Per-test covered files |
-
-## Related Documentation
-
-- **`CODECOVERAGE_EXTRACTION.md`**: Analysis of individual test coverage extraction, known issues with cumulative coverage, and proposed fixes
