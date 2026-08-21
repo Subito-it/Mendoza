@@ -37,6 +37,11 @@ enum SimulatorFramebuffer {
     /// - Note: Requires a booted device.
     static func screen(for device: AnyObject) -> AnyObject? {
         guard let screenClass = NSClassFromString("_TtC12SimulatorKit15SimDeviceScreen") else { return nil }
+
+        // Known leak: `alloc` hands back +1 and this takes it unretained, so one SimDeviceScreen is
+        // leaked per device. Deliberate for now — the returned `screen` proxy stays alive only while
+        // this wrapper does, so releasing it risks a use after free while the framebuffer is polled.
+        // Bounded in practice: `simulator_windows` is a short lived, opt-in debugging command.
         guard let allocated = (screenClass as AnyObject).perform(NSSelectorFromString("alloc"))?.takeUnretainedValue() else { return nil }
 
         let selector = NSSelectorFromString("initWithDevice:screenID:")
