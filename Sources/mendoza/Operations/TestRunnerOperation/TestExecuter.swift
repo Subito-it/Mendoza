@@ -24,9 +24,15 @@ class TestExecuter {
 
     private let verbose: Bool
 
-    private var timerSource: DispatchSourceTimer?
     private let timerQueue = DispatchQueue(label: "com.mendoza.stdoutTimeout")
     private let syncQueue = DispatchQueue(label: "com.mendoza.stdoutTimeout.sync")
+
+    private var _timerSource: DispatchSourceTimer?
+    private var timerSource: DispatchSourceTimer? {
+        get { syncQueue.sync { _timerSource } }
+        set { syncQueue.sync { _timerSource = newValue } }
+    }
+
     private var _lastStdOutputUpdateTimeInterval: TimeInterval = 0
     private var lastStdOutputUpdateTimeInterval: TimeInterval {
         get { syncQueue.sync { _lastStdOutputUpdateTimeInterval } }
