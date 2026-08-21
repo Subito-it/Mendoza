@@ -74,11 +74,14 @@ class Test {
 
             try syncLogs(destinationPath: logsDestinationPath, destination: destinationNode, timestamp: timestamp, logger: logger)
 
+            // `try?`, like every other event call site: an event plugin reports on a session, it
+            // does not decide its outcome. Letting it throw here made a non-zero exit from e.g. a
+            // notification script surface as a failed session even when every test passed.
             if let error = error {
-                try eventPlugin.run(event: Event(kind: .error, info: ["error": error.localizedDescription]), device: device)
+                try? eventPlugin.run(event: Event(kind: .error, info: ["error": error.localizedDescription]), device: device)
                 didFail?(error)
             } else {
-                try eventPlugin.run(event: Event(kind: .stop, info: [:]), device: device)
+                try? eventPlugin.run(event: Event(kind: .stop, info: [:]), device: device)
             }
         } catch {
             try? dumpOperationLogs(operations)
