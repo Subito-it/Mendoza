@@ -14,9 +14,11 @@ import Foundation
 /// `com.apple.iphonesimulator` host plist are therefore ignored. The equivalent knobs live on
 /// `SimDevice` inside CoreSimulator, which is shared by every Xcode version and works headless.
 ///
-/// - Important: This is a private API. Every selector is looked up dynamically and a missing one is
-///              reported as `.unavailable` rather than crashing, so a future Xcode that renames or
-///              removes a selector degrades instead of taking the whole test run down.
+/// - Important: This is a private API. The setters check `responds(to:)` and report a missing
+///              selector as `.unavailable`, so an Xcode that renames one of them degrades to leaving
+///              that setting alone. The device lookup deliberately does not: `perform` on a renamed
+///              lookup selector crashes, which is preferable to carrying on against no device set
+///              and silently applying nothing.
 /// - Note: Must run *on the node owning the simulator* — CoreSimulator is not reachable over SSH.
 ///         Callers go through `mendoza mendoza coresimulator …` so this holds for remote nodes too.
 enum CoreSimulatorProxy {
