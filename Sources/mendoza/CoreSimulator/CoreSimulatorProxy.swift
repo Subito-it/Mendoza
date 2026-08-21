@@ -142,18 +142,22 @@ enum CoreSimulatorProxy {
             return .unavailable
         }
 
-        var error: AnyObject?
+        // The trailing out-param is an `NSError * __autoreleasing *`: the callee stores an
+        // autoreleased error without retaining it, so it has to be bridged as an
+        // AutoreleasingUnsafeMutablePointer. Passing a plain UnsafeMutablePointer leaves Swift
+        // releasing an object it never owned, over-releasing the error when the pool drains.
+        var error: NSError?
         let succeeded: Bool
 
         if let keyboardType {
             // Type encoding is B32@0:8B16C20^@24, so keyboardType is an unsigned char
-            typealias Function = @convention(c) (AnyObject, Selector, ObjCBool, UInt8, UnsafeMutablePointer<AnyObject?>?) -> ObjCBool
+            typealias Function = @convention(c) (AnyObject, Selector, ObjCBool, UInt8, AutoreleasingUnsafeMutablePointer<NSError?>?) -> ObjCBool
             let function = unsafeBitCast(method_getImplementation(method), to: Function.self)
-            succeeded = withUnsafeMutablePointer(to: &error) { function(device, selector, ObjCBool(flag), keyboardType, $0) }.boolValue
+            succeeded = function(device, selector, ObjCBool(flag), keyboardType, &error).boolValue
         } else {
-            typealias Function = @convention(c) (AnyObject, Selector, ObjCBool, UnsafeMutablePointer<AnyObject?>?) -> ObjCBool
+            typealias Function = @convention(c) (AnyObject, Selector, ObjCBool, AutoreleasingUnsafeMutablePointer<NSError?>?) -> ObjCBool
             let function = unsafeBitCast(method_getImplementation(method), to: Function.self)
-            succeeded = withUnsafeMutablePointer(to: &error) { function(device, selector, ObjCBool(flag), $0) }.boolValue
+            succeeded = function(device, selector, ObjCBool(flag), &error).boolValue
         }
 
         return succeeded ? .success : .failure(describe(error))
@@ -167,16 +171,16 @@ enum CoreSimulatorProxy {
             return .unavailable
         }
 
-        typealias Function = @convention(c) (AnyObject, Selector, NSString, UnsafeMutablePointer<AnyObject?>?) -> ObjCBool
+        typealias Function = @convention(c) (AnyObject, Selector, NSString, AutoreleasingUnsafeMutablePointer<NSError?>?) -> ObjCBool
         let function = unsafeBitCast(method_getImplementation(method), to: Function.self)
 
-        var error: AnyObject?
-        let succeeded = withUnsafeMutablePointer(to: &error) { function(device, selector, string as NSString, $0) }.boolValue
+        var error: NSError?
+        let succeeded = function(device, selector, string as NSString, &error).boolValue
 
         return succeeded ? .success : .failure(describe(error))
     }
 
-    private static func describe(_ error: AnyObject?) -> String {
-        (error as? NSError)?.localizedDescription ?? "unknown error"
+    private static func describe(_ error: NSError?) -> String {
+        error?.localizedDescription ?? "unknown error"
     }
 }
