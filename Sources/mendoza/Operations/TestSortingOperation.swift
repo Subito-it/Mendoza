@@ -34,13 +34,35 @@ class TestSortingOperation: BaseOperation<[TestCase]> {
 
             if plugin.isInstalled {
                 let input = TestOrderInput(tests: testCases, device: device)
-                try didEnd?(plugin.run(input: input))
+                let sortedTestCases = try plugin.run(input: input)
+                try assertIsReordering(sortedTestCases, of: testCases)
+                didEnd?(sortedTestCases)
             } else {
                 didEnd?(testCases)
             }
         } catch {
             didThrow?(error)
         }
+    }
+
+    /// A sorting plugin reorders the suite, it does not select from it. Whatever it returns becomes
+    /// the set of tests that run, so a plugin that drops entries would quietly shrink the session and
+    /// still report success.
+    private func assertIsReordering(_ sortedTestCases: [TestCase], of testCases: [TestCase]) throws {
+        if sortedTestCases.count == testCases.count, Set(sortedTestCases) == Set(testCases) { return }
+
+        let missing = Set(testCases).subtracting(sortedTestCases).map(\.testIdentifier).sorted()
+        let unexpected = Set(sortedTestCases).subtracting(testCases).map(\.testIdentifier).sorted()
+
+        var reason = "TestSortingPlugin returned \(sortedTestCases.count) test cases, expected the \(testCases.count) it was given."
+        if !missing.isEmpty {
+            reason += " Missing: \(missing.joined(separator: ", "))."
+        }
+        if !unexpected.isEmpty {
+            reason += " Not part of the input: \(unexpected.joined(separator: ", "))."
+        }
+
+        throw Error(reason, logger: plugin.logger)
     }
 
     override func cancel() {
