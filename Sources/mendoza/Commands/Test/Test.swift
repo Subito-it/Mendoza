@@ -141,7 +141,10 @@ extension Test {
     }
 
     func dumpOperationLogs(_ operations: [LoggedOperation]) throws {
-        let loggerCoordinator = LoggerCoordinator(operations: operations)
+        // EventPlugin belongs to Test rather than to an operation, so unlike every other plugin its
+        // logger reaches no operation's `loggers` set and has to be added by hand. Since event
+        // plugin failures are ignored by design, this log is the only place its stderr shows up.
+        let loggerCoordinator = LoggerCoordinator(loggers: operations.flatMap(\.loggers) + [eventPlugin.logger])
 
         try loggerCoordinator.dump()
     }
