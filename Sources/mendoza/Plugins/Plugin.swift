@@ -186,8 +186,9 @@ class Plugin<Input: DefaultInitializable, Output: DefaultInitializable> {
         // invocation overwriting another's envelope would be worse than not keeping it.
         let url = directory.appendingPathComponent("\(name).\(envelopeTimestampFormatter.string(from: Date())).json")
 
-        guard (try? envelope.write(to: url, options: .atomic)) != nil else { return nil }
-        try? fileManager.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
+        // Created 0600 rather than written and then chmod'd: the envelope carries `data`
+        // verbatim, so it must never exist group/world readable, not even briefly.
+        guard fileManager.createFile(atPath: url.path, contents: envelope, attributes: [.posixPermissions: 0o600]) else { return nil }
 
         return url
     }
