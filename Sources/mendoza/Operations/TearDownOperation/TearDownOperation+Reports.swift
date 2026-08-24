@@ -126,7 +126,10 @@ extension TearDownOperation {
         encoder.outputFormatting = .prettyPrinted
         let data = try encoder.encode(testSessionResult)
 
+        // `<` only occurs inside JSON strings, where `\/` is a legal escape: keeps a commit
+        // message containing `</script` from closing the element that carries the payload.
         let suiteDetailJson = String(decoding: data, as: UTF8.self)
+            .replacingOccurrences(of: "</", with: "<\\/")
 
         let executionGraph = ExecutionGraph.template.replacingOccurrences(of: "$$TEST_DETAIL_JSON", with: suiteDetailJson)
 
