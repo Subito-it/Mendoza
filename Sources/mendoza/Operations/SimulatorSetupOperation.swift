@@ -128,7 +128,7 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
         let bootQueue = OperationQueue()
 
         for simulator in simulators {
-            let logger = ExecuterLogger(name: "\(type(of: self))-AsyncBoot", address: node.address)
+            let logger = ExecuterLogger(name: "\(type(of: self))-AsyncBoot-\(simulator.name)", address: node.address)
             addLogger(logger)
 
             let queueExecuter = try node.makeExecuter(logger: logger, environment: nodesEnvironment[node.address] ?? [:])
@@ -169,7 +169,7 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
         var firstError: Swift.Error?
 
         for simulator in simulators {
-            let logger = ExecuterLogger(name: "\(type(of: self))-AsyncServices", address: node.address)
+            let logger = ExecuterLogger(name: "\(type(of: self))-AsyncServices-\(simulator.name)", address: node.address)
             addLogger(logger)
 
             let queueExecuter = try node.makeExecuter(logger: logger, environment: nodesEnvironment[node.address] ?? [:])
