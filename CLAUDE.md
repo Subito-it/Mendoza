@@ -435,7 +435,7 @@ Defined in `Path` enum (`Operations/BaseOperation.swift`):
 
 | Path | Value | Purpose |
 |------|-------|---------|
-| `.base` | `~/.mendoza` | Root temp directory |
+| `.base` | `/tmp/mendoza` | Root temp directory (`Environment.temporaryBasePath`) |
 | `.build` | `base/build` | Compilation output |
 | `.testBundle` | `build/Build/Products` | .xctest bundle |
 | `.logs` | `base/logs` | Per-operation HTML logs |
