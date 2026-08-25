@@ -217,6 +217,35 @@ Note that when the flag isn't specified `xcodebuild` would otherwise fall back t
 
 Crash reports are collected by Mendoza independently of this setting.
 
+### Disabling simulator services
+
+On iOS, each booted simulator runs hundreds of background daemons that consume RAM and CPU even when idle. On memory-constrained nodes running multiple simulators this pressure can destabilize tests. The `--disable_sim_services` flag lets you disable unnecessary daemons via `launchctl disable`, freeing resources for actual test execution.
+
+```
+mendoza test ... --disable_sim_services siri,intelligence,generative,watch,widgets,posters
+```
+
+Tokens are resolved from a catalog of known-safe services. You can pass **group names** (which expand to all underlying services) or **individual service IDs**:
+
+| Group | Feature | Services |
+|-------|---------|----------|
+| `payments` | StoreKit / in-app purchase | storekitd, itunesstored, amsaccountsd, amsengagementd, amsondevicestoraged, passd, financed |
+| `app-store` | App Store | appstored, itunesstored |
+| `spotlight` | Spotlight & Settings search | searchd, searchtoold |
+| `siri` | Siri & speech | assistantd, corespeechd, siriinferenced, siriknowledged, siriactionsd, sirittsd, siricontextd, siriacousticsignatured |
+| `photos` | Photos library & analysis | assetsd, photoanalysisd |
+| `widgets` | Widgets & Live Activities | chronod, liveactivitiesd |
+| `intelligence` | Apple Intelligence | intelligenceplatformd, intelligencetasksd, intelligenceflowd, intelligencecontextd, callintelligenced, fitnessintelligenced |
+| `posters` | Lock screen & wallpaper posters | posterboard, postersyncd |
+| `generative` | Generative AI & ML models | generativeexperiencesd, imageplaygroundd, modelcatalogd, modelmanagerd, textunderstandingd, hybridsearchd, voicebankingd, translationd, mlhostd, mlruntimed, knowledgeconstructiond, agentstored, contentlinkingd, naturallanguaged |
+| `watch` | Apple Watch companion | nanomapscd, nanosystemsettingsd, npkcompanionagent, companionappd, brookcompaniond, appconduitd, nanoappregistryd, nanonewscd, pairedsyncd, pairedunlockd, companiond, companionmessagesd, companionfindlocallyd |
+
+Individual services can also be passed directly (e.g. `--disable_sim_services weatherd,newsd,gamed`).
+
+The override persists across reboots on iOS 18+. Mendoza tracks which labels it manages so it will re-enable any previously disabled service that is no longer in the desired set.
+
+For a full audit of per-service memory usage on iOS 27, see [docs/ios27-simulator-services.md](docs/ios27-simulator-services.md).
+
 ### Test output
 
 Mendoza will write a set of log files containing information about the test session:

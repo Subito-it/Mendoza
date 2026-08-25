@@ -175,7 +175,7 @@ Since the codebase **does not use Swift Concurrency**:
 
 ### Pipeline DAG (Dependency Order)
 
-Defined in `Commands/Test/Test.swift:127-156`:
+Defined in `Commands/Test/Test+MakeOperations.swift:82-116`:
 
 ```
 InitialSetupOperation
