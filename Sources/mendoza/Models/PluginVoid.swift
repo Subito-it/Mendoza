@@ -7,11 +7,18 @@
 
 import Foundation
 
-enum PluginVoid: DefaultInitializable, CustomReflectable {
+/// Input or output of a plugin that has none. Encodes to `{}`, which is what the `input` key
+/// of the envelope carries for plugins that take no input.
+enum PluginVoid: DefaultInitializable {
     case void
 
-    var customMirror: Mirror { Mirror(self, children: []) }
-    static func defaultInit() -> PluginVoid { .void }
-    init(from _: Decoder) throws { self = PluginVoid.defaultInit() }
+    static func defaultInit() -> PluginVoid {
+        .void
+    }
+
+    init(from _: Decoder) throws {
+        self = PluginVoid.defaultInit()
+    }
+
     func encode(to _: Encoder) throws {}
 }

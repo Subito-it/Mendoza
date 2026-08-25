@@ -52,6 +52,9 @@ class MendozaCommand: Command {
 
             // On Catalina, unless you enable screen recording permissions,
             // you no longer get kCGWindowName access for security reasons
+            //
+            // Matches Simulator.app only: on Xcode 27 DeviceHub never shows simulators booted via
+            // simctl, so its only window is the management window, which is not a simulator
             for dict in info where dict["kCGWindowOwnerName"] as? String == "Simulator" {
                 guard let windowBoundsInfo = dict["kCGWindowBounds"] as? [String: Int] else {
                     return false
@@ -65,13 +68,49 @@ class MendozaCommand: Command {
 
             return true
         case "close_simulator_app":
-            let runningApps = NSRunningApplication.runningApplications(withBundleIdentifier: "com.apple.iphonesimulator")
+            // com.apple.dt.Devices is DeviceHub, which replaced Simulator.app in Xcode 27
+            let runningApps = ["com.apple.iphonesimulator", "com.apple.dt.Devices"]
+                .flatMap { NSRunningApplication.runningApplications(withBundleIdentifier: $0) }
 
             for runningApp in runningApps {
                 runningApp.terminate()
             }
 
             return true
+        case "coresimulator":
+            // Usage: coresimulator <device_udid> <developer_dir> <key=value> [<key=value> ...]
+            //
+            // Applies settings through CoreSimulator.framework, which must run on the node owning
+            // the simulator. Unavailable selectors are reported but do not fail the command, so a
+            // future Xcode dropping one degrades rather than breaking the run.
+            guard let parameters = parameters.value?.filter({ !$0.isEmpty }), parameters.count >= 3 else {
+                print("Expecting <device_udid> <developer_dir> <key=value> [<key=value> ...]")
+                return false
+            }
+
+            let deviceIdentifier = parameters[0]
+            let developerDir = parameters[1]
+            var succeeded = true
+
+            for rawSetting in parameters.dropFirst(2) {
+                guard let setting = CoreSimulatorProxy.Setting(rawValue: rawSetting) else {
+                    print("Unsupported setting '\(rawSetting)'")
+                    succeeded = false
+                    continue
+                }
+
+                switch CoreSimulatorProxy.apply(setting, deviceIdentifier: deviceIdentifier, developerDir: developerDir) {
+                case .success:
+                    print("\(setting.name): ok")
+                case .unavailable:
+                    print("\(setting.name): unavailable in this Xcode version")
+                case let .failure(message):
+                    print("\(setting.name): failed (\(message))")
+                    succeeded = false
+                }
+            }
+
+            return succeeded
         case "cleaunp_xcresult":
             guard let parameters = parameters.value?.filter({ !$0.isEmpty }), parameters.count == 2 else {
                 return false

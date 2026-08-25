@@ -13,7 +13,7 @@ class TestCommand: Command {
     let usage: String? = "Dispatch UI tests as specified in the `configuration_file`"
     let help: String? = "Dispatch UI tests"
 
-    let debugPluginsFlag = Flag(short: nil, long: "plugin_debug", help: "Dump plugin invocation commands")
+    let pluginReplayPath = Argument<URL>(name: "path", kind: .named(short: nil, long: "plugin_replay_path"), optional: true, help: "Folder where every plugin invocation's stdin envelope is written, as `<PluginName>.<timestamp>.json`, so a failing plugin can be re-run against the exact input it received. Default: the session logs folder, which is wiped when the next session starts", autocomplete: .directories)
     let verboseFlag = Flag(short: nil, long: "verbose", help: "Dump debug messages")
 
     let remoteNodesConfigurationPath = Argument<URL>(name: "path", kind: .named(short: nil, long: "remote_nodes_configuration"), optional: true, help: "Path to remote configuration file containing the list of remote nodes to use and destination path")
@@ -40,7 +40,9 @@ class TestCommand: Command {
     let xcresultBlobThresholdKB = Argument<Int>(name: "size", kind: .named(short: nil, long: "xcresult_blob_threshold_kb"), optional: true, help: "Delete data blobs larger than the specified threshold")
     let excludeNodes = Argument<String>(name: "nodes", kind: .named(short: nil, long: "exclude_nodes"), optional: true, help: "Specify which nodes (by name or address) specified in the configuration should be excluded from the dispatch. Accepts comma separated values. Default: ''")
     let killSimulatorProcesses = Flag(short: nil, long: "kill_sim_procs", help: "Automatically kill Simulator's CPU intensive processes, see https://github.com/biscuitehh/yeetd")
+    let disabledSimulatorServices = Argument<String>(name: "services", kind: .named(short: nil, long: "disable_sim_services"), optional: true, help: "Comma separated list of simulator background services to disable to slim down memory usage. Accepts groups or individual services. Requires iOS 18+ (ignored with a warning on older runtimes). \(SimulatorServiceCatalog.helpDescription)")
     let keepBuildFolderOnFailure = Flag(short: nil, long: "keep_build_folder_on_failure", help: "Keep build folder on failure")
+    let collectTestDiagnosticsOnFailure = Flag(short: nil, long: "collect_test_diagnostics_on_failure", help: "Collect verbose xcodebuild diagnostics (sysdiagnose, log archives) when a test fails. ⚠️ Significant performance regression: xcodebuild runs `simctl diagnose` with a 600s timeout after the test verdict is known, writing ~280MB into the .xcresult while the simulator stays out of rotation. Default: diagnostics collection is disabled")
 
     let projectPath = Argument<URL>(name: "path", kind: .named(short: nil, long: "project"), optional: false, help: "The path to the .xcworkspace or .xcodeproj to build")
     let scheme = Argument<String>(name: "name", kind: .named(short: nil, long: "scheme"), optional: false, help: "The scheme to build")
@@ -120,6 +122,9 @@ class TestCommand: Command {
             }
         }
 
+        let disabledServices = disabledSimulatorServices.value?.components(separatedBy: ",").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty } ?? []
+        _ = try SimulatorServiceCatalog.resolveLabels(for: disabledServices) // validate tokens up front
+
         let testing = Configuration.Testing(maximumStdOutIdleTime: maximumStdOutIdleTime.value,
                                             maximumTestExecutionTime: maximumTestExecutionTime.value,
                                             failingTestsRetryCount: failingTestsRetryCount.value,
@@ -131,14 +136,11 @@ class TestCommand: Command {
                                             extractIndividualTestCoverage: extractIndividualTestCoverage.value,
                                             extractTestCoveredFiles: extractTestCoveredFiles.value,
                                             clearDerivedDataOnCompilationFailure: clearDerivedDataOnCompilationFailure.value,
-                                            skipResultMerge: skipResultMerge.value)
+                                            skipResultMerge: skipResultMerge.value,
+                                            disabledSimulatorServices: disabledServices,
+                                            collectTestDiagnosticsOnFailure: collectTestDiagnosticsOnFailure.value)
 
-        let plugins: Configuration.Plugins
-        if let pluginsData = pluginCustom.value {
-            plugins = Configuration.Plugins(data: pluginsData, debug: debugPluginsFlag.value)
-        } else {
-            plugins = Configuration.Plugins(data: "", debug: false)
-        }
+        let plugins = Configuration.Plugins(data: pluginCustom.value ?? "", replayPath: pluginReplayPath.value?.path)
 
         let resultDestination: ConfigurationResultDestination
         var nodes: [Node]

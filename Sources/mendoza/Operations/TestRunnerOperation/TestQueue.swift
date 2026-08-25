@@ -13,6 +13,8 @@ class TestQueue {
     private var testCases: [TestCase]
     private var retryCountMap = NSCountedSet()
     private let maxRetryCount: Int
+    /// Runner indexes a test case must not be dequeued by, so a retry lands on a different node.
+    private var excludedRunners = [TestCase: Set<Int>]()
 
     var count: Int {
         syncQueue.sync { testCases.count }
@@ -29,22 +31,43 @@ class TestQueue {
         self.maxRetryCount = maxRetryCount
     }
 
-    /// Atomically dequeue the next test case
-    /// - Returns: The next test case, or nil if queue is empty
-    func dequeue() -> TestCase? {
+    /// Atomically dequeue the next test case the given runner is allowed to execute, skipping
+    /// test cases that previously failed on its node.
+    /// - Returns: The next eligible test case, or nil if none is available
+    func dequeue(for runnerIndex: Int) -> TestCase? {
         syncQueue.sync {
-            guard let testCase = testCases.first else {
+            guard let index = testCases.firstIndex(where: { excludedRunners[$0]?.contains(runnerIndex) != true }) else {
                 return nil
             }
-            testCases.removeFirst()
-            return testCase
+            return testCases.remove(at: index)
+        }
+    }
+
+    /// Atomically dequeue the next test case ignoring retry exclusions. Only meant for the case
+    /// where no other runner can pick up the remaining test cases, which would otherwise stall the run.
+    func dequeueIgnoringExclusions() -> TestCase? {
+        syncQueue.sync {
+            testCases.isEmpty ? nil : testCases.removeFirst()
+        }
+    }
+
+    /// Whether any queued test case can be dequeued by at least one of the given runners
+    func containsTestCase(eligibleForAnyOf runnerIndexes: [Int]) -> Bool {
+        syncQueue.sync {
+            testCases.contains { testCase in
+                let excluded = excludedRunners[testCase] ?? []
+                return runnerIndexes.contains { !excluded.contains($0) }
+            }
         }
     }
 
     /// Enqueue a test case for retry after failure
-    /// - Parameter testCase: The test case to retry
+    /// - Parameters:
+    ///   - testCase: The test case to retry
+    ///   - excludedRunnerIndexes: Runners that should not pick the test case up again, typically
+    ///     all runners on the node that just failed it
     /// - Returns: true if the test was enqueued for retry, false if max retries exceeded
-    func enqueueForRetry(_ testCase: TestCase) -> Bool {
+    func enqueueForRetry(_ testCase: TestCase, excludedRunnerIndexes: Set<Int>) -> Bool {
         syncQueue.sync {
             let currentRetryCount = retryCountMap.count(for: testCase)
             guard currentRetryCount < maxRetryCount else {
@@ -52,13 +75,8 @@ class TestQueue {
             }
 
             retryCountMap.add(testCase)
-
-            // Insert at index 1 (if possible) so the test runs on a different simulator
-            if testCases.isEmpty {
-                testCases.append(testCase)
-            } else {
-                testCases.insert(testCase, at: 1)
-            }
+            excludedRunners[testCase, default: []].formUnion(excludedRunnerIndexes)
+            testCases.insert(testCase, at: 0)
 
             return true
         }

@@ -20,12 +20,19 @@ class TestExecuter {
     private let building: Configuration.Building
     private let testing: Configuration.Testing
     private let xcodebuildDestination: String
+    private let outputParser: XcodebuildOutputParser
 
     private let verbose: Bool
 
-    private var timerSource: DispatchSourceTimer?
     private let timerQueue = DispatchQueue(label: "com.mendoza.stdoutTimeout")
     private let syncQueue = DispatchQueue(label: "com.mendoza.stdoutTimeout.sync")
+
+    private var _timerSource: DispatchSourceTimer?
+    private var timerSource: DispatchSourceTimer? {
+        get { syncQueue.sync { _timerSource } }
+        set { syncQueue.sync { _timerSource = newValue } }
+    }
+
     private var _lastStdOutputUpdateTimeInterval: TimeInterval = 0
     private var lastStdOutputUpdateTimeInterval: TimeInterval {
         get { syncQueue.sync { _lastStdOutputUpdateTimeInterval } }
@@ -38,10 +45,21 @@ class TestExecuter {
         set { syncQueue.sync { _stdOutIdleTimes = newValue } }
     }
 
-    private var didTriggerTimeout = false
+    private var _didTriggerTimeout = false
+    private var didTriggerTimeout: Bool {
+        get { syncQueue.sync { _didTriggerTimeout } }
+        set { syncQueue.sync { _didTriggerTimeout = newValue } }
+    }
 
     private var testCaseStartTimeInterval: TimeInterval = 0
     private var previewCompletionBlock: ((TestCaseResult) -> Void)?
+
+    /// True once the test method actually started executing (a `Test Case ... started` line was
+    /// parsed). Distinguishes a genuine test failure from a simulator-level launch failure where
+    /// the test never ran. Only valid to read after `launch(...)` returns.
+    var didStartTest: Bool {
+        testCaseStartTimeInterval > 0
+    }
 
     init(executer: Executer,
          testCase: TestCase,
@@ -51,8 +69,7 @@ class TestExecuter {
          node: Node,
          testRunner: TestRunner,
          runnerIndex: Int,
-         verbose: Bool)
-    {
+         verbose: Bool) {
         self.executer = executer
         self.testCase = testCase
         self.testTarget = testTarget
@@ -62,6 +79,7 @@ class TestExecuter {
         self.node = node
         self.runnerIndex = runnerIndex
         self.verbose = verbose
+        self.outputParser = XcodebuildOutputParser(testTarget: testTarget)
 
         switch XcodeProject.SDK(rawValue: building.sdk)! {
         case .ios:
@@ -99,6 +117,13 @@ class TestExecuter {
         let result = try? testWithoutBuilding(executer: executer)
         output = result?.output ?? ""
         testResult = result?.testCaseResult
+
+        // Logged only now that xcodebuild has returned: ExecuterLogger expects strictly alternating
+        // start/end events, so appending an exception while the command is still in flight would
+        // break the pairing when the log is written out.
+        if didTriggerTimeout {
+            executer.logger?.log(exception: "no stdout updates for more than \(testing.maximumStdOutIdleTime ?? 0)s, terminated app on \(testRunner.name)")
+        }
 
         if testResult == nil {
             if verbose {
@@ -149,6 +174,11 @@ class TestExecuter {
         timerSource = source
     }
 
+    /// Disarm the stdout watchdog. Must be called as soon as the test verdict is known: after that
+    /// point xcodebuild is in its post-test phase (finalizing the xcresult, collecting simulator
+    /// diagnostics) where stdout is legitimately silent for far longer than `maximumStdOutIdleTime`.
+    /// Terminating the test runner host during that phase breaks xcodebuild's diagnostics collection,
+    /// which then blocks for its own 600s timeout while holding the runner slot.
     private func stopStdOutTimeoutHandler() {
         timerSource?.cancel()
         timerSource = nil
@@ -164,22 +194,6 @@ class TestExecuter {
             print(prefix + "[\(Date().description)] Node \(node.address)", txt, color: color)
         }
     }
-}
-
-private enum XcodebuildLineEvent {
-    case testStart
-    case testPassed(duration: Double)
-    case testFailed(duration: Double)
-    case testCrashed
-    case noSpaceOnDevice
-    case testTimedOut
-
-    var isTestPassed: Bool {
-        switch self { case .testPassed: return true; default: return false }
-    } // swiftlint:disable:this switch_case_alignment
-    var isTestCrashed: Bool {
-        switch self { case .testCrashed: return true; default: return false }
-    } // swiftlint:disable:this switch_case_alignment
 }
 
 extension TestExecuter {
@@ -217,16 +231,22 @@ extension TestExecuter {
             parsedProgress += progress
             partialProgress += progress
             let lines = partialProgress.components(separatedBy: "\n")
-            let events = lines.compactMap(self.parseXcodebuildOutput)
+            let events = lines.compactMap(self.outputParser.event)
 
             for event in events {
                 switch event {
-                case .testStart:
+                case let .testStart(startedTestCase):
+                    if startedTestCase.name != testCase.name || startedTestCase.suite != testCase.suite {
+                        fatalError("Unexpected test case found! Got \(startedTestCase) expected \(testCase)")
+                    }
+
                     testCaseStartTimeInterval = CFAbsoluteTimeGetCurrent()
                     self.startStdOutTimeoutHandler()
 
                     self.printIfVerbose("🛫", "\(testCase.description) started", color: { $0.yellow })
                 case .testPassed:
+                    self.stopStdOutTimeoutHandler()
+
                     let idleTimes = self.stdOutIdleTimes
                     let avgIdleTime = idleTimes.isEmpty ? nil : idleTimes.reduce(0, +) / Double(idleTimes.count)
                     let maxIdleTime = idleTimes.max()
@@ -235,6 +255,8 @@ extension TestExecuter {
 
                     testCaseResult = result
                 case .testFailed, .testCrashed, .testTimedOut:
+                    self.stopStdOutTimeoutHandler()
+
                     let idleTimes = self.stdOutIdleTimes
                     let avgIdleTime = idleTimes.isEmpty ? nil : idleTimes.reduce(0, +) / Double(idleTimes.count)
                     let maxIdleTime = idleTimes.max()
@@ -273,81 +295,14 @@ extension TestExecuter {
             maxAllowedTestExecutionTimeParameter = "-maximum-test-execution-time-allowance \(maximumTestExecutionTime)"
         }
 
-        return #"$(xcode-select -p)/usr/bin/xcodebuild -parallel-testing-enabled NO -disable-concurrent-destination-testing -xctestrun '\#(testRun)' -destination '\#(xcodebuildDestination)' -derivedDataPath '\#(destinationPath)' \#(onlyTesting) -enableCodeCoverage YES -destination-timeout 60 -test-timeouts-enabled YES \#(maxAllowedTestExecutionTimeParameter) test-without-building 2>&1 || true"#
-    }
+        // Diagnostics collection is opt-in because it is very expensive: xcodebuild shells out to
+        // `simctl diagnose --timeout=600`, which spends minutes gathering a ~280MB sysdiagnose into
+        // the .xcresult *after* the verdict has already been parsed from stdout. The runner slot stays
+        // held for the whole collection, so a single failure can take a simulator out of rotation for
+        // up to 10 minutes. Passing the flag explicitly also overrides whatever the test plan sets.
+        let collectDiagnosticsParameter = "-collect-test-diagnostics \(testing.collectTestDiagnosticsOnFailure ? "on-failure" : "never")"
 
-    private func parseXcodebuildOutput(line: String) -> XcodebuildLineEvent? {
-        let testResultCrashMarker1 = #"Restarting after unexpected exit or crash in (.*)/(.*)\(\)"#
-        let testResultCrashMarker2 = #"\s+(.*)\(\) encountered an error \(Crash:"#
-        let testResultCrashMarker3 = #"Checking for crash reports corresponding to unexpected termination of"#
-        let testResultCrashMarker4 = #"Restarting after unexpected exit, crash, or test timeout in (.*)\.(.*)\(\)"#
-        let testResultTimeoutMarker1 = #"\s+(.*)\(\) encountered an error \(Test runner exited"# // Should be caused by the force reset of simulator
-        let testResultFailureMarker1 = #"^(Testing failed:)$"#
-
-        let testTarget = self.testTarget.replacingOccurrences(of: " ", with: "_")
-
-        let startRegex = #"Test Case '-\[\#(testTarget)\.(.*)\]' started"#
-
-        if line.contains(##"Code=28 "No space left on device""##) {
-            return .noSpaceOnDevice
-        }
-
-        if let tests = try? line.capturedGroups(withRegexString: startRegex), tests.count == 1 {
-            let testCaseName = tests[0].components(separatedBy: " ").last ?? ""
-            let testCaseSuite = tests[0].components(separatedBy: " ").first ?? ""
-
-            let startedTestCase = TestCase(name: testCaseName, suite: testCaseSuite)
-
-            if startedTestCase.name != testCase.name || startedTestCase.suite != testCase.suite {
-                fatalError("Unexpected test case found! Got \(startedTestCase) expected \(testCase)")
-            }
-
-            return .testStart
-        }
-
-        let passFailRegex = #"Test Case '-\[\#(testTarget)\.(.*)\]' (passed|failed|skipped) \((.*) seconds\)"#
-        if let tests = try? line.capturedGroups(withRegexString: passFailRegex), tests.count == 3 {
-            let duration = Double(tests[2]) ?? -1
-
-            if ["skipped", "passed"].contains(tests[1]) {
-                return .testPassed(duration: duration)
-            } else if tests[1] == "failed" {
-                return .testFailed(duration: duration)
-            } else {
-                fatalError("Unexpected test result \(tests[1]). Expecting either 'passed' or 'failed'")
-            }
-        }
-
-        let timeoutRegex = #"Test Case '-\[\#(testTarget)\.(.*)\]' exceeded execution time allowance"#
-        if let tests = try? line.capturedGroups(withRegexString: timeoutRegex), tests.count == 1 {
-            return .testTimedOut
-        }
-
-        if let tests = try? line.capturedGroups(withRegexString: testResultCrashMarker1), tests.count == 2 {
-            return .testCrashed
-        }
-
-        if let tests = try? line.capturedGroups(withRegexString: testResultCrashMarker2), tests.count == 1 {
-            return .testCrashed
-        }
-
-        if line.contains(testResultCrashMarker3) {
-            return .testCrashed
-        }
-
-        if let tests = try? line.capturedGroups(withRegexString: testResultCrashMarker4), tests.count == 2 {
-            return .testCrashed
-        }
-
-        if let tests = try? line.capturedGroups(withRegexString: testResultTimeoutMarker1), tests.count == 1 {
-            return .testFailed(duration: -1)
-        }
-
-        if let tests = try? line.capturedGroups(withRegexString: testResultFailureMarker1), tests.count == 1 {
-            return .testFailed(duration: -1)
-        }
-
-        return nil
+        return #"$(xcode-select -p)/usr/bin/xcodebuild -parallel-testing-enabled NO -disable-concurrent-destination-testing -xctestrun '\#(testRun)' -destination '\#(xcodebuildDestination)' -derivedDataPath '\#(destinationPath)' \#(onlyTesting) -enableCodeCoverage YES -destination-timeout 60 -test-timeouts-enabled YES \#(collectDiagnosticsParameter) \#(maxAllowedTestExecutionTimeParameter) test-without-building 2>&1 || true"#
     }
 
     private func shouldIgnoreTestExecutionError(_ error: Error) -> Bool {

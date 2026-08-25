@@ -55,8 +55,16 @@ class ConnectionPool<SourceValue> {
 
         operationQueue.waitUntilAllOperationsAreFinished()
 
-        for error in errors {
-            throw error
+        switch errors.count {
+        case 0:
+            break
+        case 1:
+            throw errors[0]
+        default:
+            let combined = errors.enumerated()
+                .map { "[\($0 + 1)/\(errors.count)] \($1.localizedDescription)" }
+                .joined(separator: "\n\n")
+            throw Error("\(errors.count) nodes failed:\n\n\(combined)")
         }
     }
 

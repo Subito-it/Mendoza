@@ -13,3 +13,5 @@ mendoza
 
 .vscode/
 *.tar.gz
+
+/notes/

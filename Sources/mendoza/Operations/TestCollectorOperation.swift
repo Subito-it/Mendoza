@@ -45,16 +45,18 @@ class TestCollectorOperation: BaseOperation<[TestCaseResult]> {
                 let resultsPath = "\(Path.results.rawValue)/"
                 try executer.rsync(sourcePath: resultsPath, destinationPath: destinationPath, on: destinationNode)
 
-                // Copy code coverage files
-                let logPath = "\(Path.logs.rawValue)/*"
+                // Copy code coverage files. Source paths end with a slash rather than a `*`
+                // glob: the glob is expanded by the node's shell and zsh aborts with
+                // `no matches found` when a coverage folder happens to be empty.
+                let logPath = "\(Path.logs.rawValue)/"
                 try executer.rsync(sourcePath: logPath, destinationPath: destinationPath, include: ["*/", "*.profdata"], exclude: ["*"], on: destinationNode)
 
                 if configuration.testing.extractIndividualTestCoverage {
-                    let path = "\(Path.individualCoverage.rawValue)/*"
+                    let path = "\(Path.individualCoverage.rawValue)/"
                     try executer.rsync(sourcePath: path, destinationPath: "\(destinationPath)/\(URL(filePath: Path.individualCoverage.rawValue).lastPathComponent)", include: ["*/", "*.json"], exclude: ["*"], on: destinationNode)
                 }
                 if configuration.testing.extractTestCoveredFiles {
-                    let path = "\(Path.testFileCoverage.rawValue)/*"
+                    let path = "\(Path.testFileCoverage.rawValue)/"
                     try executer.rsync(sourcePath: path, destinationPath: "\(destinationPath)/\(URL(filePath: Path.testFileCoverage.rawValue).lastPathComponent)", include: ["*/", "*.json"], exclude: ["*"], on: destinationNode)
                 }
 
@@ -81,7 +83,7 @@ class TestCollectorOperation: BaseOperation<[TestCaseResult]> {
                     testCaseResults[index].xcResultPath = Environment.xcresultFilename
                 }
             } else {
-                let results = try executer.execute("find '\(destinationPath)' -type d -name '*.xcresult'").components(separatedBy: "\n")
+                let results = try executer.execute("find '\(destinationPath)' -type d -name '*.xcresult'").components(separatedBy: "\n").filter { !$0.isEmpty }
 
                 let lastTwoPathComponents: (String) -> String = { path in
                     let components = path.components(separatedBy: "/")
@@ -136,7 +138,7 @@ class TestCollectorOperation: BaseOperation<[TestCaseResult]> {
         let mergedDestinationPath = "\(destinationPath)/\(destinationName)"
 
         let executer = try destinationNode.makeExecuter(logger: logger, environment: nodesEnvironment[destinationNode.address] ?? [:])
-        let sourcePaths = try executer.execute("find \(destinationPath) -type d -name '*.xcresult'").components(separatedBy: "\n")
+        let sourcePaths = try executer.execute("find \(destinationPath) -type d -name '*.xcresult'").components(separatedBy: "\n").filter { !$0.isEmpty }
 
         let mergeCmd: (_ sourcePaths: [String], _ destinationPath: String) -> String = { "xcrun xcresulttool merge " + $0.map { "'\($0)'" }.joined(separator: " ") + " --output-path '\($1)' 2>/dev/null" }
 

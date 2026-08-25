@@ -16,6 +16,7 @@ extension CommandLineProxy {
         }
 
         func unlock(password: String) throws {
+            executer.logger?.addIgnoreList(password)
             _ = try executer.execute("security unlock-keychain -p '\(password)' '\(executer.homePath)/Library/Keychains/login.keychain-db'")
         }
     }

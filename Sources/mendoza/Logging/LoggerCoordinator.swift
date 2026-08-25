@@ -89,10 +89,3 @@ extension LoggerCoordinator {
             """.replacingOccurrences(of: contentMarker, with: content)
     }
 }
-
-extension LoggerCoordinator where T == ExecuterLogger {
-    convenience init(operations: [LoggedOperation]) {
-        let loggers = operations.reduce([ExecuterLogger]()) { $0 + $1.loggers }
-        self.init(loggers: loggers)
-    }
-}

@@ -98,11 +98,11 @@ enum ExecutionGraph {
 
     <div id="footer" style="height:40px;"></div>
 
-    <script type="text/javascript">
-      const rawData = String.raw`
+    <script type="application/json" id="test-detail">
     $$TEST_DETAIL_JSON
-      `;
+    </script>
 
+    <script type="text/javascript">
       const pixelsPerSecond = 6.0;
       const ipHeight = 15.0;
       const ipSeparator = 5.0;
@@ -133,7 +133,7 @@ enum ExecutionGraph {
         positionDiv.innerHTML = `Curson position: ${currentPosition}s`;
       }
 
-      const data = JSON.parse(rawData);
+      const data = JSON.parse(document.getElementById("test-detail").textContent);
       var tests = data.passedTests.concat(data.failedTests, data.retriedTests);
       tests = tests.sort((a, b) => (a.startInterval > b.startInterval) ? 1 : -1)
 

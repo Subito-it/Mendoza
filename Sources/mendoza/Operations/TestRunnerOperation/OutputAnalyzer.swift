@@ -14,6 +14,7 @@ struct OutputAnalyzer {
         var failedPreflightChecks: Bool = false
         var failedBootstrapping: Bool = false
         var failedLoadingAccessibility: Bool = false
+        var failedLaunchingTestRunner: Bool = false
         var damagedBuild: Bool = false
 
         var requiresSimulatorReset: Bool {
@@ -22,6 +23,13 @@ struct OutputAnalyzer {
 
         var requiresBootstrapWait: Bool {
             failedBootstrapping
+        }
+
+        /// True when the failure indicates the test runner never launched on the simulator
+        /// (as opposed to the test method running and failing). Combined with the fact that
+        /// the test never started, this identifies a simulator-level infrastructure failure.
+        var isInfrastructureLaunchFailure: Bool {
+            failedPreflightChecks || failedBootstrapping || failedLaunchingTestRunner
         }
     }
 
@@ -33,6 +41,7 @@ struct OutputAnalyzer {
         analysis.failedPreflightChecks = output.contains("Application failed preflight checks")
         analysis.failedBootstrapping = output.contains("Test runner exited before starting test execution")
         analysis.failedLoadingAccessibility = output.contains("has not loaded accessibility")
+        analysis.failedLaunchingTestRunner = output.contains("Failed to install or launch the test runner")
         analysis.damagedBuild = output.contains("The application may be damaged or incomplete")
 
         return analysis

@@ -65,7 +65,7 @@ class ExecuterLogger: Logger, CustomDebugStringConvertible {
     var description: String { "\(address) - \(name)" }
     var debugDescription: String { "\(name), \(address), logs: \(logs.count)" }
     var hasErrors: Bool { logs.contains(where: \.isError) }
-    var filename: String { "\(address)-\(name).html" }
+    var filename: String { "\(address)-\(name).html".replacingOccurrences(of: " ", with: "_") }
     var isEmpty: Bool { logs.isEmpty }
     var dumpToStandardOutput: Bool = false
 
@@ -108,6 +108,8 @@ class ExecuterLogger: Logger, CustomDebugStringConvertible {
     }
 
     func redact(_ input: String) -> String {
+        let ignoreList = syncQueue.sync { self.ignoreList }
+
         var result = input
         for redact in ignoreList {
             result = result.replacingOccurrences(of: redact, with: "~redacted~")
@@ -139,7 +141,7 @@ class ExecuterLogger: Logger, CustomDebugStringConvertible {
                 // guard lastLog.isStart else { print(logs); /* assertionFailure("💣 Unexpected order of events, expecting start event"); */ return }
                 pairs.append((start: lastLog, end: log))
             case .exception:
-                pairs.append((start: LoggerEvent(date: Date(), kind: .start(command: "EXCEPTION")), end: log))
+                pairs.append((start: LoggerEvent(date: log.date, kind: .start(command: "EXCEPTION")), end: log))
             }
         }
 

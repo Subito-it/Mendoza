@@ -8,11 +8,15 @@
 import Foundation
 
 struct TestCaseResult: Codable, CustomStringConvertible, Hashable {
+    /// Encoded into the result-destination report consumed by external tooling, so the raw
+    /// values are a published contract: appending is safe, reordering is not.
     enum Status: Int, Codable {
         case passed, failed
     }
 
-    var duration: TimeInterval { endInterval - startInterval }
+    var duration: TimeInterval {
+        endInterval - startInterval
+    }
 
     var node: String
     var runnerName: String
@@ -26,24 +30,18 @@ struct TestCaseResult: Codable, CustomStringConvertible, Hashable {
     var averageStdOutIdleTime: TimeInterval?
     var maxStdOutIdleTime: TimeInterval?
 
-    var description: String { "\(testCaseIdentifier) (\(Int(endInterval - startInterval)) seconds)" }
-    var testCaseIdentifier: String { "\(suite)/\(name)" }
+    var description: String {
+        "\(testCaseIdentifier) (\(Int(endInterval - startInterval)) seconds)"
+    }
+
+    var testCaseIdentifier: String {
+        "\(suite)/\(name)"
+    }
 }
 
 extension TestCaseResult: DefaultInitializable {
     static func defaultInit() -> TestCaseResult {
         TestCaseResult(node: "", runnerName: "", runnerIdentifier: "", xcResultPath: "", suite: "", name: "", status: .passed, startInterval: 0.0, endInterval: 0.0, averageStdOutIdleTime: nil, maxStdOutIdleTime: nil)
-    }
-}
-
-extension TestCaseResult.Status: CustomReflectable {
-    var customMirror: Mirror {
-        Mirror(self, children: ["hack": """
-        enum Status: Int, Codable {
-            case passed, failed
-        }
-
-        """])
     }
 }
 

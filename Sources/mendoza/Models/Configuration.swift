@@ -46,11 +46,13 @@ extension Configuration {
 
     struct Plugins: Codable {
         let data: String
-        let debug: Bool
+        /// Where to keep each invocation's stdin envelope for replay. Defaults to the session
+        /// logs, which are wiped when the next session starts.
+        let replayPath: String?
 
-        init(data: String = "", debug: Bool = false) {
+        init(data: String = "", replayPath: String? = nil) {
             self.data = data
-            self.debug = debug
+            self.replayPath = replayPath
         }
     }
 
@@ -67,6 +69,8 @@ extension Configuration {
         let extractTestCoveredFiles: Bool
         let clearDerivedDataOnCompilationFailure: Bool
         let skipResultMerge: Bool
+        let disabledSimulatorServices: [String]
+        let collectTestDiagnosticsOnFailure: Bool
     }
 }
 

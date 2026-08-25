@@ -55,8 +55,8 @@ mendoza test --project MyApp.xcodeproj --scheme MyAppUITests --remote_nodes_conf
 # Generate node configuration
 mendoza configuration init
 
-# Generate plugin template
-mendoza plugin init
+# Show a plugin's input envelope and expected output
+mendoza plugin describe TearDownPlugin
 ```
 
 ---
@@ -175,7 +175,7 @@ Since the codebase **does not use Swift Concurrency**:
 
 ### Pipeline DAG (Dependency Order)
 
-Defined in `Commands/Test/Test.swift:127-156`:
+Defined in `Commands/Test/Test+MakeOperations.swift:82-116`:
 
 ```
 InitialSetupOperation
@@ -307,7 +307,7 @@ struct Configuration: Codable {
     let building: Building      // projectPath, scheme, sdk, buildConfiguration
     let testing: Testing        // timeouts, retries, coverage settings
     let device: Device?         // name, runtime, language, locale (iOS only)
-    let plugins: Plugins?       // custom data, debug flag
+    let plugins: Plugins?       // custom data, replay path
     let resultDestination: ConfigurationResultDestination
     let nodes: [Node]
     let verbose: Bool
@@ -336,14 +336,27 @@ Uses SourceKittenFramework to parse Swift source files:
 | `EventPlugin` | `EventPluginInput` | `PluginVoid` | React to pipeline events |
 | `PreCompilationPlugin` | `PluginVoid` | `PluginVoid` | Pre-compile actions |
 | `PostCompilationPlugin` | `PostCompilationInput` | `PluginVoid` | Post-compile actions |
-| `TearDownPlugin` | `TearDownInput` | `PluginVoid` | Cleanup actions |
+| `TearDownPlugin` | `TestSessionResult` | `PluginVoid` | Cleanup actions |
 
 ### Plugin Execution (`Plugins/Plugin.swift`)
 
-1. Copies plugin script with SHA256 suffix (cache key)
-2. Appends runner code for JSON serialization
-3. Executes: `./Plugin.swift '<json_input>' '<plugin_data>'`
-4. Parses output after `# plugin-result` marker
+A plugin is any executable named after the plugin type (no extension, executable bit set) at
+`pluginUrl`. It is run via its own shebang and communicates over standard streams:
+
+1. Encodes `{input, data}` into a single JSON envelope. `input` is `{}` for
+   `PluginVoid` inputs; `data` is null when the plugin data string is empty
+2. Dumps the envelope to `<name>.<timestamp>.json` (`0600`) on every invocation, under
+   `--plugin_replay_path` or the session logs, so failures are reproducible with
+   `cat envelope | plugin`
+3. Spawns the executable directly, writing the envelope to **stdin off-thread** (a plugin
+   that ignores stdin, or writes a lot to stdout first, would otherwise deadlock) with
+   stderr redirected to a temp file (two pipes drained sequentially deadlock)
+4. Always waits, then decodes the **entire** stdout as `Output` — unless `Output` is
+   `PluginVoid`, in which case stdout is ignored. Non-zero exit throws with stderr attached
+
+`main.swift` ignores `SIGPIPE`: without it, writing to a plugin that exited early would
+terminate Mendoza. Concurrent invocations are expected (one `EventPlugin` instance is shared
+across the pipeline), so in-flight processes are tracked under a serial queue.
 
 ## Remote Execution
 
@@ -422,7 +435,7 @@ Defined in `Path` enum (`Operations/BaseOperation.swift`):
 
 | Path | Value | Purpose |
 |------|-------|---------|
-| `.base` | `~/.mendoza` | Root temp directory |
+| `.base` | `/tmp/mendoza` | Root temp directory (`Environment.temporaryBasePath`) |
 | `.build` | `base/build` | Compilation output |
 | `.testBundle` | `build/Build/Products` | .xctest bundle |
 | `.logs` | `base/logs` | Per-operation HTML logs |
@@ -430,7 +443,3 @@ Defined in `Path` enum (`Operations/BaseOperation.swift`):
 | `.coverage` | `base/coverage` | Merged coverage |
 | `.individualCoverage` | `base/individual_coverage` | Per-test coverage JSONs |
 | `.testFileCoverage` | `base/test_file_coverage` | Per-test covered files |
-
-## Related Documentation
-
-- **`CODECOVERAGE_EXTRACTION.md`**: Analysis of individual test coverage extraction, known issues with cumulative coverage, and proposed fixes
