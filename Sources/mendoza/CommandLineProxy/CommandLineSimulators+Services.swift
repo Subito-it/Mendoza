@@ -48,26 +48,35 @@ extension CommandLineProxy.Simulators {
     ///
     /// - Note: The overrides only persist across reboots on iOS 18+, so the feature is
     ///   gated on the runtime version and verified after the reboot.
-    @discardableResult
-    func applyDisabledServices(_ desired: Set<String>, on simulator: Simulator) throws -> Bool {
+    struct ApplyResult {
+        let modified: Bool
+        let unrecognizedLabels: Set<String>
+    }
+
+    func applyDisabledServices(_ desired: Set<String>, on simulator: Simulator) throws -> ApplyResult {
         let numberFormatter = NumberFormatter()
         numberFormatter.decimalSeparator = "."
         let deviceVersion = numberFormatter.number(from: simulator.device.runtime)?.floatValue ?? 0.0
 
         guard deviceVersion >= 18.0 else {
             print("⚠️  Skipping simulator service slimming on \(simulator.name): requires iOS 18+, got \(simulator.device.runtime)")
-            return false
+            return ApplyResult(modified: false, unrecognizedLabels: [])
         }
 
         let current = try readDisabledServices(on: simulator)
         let delta = SimulatorServiceCatalog.delta(current: current, desired: desired)
 
         guard !delta.isEmpty else {
-            return false
+            return ApplyResult(modified: false, unrecognizedLabels: [])
         }
 
         try spawnLaunchctl(action: "disable", labels: delta.toDisable, on: simulator)
         try spawnLaunchctl(action: "enable", labels: delta.toEnable, on: simulator)
+
+        // Snapshot which labels launchd actually accepted before rebooting. Labels that
+        // don't exist on this runtime won't appear here — they're harmless no-ops.
+        let confirmedDisabled = try readDisabledServices(on: simulator)
+        let unrecognized = Set(delta.toDisable).subtracting(confirmedDisabled)
 
         // launchctl disable only prevents future launches, so a reboot is required to
         // actually stop the daemons already running.
@@ -75,12 +84,16 @@ extension CommandLineProxy.Simulators {
         try bootSynchronously(simulator: simulator)
 
         let afterReboot = try readDisabledServices(on: simulator)
-        let residual = SimulatorServiceCatalog.delta(current: afterReboot, desired: desired)
-        if !residual.toDisable.isEmpty {
-            throw Error("Simulator service overrides were not persisted on \(simulator.name) (runtime \(simulator.device.runtime)). Lost: \(residual.toDisable.joined(separator: ", "))", logger: executer.logger)
+        // Only flag labels that launchd confirmed as disabled pre-reboot but reverted
+        // after. Labels absent from the runtime never appear in confirmedDisabled, so
+        // they are silently skipped — no memory to reclaim anyway.
+        let reverted = confirmedDisabled.intersection(desired).subtracting(afterReboot)
+        if !reverted.isEmpty {
+            let lost = reverted.sorted()
+            throw Error("Simulator service overrides were not persisted on \(simulator.name) (runtime \(simulator.device.runtime)). Lost: \(lost.joined(separator: ", "))", logger: executer.logger)
         }
 
-        return true
+        return ApplyResult(modified: true, unrecognizedLabels: unrecognized)
     }
 
     private func spawnLaunchctl(action: String, labels: [String], on simulator: Simulator) throws {
