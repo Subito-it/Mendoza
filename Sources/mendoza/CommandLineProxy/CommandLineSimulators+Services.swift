@@ -18,7 +18,7 @@ extension CommandLineProxy.Simulators {
     private static let serviceSpawnBatchSize = 6
 
     func readDisabledServices(on simulator: Simulator) throws -> Set<String> {
-        let output = try executer.execute("xcrun simctl spawn '\(simulator.id)' launchctl print-disabled system 2>/dev/null")
+        let output = try executer.execute("xcrun simctl spawn '\(simulator.id)' launchctl print-disabled system </dev/null 2>/dev/null")
         return Self.parseDisabledServices(output)
     }
 
@@ -122,7 +122,7 @@ extension CommandLineProxy.Simulators {
         let command = stride(from: 0, to: labels.count, by: Self.serviceSpawnBatchSize)
             .map { offset in
                 labels[offset ..< min(offset + Self.serviceSpawnBatchSize, labels.count)]
-                    .map { "xcrun simctl spawn '\(simulator.id)' launchctl \(action) 'system/\($0)' &" }
+                    .map { "xcrun simctl spawn '\(simulator.id)' launchctl \(action) 'system/\($0)' </dev/null &" }
                     .joined(separator: " ") + " wait"
             }
             .joined(separator: "; ")
