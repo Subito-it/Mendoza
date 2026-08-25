@@ -85,21 +85,75 @@ final class SimulatorServiceTests: XCTestCase {
             "com.apple.amsengagementd",
             "com.apple.amsondevicestoraged",
             "com.apple.passd",
-            "com.apple.financed"
+            "com.apple.financed",
+            "com.apple.merchantd"
         ])
+    }
+
+    func testResolveSiriGroupCoversTheWholeSubsystem() throws {
+        let labels = try SimulatorServiceCatalog.resolveLabels(for: ["siri"])
+        XCTAssertEqual(labels, [
+            "com.apple.assistantd",
+            "com.apple.corespeechd",
+            "com.apple.siriinferenced",
+            "com.apple.siriknowledged",
+            "com.apple.siriactionsd",
+            "com.apple.sirittsd",
+            "com.apple.siri.context.service",
+            "com.apple.siri.acousticsignature"
+        ])
+    }
+
+    func testResolveIntelligenceGroup() throws {
+        let labels = try SimulatorServiceCatalog.resolveLabels(for: ["intelligence"])
+        XCTAssertEqual(labels, [
+            "com.apple.intelligenceplatformd",
+            "com.apple.intelligencetasksd",
+            "com.apple.intelligenceflowd",
+            "com.apple.intelligencecontextd",
+            "com.apple.callintelligenced",
+            "com.apple.fitnessintelligenced",
+            "com.apple.suggestd"
+        ])
+    }
+
+    func testResolvePostersGroup() throws {
+        let labels = try SimulatorServiceCatalog.resolveLabels(for: ["posters"])
+        XCTAssertEqual(labels, ["com.apple.PosterBoard", "com.apple.contacts.postersyncd"])
+    }
+
+    func testResolveGenerativeGroup() throws {
+        let labels = try SimulatorServiceCatalog.resolveLabels(for: ["generative"])
+        XCTAssertEqual(labels.count, 14)
+        XCTAssertTrue(labels.contains("com.apple.generativeexperiencesd"))
+        XCTAssertTrue(labels.contains("com.apple.imageplaygroundd"))
+        XCTAssertTrue(labels.contains("com.apple.modelcatalogd"))
+        XCTAssertTrue(labels.contains("com.apple.translationd"))
+        XCTAssertTrue(labels.contains("com.apple.mlhostd"))
+        XCTAssertTrue(labels.contains("com.apple.GenerativeFunctions.agentstored"))
+    }
+
+    func testResolveWatchGroup() throws {
+        let labels = try SimulatorServiceCatalog.resolveLabels(for: ["watch"])
+        XCTAssertEqual(labels.count, 13)
+        XCTAssertTrue(labels.contains("com.apple.nanomapscd"))
+        XCTAssertTrue(labels.contains("com.apple.nanosystemsettingsd"))
+        XCTAssertTrue(labels.contains("com.apple.NPKCompanionAgent"))
+        XCTAssertTrue(labels.contains("com.apple.companionappd"))
+        XCTAssertTrue(labels.contains("com.apple.brook.brookcompaniond"))
     }
 
     func testResolveIsUnionAndOrderIndependent() throws {
         let a = try SimulatorServiceCatalog.resolveLabels(for: ["payments", "app-store"])
         let b = try SimulatorServiceCatalog.resolveLabels(for: ["app-store", "payments"])
         XCTAssertEqual(a, b)
-        // payments (7) ∪ app-store (appstored, itunesstored) — itunesstored is shared
-        XCTAssertEqual(a.count, 8)
+        // payments (8) ∪ app-store (appstored, itunesstored) — itunesstored is shared
+        XCTAssertEqual(a.count, 9)
     }
 
     func testResolveGroupAndOverlappingServiceDoNotDoubleCount() throws {
         let labels = try SimulatorServiceCatalog.resolveLabels(for: ["payments", "passd"])
-        XCTAssertEqual(labels.count, 7)
+        XCTAssertEqual(labels.count, 8)
     }
 
     func testResolveEmptyAndWhitespaceTokensIgnored() throws {
