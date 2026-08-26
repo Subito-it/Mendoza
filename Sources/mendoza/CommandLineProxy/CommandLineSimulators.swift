@@ -242,16 +242,15 @@ extension CommandLineProxy {
         }
 
         private func waitForSimulatorReady(simulator: Simulator, timeout: TimeInterval = 30.0) throws {
-            // Plist files that are modified after boot and need to exist before we can update them.
-            // These files are created during simulator boot on iOS 15+.
-            // com.apple.suggestions.plist is the last one to be created, so once it exists all others should too.
+            let deviceBase = "~/Library/Developer/CoreSimulator/Devices/\(simulator.id)/data"
+
+            // Only wait for paths that CoreSimulator itself creates during boot.
+            // com.apple.suggestions.plist and the systemgroup UserSettings.plist are
+            // created by service daemons (suggestd, remotemanagementd) which may be
+            // disabled before boot — so they cannot be used as readiness signals.
             let requiredPaths = [
-                // Modified by enableXcode13Workarounds (created last during boot)
-                "~/Library/Developer/CoreSimulator/Devices/\(simulator.id)/data/Library/Preferences/com.apple.suggestions.plist",
-                // Modified by disablePasswordAutofill/enablePasswordAutofill
-                "~/Library/Developer/CoreSimulator/Devices/\(simulator.id)/data/Containers/Shared/SystemGroup/systemgroup.com.apple.configurationprofiles/Library/ConfigurationProfiles/UserSettings.plist",
-                "~/Library/Developer/CoreSimulator/Devices/\(simulator.id)/data/Library/UserConfigurationProfiles/EffectiveUserSettings.plist",
-                "~/Library/Developer/CoreSimulator/Devices/\(simulator.id)/data/Library/UserConfigurationProfiles/PublicInfo/PublicEffectiveUserSettings.plist"
+                "\(deviceBase)/Library/UserConfigurationProfiles/EffectiveUserSettings.plist",
+                "\(deviceBase)/Library/UserConfigurationProfiles/PublicInfo/PublicEffectiveUserSettings.plist",
             ]
 
             try waitForPaths(paths: requiredPaths, timeout: timeout)
