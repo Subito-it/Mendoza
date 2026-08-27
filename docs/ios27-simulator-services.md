@@ -180,7 +180,7 @@ Memory is RSS (Resident Set Size) in MB, measured via `ps -o rss` on the host af
 | 13.0 | com.apple.followupd | Follow-up actions | — |
 | 12.8 | com.apple.accessibility.mediaaccessibilityd | Media accessibility | — |
 | 12.8 | com.apple.purplebuddy.budd | Setup assistant | — |
-| 11.2 | com.apple.nanoregistrylaunchd | Watch registry launcher | — |
+| 11.2 | com.apple.nanoregistrylaunchd | Watch registry launcher | ✓ |
 | 11.0 | com.apple.ids_simd | IDS sim bridge | — |
 | 10.5 | com.apple.mobile.installd | App installer | — |
 | 10.0 | com.apple.cfprefsd.xpc.daemon | Preferences daemon | — |
@@ -218,6 +218,24 @@ These services are registered in launchd but not currently running. They launch 
 | com.apple.tvremoted | Apple TV remote |
 | com.apple.cloudphotod | iCloud Photo Library sync |
 | com.apple.mediaanalysisd.service | Media analysis service |
+
+## The Watch companion family is gated by a single daemon
+
+Every daemon in `/System/Library/NanoLaunchDaemons` ships with `Disabled => true` in its own
+plist. They run only because `com.apple.nanoregistrylaunchd` scans that directory and enables
+the lot. Because it is on-demand (`RunAtLoad => false`) it fires well after a boot-readiness
+wait returns, so its `enable` overwrites any `disable` written earlier — which is why the
+individual Watch labels could not be kept disabled on their own.
+
+Disabling the enabler keeps all of them down, survives reboots, and needs no per-boot
+follow-up. Measured on iOS 26.2: ~432 MB RSS per simulator. The effect also reaches on-demand
+clients that are not in that directory — notably `nanotimekitcompaniond` (96 MB here, 132 MB
+on the 26.2 probe), which is otherwise excluded from the catalog because disabling it directly
+wedges the simulator.
+
+Note that `launchctl print-disabled` reports only *overrides*, never the plist-level
+`Disabled` default, so it cannot be used to tell whether a service will actually run. Use
+`plutil -extract Disabled raw` on the job's plist for that.
 
 ## Notes
 

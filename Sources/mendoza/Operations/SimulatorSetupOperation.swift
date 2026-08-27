@@ -170,7 +170,6 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
         let queue = OperationQueue()
         let lock = NSLock()
         var firstError: Swift.Error?
-        var nodeUnrecognized: Set<String>?
 
         for simulator in simulators {
             let logger = ExecuterLogger(name: "\(type(of: self))-AsyncServices-\(simulator.name)", address: node.address)
@@ -181,14 +180,7 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
 
             queue.addOperation {
                 do {
-                    let result = try queueProxy.applyDisabledServices(desired, on: simulator)
-                    if !result.unrecognizedLabels.isEmpty {
-                        lock.lock()
-                        if nodeUnrecognized == nil {
-                            nodeUnrecognized = result.unrecognizedLabels
-                        }
-                        lock.unlock()
-                    }
+                    _ = try queueProxy.applyDisabledServices(desired, on: simulator)
                 } catch {
                     lock.lock()
                     firstError = firstError ?? error
@@ -199,11 +191,6 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
             }
         }
         queue.waitUntilAllOperationsAreFinished()
-
-        if let unrecognized = nodeUnrecognized {
-            let runtime = simulators.first?.device.runtime ?? "unknown"
-            print("ℹ️  Services not registered on \(node.address) (runtime \(runtime)), skipped: \(unrecognized.sorted().joined(separator: ", "))")
-        }
 
         if let firstError {
             throw firstError

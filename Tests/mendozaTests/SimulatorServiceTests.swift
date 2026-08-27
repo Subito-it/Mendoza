@@ -5,9 +5,13 @@ final class SimulatorServiceTests: XCTestCase {
     /// Daemons that wedge or deadlock a simulator when disabled. None must ever
     /// appear in the catalog; nanoregistryd in particular hangs every subsequent
     /// simctl call, which would mean a hung node with no useful error.
+    ///
+    /// `nanoregistrylaunchd` used to be listed here by association with nanoregistryd,
+    /// but disabling it on its own was measured to be safe (simctl stayed responsive
+    /// across a reboot) and is what keeps the Watch companion daemons down, so it is now
+    /// in the catalog instead.
     private let forbiddenLabels: Set<String> = [
         "com.apple.nanoregistryd",
-        "com.apple.nanoregistrylaunchd",
         "com.apple.nanoprefsyncd.2",
         "com.apple.nanotimekitcompaniond",
         "com.apple.nanobackupd",
@@ -135,7 +139,10 @@ final class SimulatorServiceTests: XCTestCase {
 
     func testResolveWatchGroup() throws {
         let labels = try SimulatorServiceCatalog.resolveLabels(for: ["watch"])
-        XCTAssertEqual(labels.count, 13)
+        XCTAssertEqual(labels.count, 14)
+        // Without the enabler the rest of the group is re-enabled ~15s into every boot, so
+        // the delta never converges and each run pays an extra reboot.
+        XCTAssertTrue(labels.contains("com.apple.nanoregistrylaunchd"))
         XCTAssertTrue(labels.contains("com.apple.nanomapscd"))
         XCTAssertTrue(labels.contains("com.apple.nanosystemsettingsd"))
         XCTAssertTrue(labels.contains("com.apple.NPKCompanionAgent"))
@@ -194,5 +201,21 @@ final class SimulatorServiceTests: XCTestCase {
         let delta = SimulatorServiceCatalog.delta(current: ["com.apple.somethingelse"], desired: ["com.apple.anotherunmanaged"])
         XCTAssertEqual(delta.toDisable, [])
         XCTAssertEqual(delta.toEnable, [])
+    }
+
+    func testParseDisabledServicesIgnoresEnabledOverridesAndNoise() {
+        // Verbatim shape of `launchctl print-disabled system`, which reports both directions.
+        let output = """
+        \tdisabled services = {
+        \t\t"com.apple.apsd" => disabled
+        \t\t"com.apple.pairedsyncd" => enabled
+        \t\t"com.apple.oldstyledisabled" => true
+        \t\t"com.apple.oldstyleenabled" => false
+        \t}
+        Could not print cache: 141: Reentrancy avoided
+        """
+
+        XCTAssertEqual(CommandLineProxy.Simulators.parseDisabledServices(output),
+                       ["com.apple.apsd", "com.apple.oldstyledisabled"])
     }
 }

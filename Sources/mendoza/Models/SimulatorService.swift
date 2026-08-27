@@ -147,7 +147,18 @@ enum SimulatorServiceCatalog {
         SimulatorService(id: "contentlinkingd", label: "com.apple.synapse.contentlinkingd", feature: "Synapse content linking"),
         SimulatorService(id: "naturallanguaged", label: "com.apple.naturallanguaged", feature: "Natural language processing"),
 
-        // Apple Watch companion
+        // Apple Watch companion.
+        //
+        // Every daemon in `/System/Library/NanoLaunchDaemons` ships with `Disabled => true`,
+        // so they are off by default and only run because `nanoregistrylaunchd` scans that
+        // directory and enables the whole thing (`launch_enable_directory`). It is on-demand
+        // (`RunAtLoad => false`), so it fires whenever its client first pokes it — well after
+        // a readiness wait returns — and its `enable` beats any `disable` written earlier.
+        //
+        // Disabling the enabler is therefore the only thing that sticks, and it stops the
+        // others without naming them. The individual labels below are kept so existing
+        // configurations keep resolving, but on their own they lose the race.
+        SimulatorService(id: "nanoregistrylaunchd", label: "com.apple.nanoregistrylaunchd", feature: "Watch registry launcher (gates every Watch companion daemon)"),
         SimulatorService(id: "nanomapscd", label: "com.apple.nanomapscd", feature: "Watch Maps companion"),
         SimulatorService(id: "nanosystemsettingsd", label: "com.apple.nanosystemsettingsd", feature: "Watch system settings"),
         SimulatorService(id: "npkcompanionagent", label: "com.apple.NPKCompanionAgent", feature: "Watch companion agent"),
@@ -210,7 +221,9 @@ enum SimulatorServiceCatalog {
         SimulatorServiceGroup(id: "ads", feature: "Ads & promoted content", serviceIDs: [
             "promotedcontentd", "adprivacyd"
         ]),
+        // `nanoregistrylaunchd` first: it is the one that actually keeps the rest down.
         SimulatorServiceGroup(id: "watch", feature: "Apple Watch companion services", serviceIDs: [
+            "nanoregistrylaunchd",
             "nanomapscd", "nanosystemsettingsd", "npkcompanionagent", "companionappd", "brookcompaniond",
             "appconduitd", "nanoappregistryd", "nanonewscd", "pairedsyncd", "pairedunlockd",
             "companiond", "companionmessagesd", "companionfindlocallyd"

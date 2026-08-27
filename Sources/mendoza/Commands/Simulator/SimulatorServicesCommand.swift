@@ -71,13 +71,13 @@ class SimulatorServicesCommand: Command {
 
             queue.addOperation {
                 do {
-                    let result = try simulatorProxy.applyDisabledServices(desired, on: simulator)
+                    let modified = try simulatorProxy.applyDisabledServices(desired, on: simulator)
                     let disabled = try simulatorProxy.readDisabledServices(on: simulator).intersection(SimulatorServiceCatalog.managed).sorted()
 
                     let state = disabled.isEmpty ? "no managed services disabled" : "disabled: \(disabled.joined(separator: ", "))"
 
                     lock.lock()
-                    summaries.append("\(simulator.name) — \(result.modified ? "updated" : "unchanged"), \(state)")
+                    summaries.append("\(simulator.name) — \(modified ? "updated" : "unchanged"), \(state)")
                     lock.unlock()
                 } catch {
                     lock.lock()

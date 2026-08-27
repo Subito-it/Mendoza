@@ -17,14 +17,23 @@ extension CommandLineProxy.Simulators {
     /// How many `simctl spawn` calls run concurrently per batch.
     private static let serviceSpawnBatchSize = 6
 
+    /// Reads the labels launchd currently holds a `disabled` override for.
+    ///
+    /// - Note: There is no host-side file backing this: the simulator's launchd never
+    ///   creates `/var/db/com.apple.xpc.launchd/disabled.plist` inside the device's data
+    ///   directory, and writing one there before boot is silently ignored. The overrides
+    ///   can only be read and written through `launchctl` on a booted device.
     func readDisabledServices(on simulator: Simulator) throws -> Set<String> {
         let output = try executer.execute("xcrun simctl spawn '\(simulator.id)' launchctl print-disabled system </dev/null 2>/dev/null")
         return Self.parseDisabledServices(output)
     }
 
-    /// Parses `launchctl print-disabled system` output. A label is disabled when its
-    /// value starts with `disabled` (recent launchd) or `true` (older builds); a label
-    /// absent from the output is enabled.
+    /// Parses `launchctl print-disabled system` output. A label is disabled when its value
+    /// starts with `disabled` (recent launchd) or `true` (older builds).
+    ///
+    /// A label absent from the output has no override, which is not the same as being
+    /// enabled: most daemons ship with `Disabled` set in their own plist, so this output
+    /// says nothing about whether a service actually runs.
     static func parseDisabledServices(_ output: String) -> Set<String> {
         var result = Set<String>()
 
@@ -48,35 +57,28 @@ extension CommandLineProxy.Simulators {
     ///
     /// - Note: The overrides only persist across reboots on iOS 18+, so the feature is
     ///   gated on the runtime version and verified after the reboot.
-    struct ApplyResult {
-        let modified: Bool
-        let unrecognizedLabels: Set<String>
-    }
-
-    func applyDisabledServices(_ desired: Set<String>, on simulator: Simulator) throws -> ApplyResult {
+    func applyDisabledServices(_ desired: Set<String>, on simulator: Simulator) throws -> Bool {
         let numberFormatter = NumberFormatter()
         numberFormatter.decimalSeparator = "."
         let deviceVersion = numberFormatter.number(from: simulator.device.runtime)?.floatValue ?? 0.0
 
         guard deviceVersion >= 18.0 else {
             print("⚠️  Skipping simulator service slimming on \(simulator.name): requires iOS 18+, got \(simulator.device.runtime)")
-            return ApplyResult(modified: false, unrecognizedLabels: [])
+            return false
         }
 
         let current = try readDisabledServices(on: simulator)
         let delta = SimulatorServiceCatalog.delta(current: current, desired: desired)
 
-        guard !delta.isEmpty else {
-            return ApplyResult(modified: false, unrecognizedLabels: [])
-        }
+        guard !delta.isEmpty else { return false }
 
         try spawnLaunchctl(action: "disable", labels: delta.toDisable, on: simulator)
         try spawnLaunchctl(action: "enable", labels: delta.toEnable, on: simulator)
 
-        // Snapshot which labels launchd actually accepted before rebooting. Labels that
-        // don't exist on this runtime won't appear here — they're harmless no-ops.
+        // launchd accepts any label, including ones no job on this runtime declares, so
+        // this snapshot only tells us the overrides were recorded — not that they matched
+        // a real service.
         let confirmedDisabled = try readDisabledServices(on: simulator)
-        let unrecognized = Set(delta.toDisable).subtracting(confirmedDisabled)
 
         // launchctl disable only prevents future launches, so a reboot is required to
         // actually stop the daemons already running.
@@ -84,16 +86,24 @@ extension CommandLineProxy.Simulators {
         try bootSynchronously(simulator: simulator)
 
         let afterReboot = try readDisabledServices(on: simulator)
-        // Only flag labels that launchd confirmed as disabled pre-reboot but reverted
-        // after. Labels absent from the runtime never appear in confirmedDisabled, so
-        // they are silently skipped — no memory to reclaim anyway.
+
+        // A label the runtime put back is one it insists on owning, which leaves the delta
+        // permanently non-empty: every future run would pay this reboot again. The known
+        // case is the Watch companion family, gated by `nanoregistrylaunchd` — disabling
+        // that enabler is what makes them stick. Warn rather than throw: the whole feature
+        // is an opportunistic memory saving, not something worth failing a session over.
         let reverted = confirmedDisabled.intersection(desired).subtracting(afterReboot)
         if !reverted.isEmpty {
-            let lost = reverted.sorted()
-            throw Error("Simulator service overrides were not persisted on \(simulator.name) (runtime \(simulator.device.runtime)). Lost: \(lost.joined(separator: ", "))", logger: executer.logger)
+            let message = """
+            ⚠️  Simulator services were re-enabled after the reboot on \(simulator.name) (runtime \(simulator.device.runtime)): \
+            \(reverted.sorted().joined(separator: ", ")). Every run will pay an extra reboot until whatever enables them is \
+            disabled too — for Watch companion daemons that is com.apple.nanoregistrylaunchd (service id 'nanoregistrylaunchd').
+            """
+            print(message)
+            executer.logger?.log(exception: message)
         }
 
-        return ApplyResult(modified: true, unrecognizedLabels: unrecognized)
+        return true
     }
 
     private func spawnLaunchctl(action: String, labels: [String], on simulator: Simulator) throws {
