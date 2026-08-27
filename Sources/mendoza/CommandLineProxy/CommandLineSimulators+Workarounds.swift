@@ -77,42 +77,65 @@ extension CommandLineProxy.Simulators {
         }
     }
 
-    func enableXcode11ReleaseNotesWorkarounds(on simulator: Simulator) {
+    func enableXcode11ReleaseNotesWorkarounds(on simulator: Simulator) throws -> Bool {
         // See release notes workarounds: https://developer.apple.com/documentation/xcode_release_notes/xcode_11_release_notes?language=objc
-        // These settings are hot loaded no reboot of the device is necessary
-        _ = try? executer.execute("xcrun simctl spawn '\(simulator.id)' defaults write com.apple.springboard FBLaunchWatchdogScale 2")
+        let path = "\(simulatorSettingsPath(for: simulator))/com.apple.springboard.plist"
+        return try updatePlistIfNeeded(path: path, key: "FBLaunchWatchdogScale", value: 2)
     }
 
-    func disableSlideToType(on simulator: Simulator) {
+    func disableSlideToType(on simulator: Simulator) throws -> Bool {
         let numberFormatter = NumberFormatter()
         numberFormatter.decimalSeparator = "."
         let deviceVersion = numberFormatter.number(from: simulator.device.runtime)?.floatValue ?? 0.0
 
-        if deviceVersion >= 13.0 {
-            // These settings are hot loaded no reboot of the device is necessary
-            _ = try? executer.execute("xcrun simctl spawn '\(simulator.id)' defaults write com.apple.keyboard.preferences DidShowContinuousPathIntroduction -bool true")
-        }
+        guard deviceVersion >= 13.0 else { return false }
+
+        let path = "\(simulatorSettingsPath(for: simulator))/com.apple.keyboard.preferences.plist"
+        return try updatePlistIfNeeded(path: path, key: "DidShowContinuousPathIntroduction", value: true)
     }
 
-    func disableMultilingualKeyboardTip(on simulator: Simulator) {
+    func disableMultilingualKeyboardTip(on simulator: Simulator) throws -> Bool {
         let numberFormatter = NumberFormatter()
         numberFormatter.decimalSeparator = "."
         let deviceVersion = numberFormatter.number(from: simulator.device.runtime)?.floatValue ?? 0.0
 
-        if deviceVersion >= 26.0 {
-            // These settings are hot loaded no reboot of the device is necessary
-            _ = try? executer.execute("xcrun simctl spawn '\(simulator.id)' defaults write com.apple.keyboard.preferences MultilingualKeyboardTip -bool true")
-        }
+        guard deviceVersion >= 26.0 else { return false }
+
+        let path = "\(simulatorSettingsPath(for: simulator))/com.apple.keyboard.preferences.plist"
+        return try updatePlistIfNeeded(path: path, key: "MultilingualKeyboardTip", value: true)
     }
 
-    func disableSafariMenuOnboarding(on simulator: Simulator) {
+    func disableSafariMenuOnboarding(on simulator: Simulator) throws -> Bool {
         let numberFormatter = NumberFormatter()
         numberFormatter.decimalSeparator = "."
         let deviceVersion = numberFormatter.number(from: simulator.device.runtime)?.floatValue ?? 0.0
 
-        if deviceVersion >= 26.0 {
-            _ = try? executer.execute(#"xcrun simctl spawn '"# + simulator.id + #"' defaults write com.apple.mobilesafari WBSOnboardingStatesDefaultsKeyV0.2 -dict "CustomizeStartPage" -int 1 "EnableCloudSync" -int 1 "EnableHighlights" -int 2 "ExtensionsDiscovery" -int 1 "SetDefaultBrowser" -int 2 "TipForMoreButton" -int 3"#)
+        guard deviceVersion >= 26.0 else { return false }
+
+        let path = "\(simulatorSettingsPath(for: simulator))/com.apple.mobilesafari.plist"
+        return try updateSafariOnboardingPlist(path: path)
+    }
+
+    private func updateSafariOnboardingPlist(path: String) throws -> Bool {
+        // The literal key contains a dot, which plutil would otherwise read as a keypath
+        // separator, so it stays escaped and single quoted all the way to plutil.
+        let keyPath = #"'WBSOnboardingStatesDefaultsKeyV0\.2'"#
+        let states = ["CustomizeStartPage": 1, "EnableCloudSync": 1, "EnableHighlights": 2,
+                      "ExtensionsDiscovery": 1, "SetDefaultBrowser": 2, "TipForMoreButton": 3]
+
+        let currentJson = try? executer.execute("plutil -extract \(keyPath) json -o - '\(path)' 2>/dev/null")
+        if let data = currentJson?.data(using: .utf8),
+           let current = try? JSONDecoder().decode([String: Int].self, from: data),
+           current == states {
+            return false
         }
+
+        try createPlistIfNeeded(path: path)
+
+        let json = "{" + states.sorted { $0.key < $1.key }.map { "\"\($0.key)\":\($0.value)" }.joined(separator: ",") + "}"
+        _ = try executer.execute("plutil -replace \(keyPath) -json '\(json)' '\(path)'")
+
+        return true
     }
 
     func updateLanguage(on simulator: Simulator, language: String?, locale: String?) throws -> Bool {

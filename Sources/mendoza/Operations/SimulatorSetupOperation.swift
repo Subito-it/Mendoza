@@ -67,10 +67,19 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
                     try rebootRequired.append(self.updateSimulatorsSettings(executer: executer, simulators: nodeSimulators, arrangeSimulators: true))
                 }
 
+                // All of these write directly into the device's preference plists, which
+                // cfprefsd owns and rewrites from memory while the simulator is booted, so
+                // they have to feed the reboot decision below rather than be applied after
+                // boot.
                 for nodeSimulator in nodeSimulators {
                     try rebootRequired.append(proxy.updateLanguage(on: nodeSimulator, language: self.device.language, locale: self.device.locale))
                     try rebootRequired.append(proxy.increaseWatchdogExceptionTimeout(on: nodeSimulator, appBundleIndentifier: self.buildBundleIdentifier, testBundleIdentifier: self.testBundleIdentifier))
                     try rebootRequired.append(proxy.disablePasswordAutofill(on: nodeSimulator))
+                    try rebootRequired.append(proxy.enableXcode11ReleaseNotesWorkarounds(on: nodeSimulator))
+                    try rebootRequired.append(proxy.enableXcode13Workarounds(on: nodeSimulator))
+                    try rebootRequired.append(proxy.disableSlideToType(on: nodeSimulator))
+                    try rebootRequired.append(proxy.disableMultilingualKeyboardTip(on: nodeSimulator))
+                    try rebootRequired.append(proxy.disableSafariMenuOnboarding(on: nodeSimulator))
                 }
 
                 if rebootRequired.contains(true) || self.alwaysRebootSimulators {
@@ -140,13 +149,7 @@ class SimulatorSetupOperation: BaseOperation<[(simulator: Simulator, node: Node)
                 #endif
                 try? queueProxy.bootSynchronously(simulator: simulator)
 
-                queueProxy.enableXcode11ReleaseNotesWorkarounds(on: simulator)
-                _ = try? queueProxy.enableXcode13Workarounds(on: simulator)
-                queueProxy.disableSlideToType(on: simulator)
-                queueProxy.disableMultilingualKeyboardTip(on: simulator)
-                queueProxy.disableSafariMenuOnboarding(on: simulator)
-
-                // Requires a booted simulator, so it has to happen after bootSynchronously
+                // Requires a booted simulator (uses CoreSimulator XPC API)
                 try? queueProxy.applyCoreSimulatorSettings(on: simulator)
 
                 #if DEBUG

@@ -80,7 +80,7 @@ extension CommandLineProxy.Simulators {
         return false
     }
 
-    private func createPlistIfNeeded(path: String) throws {
+    func createPlistIfNeeded(path: String) throws {
         let exists = try executer.execute("ls '\(path)' &>/dev/null && echo 'yes' || echo 'no'")
         if exists == "no" {
             _ = try executer.execute("mkdir -p \"$(dirname '\(path)')\" && plutil -create xml1 '\(path)'")
