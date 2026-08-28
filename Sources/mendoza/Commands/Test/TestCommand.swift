@@ -47,6 +47,7 @@ class TestCommand: Command {
     let projectPath = Argument<URL>(name: "path", kind: .named(short: nil, long: "project"), optional: false, help: "The path to the .xcworkspace or .xcodeproj to build")
     let scheme = Argument<String>(name: "name", kind: .named(short: nil, long: "scheme"), optional: false, help: "The scheme to build")
     let buildConfiguration = Argument<String>(name: "name", kind: .named(short: nil, long: "build_configuration"), optional: true, help: "Build configuration. Default: Debug")
+    let buildSettings = Argument<String>(name: "settings", kind: .named(short: nil, long: "build_settings"), optional: true, help: "Additional build settings passed to xcodebuild, e.g. \"SWIFT_COMPILATION_MODE=wholemodule COMPILATION_CACHE_CAS_PATH=/path/to/cas\". These outrank the project's own settings, so only pass what you intend to override. Default: ''")
     let pluginsBasePath = Argument<URL>(name: "path", kind: .named(short: nil, long: "plugins_path"), optional: true, help: "The path to the folder containing Mendoza's plugins")
 
     func run() -> Bool {
@@ -114,7 +115,9 @@ class TestCommand: Command {
 
         let filePatterns = FilePatterns(commaSeparatedIncludePattern: includePattern.value, commaSeparatedExcludePattern: excludePattern.value)
 
-        let building = Configuration.Building(projectPath: projectUrl.path, buildBundleIdentifier: bundleIdentifiers.build, testBundleIdentifier: bundleIdentifiers.test, scheme: scheme, buildConfiguration: buildConfiguration, sdk: sdk.rawValue, filePatterns: filePatterns, xcodeBuildNumber: xcodeBuildNumber)
+        let settings = Configuration.Building.Settings(buildSettings: buildSettings.value ?? "")
+
+        let building = Configuration.Building(projectPath: projectUrl.path, buildBundleIdentifier: bundleIdentifiers.build, testBundleIdentifier: bundleIdentifiers.test, scheme: scheme, buildConfiguration: buildConfiguration, sdk: sdk.rawValue, settings: settings, filePatterns: filePatterns, xcodeBuildNumber: xcodeBuildNumber)
 
         if let codeCoveragePathEquivalenceValue = codeCoveragePathEquivalence.value {
             if codeCoveragePathEquivalenceValue.components(separatedBy: ",").count % 2 != 0 {

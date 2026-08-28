@@ -80,7 +80,10 @@ extension Configuration.Building {
         let onlyActiveArchitecture: String
         let architectures: String
 
-        init(buildSettings: String = "GCC_OPTIMIZATION_LEVEL='s' SWIFT_OPTIMIZATION_LEVEL='-Osize'", onlyActiveArchitecture: Bool = true, architectures: String = "arm64") {
+        /// - Note: `buildSettings` is empty by default so that the project's own build configuration is
+        ///         honoured. These end up on xcodebuild's command line, which outranks every xcconfig,
+        ///         target and configuration value in the project.
+        init(buildSettings: String = "", onlyActiveArchitecture: Bool = true, architectures: String = "arm64") {
             self.buildSettings = buildSettings
             self.onlyActiveArchitecture = onlyActiveArchitecture ? "YES" : "NO"
             self.architectures = architectures
