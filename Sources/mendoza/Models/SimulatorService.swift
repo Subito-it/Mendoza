@@ -49,7 +49,6 @@ enum SimulatorServiceCatalog {
 
         // Links & sharing
         SimulatorService(id: "swcd", label: "com.apple.swcd", feature: "Universal links / associated domains"),
-        SimulatorService(id: "sharingd", label: "com.apple.sharingd", feature: "AirDrop & proximity sharing"),
 
         // Spotlight & search
         SimulatorService(id: "searchd", label: "com.apple.searchd", feature: "Spotlight search"),

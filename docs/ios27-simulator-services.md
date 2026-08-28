@@ -15,7 +15,7 @@ Memory is RSS (Resident Set Size) in MB, measured via `ps -o rss` on the host af
 | 218.3 | com.apple.assistantd | Siri | ✓ |
 | 211.0 | com.apple.siriactionsd | Siri actions | ✓ |
 | 206.4 | com.apple.intelligenceflowd | Apple Intelligence flows | ✓ |
-| 185.6 | com.apple.sharingd | AirDrop & proximity sharing | ✓ |
+| 185.6 | com.apple.sharingd | AirDrop & proximity sharing | — |
 | 181.7 | com.apple.chronod | Widgets | ✓ |
 | 179.7 | com.apple.MapKit.SnapshotService | MapKit snapshot rendering | ✓ |
 | 178.4 | com.apple.calaccessd | Calendar | ✓ |
@@ -241,7 +241,7 @@ Note that `launchctl print-disabled` reports only *overrides*, never the plist-l
 
 - RSS is not additive across processes due to shared memory pages, but gives a useful relative ranking.
 - On-demand services (not running) would add further memory pressure when triggered.
-- The catalog now covers 95 services across 13 groups. Of the 192 running services observed, 79 are in the catalog (total RSS ~8.9 GB), leaving 113 uncatalogued (total RSS ~6.3 GB). Uncatalogued services above 60 MB that were deliberately excluded: `locationd` (breaks CLLocationManager mocking), `AccessibilityUIServer` (XCUITest depends on it), `backboardd` (display compositor — simulator won't function), `usernotificationsd` (needed for notification-delivery assertions), `dasd` (system-critical task scheduler), `routined`/`biomed`/`nanotimekitcompaniond`/`managedconfiguration.profiled` (wedge the simulator when disabled).
+- The catalog now covers 95 services across 13 groups. Of the 192 running services observed, 79 are in the catalog (total RSS ~8.9 GB), leaving 113 uncatalogued (total RSS ~6.3 GB). Uncatalogued services above 60 MB that were deliberately excluded: `locationd` (breaks CLLocationManager mocking), `AccessibilityUIServer` (XCUITest depends on it), `backboardd` (display compositor — simulator won't function), `usernotificationsd` (needed for notification-delivery assertions), `dasd` (system-critical task scheduler), `routined`/`biomed`/`nanotimekitcompaniond`/`managedconfiguration.profiled` (wedge the simulator when disabled), `sharingd` (removed from the catalog — `UIActivityViewController` queries it synchronously to populate its share sheet; disabling it leaves the sheet empty, breaking the system Copy action and any other activity, in any app that presents a share sheet).
 - The `generative` group (14 services) totals ~690 MB of the running subset when all are resident.
 - The `watch` group (13 services) totals ~660 MB of the running subset.
 - The `maps` group (4 services: mapssyncd, navd, geod, mapkitsnapshotservice) totals ~356 MB when all are resident.
