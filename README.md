@@ -207,6 +207,18 @@ mendoza plugin describe TearDownPlugin
 
 Will launch tests as specified in the configuration files.
 
+### Additional build settings
+
+`--build_settings` forwards arbitrary build settings to the `build-for-testing` invocation:
+
+```
+mendoza test ... --build_settings "SWIFT_COMPILATION_MODE=wholemodule COMPILATION_CACHE_CAS_PATH=/path/to/cas"
+```
+
+The string is passed to `xcodebuild` verbatim, so it takes the usual `KEY=value` form and is subject to `xcodebuild`'s precedence rules: command line settings **outrank every xcconfig, target and configuration value in your project**, with no way for the project to opt out. Pass only what you intend to override.
+
+Nothing is set by default, so your project's own build configuration is honoured.
+
 ### Test diagnostics collection
 
 By default Mendoza passes `-collect-test-diagnostics never` to `xcodebuild`, which disables the collection of verbose diagnostics (sysdiagnoses, log archives).
@@ -238,11 +250,13 @@ Tokens are resolved from a catalog of known-safe services. You can pass **group 
 | `intelligence` | Apple Intelligence | intelligenceplatformd, intelligencetasksd, intelligenceflowd, intelligencecontextd, callintelligenced, fitnessintelligenced |
 | `posters` | Lock screen & wallpaper posters | posterboard, postersyncd |
 | `generative` | Generative AI & ML models | generativeexperiencesd, imageplaygroundd, modelcatalogd, modelmanagerd, textunderstandingd, hybridsearchd, voicebankingd, translationd, mlhostd, mlruntimed, knowledgeconstructiond, agentstored, contentlinkingd, naturallanguaged |
-| `watch` | Apple Watch companion | nanomapscd, nanosystemsettingsd, npkcompanionagent, companionappd, brookcompaniond, appconduitd, nanoappregistryd, nanonewscd, pairedsyncd, pairedunlockd, companiond, companionmessagesd, companionfindlocallyd |
+| `watch` | Apple Watch companion | nanoregistrylaunchd, nanomapscd, nanosystemsettingsd, npkcompanionagent, companionappd, brookcompaniond, appconduitd, nanoappregistryd, nanonewscd, pairedsyncd, pairedunlockd, companiond, companionmessagesd, companionfindlocallyd |
 
 Individual services can also be passed directly (e.g. `--disable_sim_services weatherd,newsd,gamed`).
 
 The override persists across reboots on iOS 18+. Mendoza tracks which labels it manages so it will re-enable any previously disabled service that is no longer in the desired set.
+
+Some services are only kept alive by another one that enables them, and disabling those on their own does not hold. The Watch companion family is the known case: every daemon in the simulator's `/System/Library/NanoLaunchDaemons` ships disabled in its own plist and runs only because `nanoregistrylaunchd` enables the whole directory on demand, well after boot. Disabling `nanoregistrylaunchd` is what keeps the family down, which is why it leads the `watch` group. If you pass the individual Watch services without it, Mendoza warns that they were re-enabled after the reboot and every subsequent run pays an extra simulator reboot.
 
 For a full audit of per-service memory usage on iOS 27, see [docs/ios27-simulator-services.md](docs/ios27-simulator-services.md).
 
