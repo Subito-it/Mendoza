@@ -14,7 +14,17 @@ class CodeCoverageMerger {
         self.executer = executer
     }
 
-    func merge(coverageFiles: [String]) throws -> String? {
+    func merge(coverageFiles: [String], strict: Bool = false) throws -> String? {
+        if strict {
+            let files = coverageFiles.filter { !$0.isEmpty }
+            guard let first = files.first else { return nil }
+            let destination = URL(fileURLWithPath: first).deletingLastPathComponent().appendingPathComponent(UUID().uuidString + ".profdata").path
+            let quote = BatchTestExecutor.quote
+            _ = try executer.execute("xcrun llvm-profdata merge -sparse \(files.map(quote).joined(separator: " ")) -o \(quote(destination))")
+            // Preserve all inputs on merge failure. Publish the merged file before deleting sources.
+            _ = try executer.execute("rm -f " + files.map(quote).joined(separator: " "))
+            return destination
+        }
         guard coverageFiles.count > 0, let coverageUrl = URL(string: coverageFiles[0])?.deletingLastPathComponent() else {
             return nil
         }

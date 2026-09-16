@@ -24,6 +24,7 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
 
     private let resultHandler: TestResultHandler
     private let testCaseExecutor: TestCaseExecutor
+    private let batchExecutor: BatchTestExecutor
     private let simulatorRecovery: SimulatorRecovery
     private let diagnosticReporter: DiagnosticReporter
 
@@ -95,6 +96,8 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
         // Temporary placeholder for addLogger - will be set after super.init
         var addLoggerClosure: ((ExecuterLogger) -> Void)?
 
+        self.batchExecutor = BatchTestExecutor(configuration: configuration, target: testTarget, baseUrl: baseUrl, destinationPath: destinationPath, jobs: postExecutionQueue, addLogger: { logger in addLoggerClosure?(logger) })
+
         self.testCaseExecutor = TestCaseExecutor(
             configuration: configuration,
             testExecuterBuilder: testExecuterBuilder,
@@ -118,6 +121,10 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
         guard !isCancelled else { return }
 
         do {
+            try configuration.testing.validateBatchSize()
+            if configuration.testing.effectiveTestBatchSize > 1, configuration.device == nil {
+                throw Error("test_batch_size 2 requires iOS simulators")
+            }
             didStart?()
 
             var results = [TestCaseResult]()
@@ -142,10 +149,14 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                 }
 
                 while true {
+                    if self.configuration.testing.effectiveTestBatchSize > 1, self.isCancelled { return }
                     let state = self.determineRunnerState(runnerIndex: runnerIndex, testRunner: testRunner)
 
                     switch state {
                     case .allRunnersCompleted:
+                        if self.configuration.testing.effectiveTestBatchSize > 1 {
+                            try self.diagnosticReporter.copyDiagnosticReports(executer: executer, testRunner: testRunner)
+                        }
                         return
                     case .waitingCompletion, .quarantinedWaiting:
                         Thread.sleep(forTimeInterval: 1.0)
@@ -154,6 +165,17 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                         self.simulatorRecovery.boot(executer: executer, testRunner: testRunner)
                         self.endQuarantine(for: testRunner, runnerIndex: runnerIndex, node: source.node)
                         continue
+                    case let .executeBatch(tests):
+                        let outcome = try self.batchExecutor.execute(tests: tests, executer: executer, node: source.node, runner: testRunner) { [weak self] result, test in
+                            self?.handleTestCaseResultPreview(result, testCase: test, runnerIndex: runnerIndex)
+                        }
+                        self.syncQueue.sync {
+                            results.append(contentsOf: outcome.results)
+                            self.testQueue.returnUnstarted(outcome.unstarted)
+                        }
+                        if outcome.requiresQuarantine {
+                            self.beginQuarantine(for: testRunner, runnerIndex: runnerIndex, node: source.node, executer: executer)
+                        }
                     case let .execute(testCase):
                         let outcome = try self.testCaseExecutor.execute(
                             testCase: testCase,
@@ -181,13 +203,28 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
 
             postExecutionQueue.waitUntilAllOperationsAreFinished()
 
+            if configuration.testing.effectiveTestBatchSize > 1 {
+                try batchExecutor.finish()
+                guard !isCancelled else { return }
+            }
+
             didEnd?(results)
         } catch {
+            if configuration.testing.effectiveTestBatchSize > 1 {
+                batchExecutor.cancel()
+                try? batchExecutor.finish()
+            }
             didThrow?(error)
         }
     }
 
     override func cancel() {
+        if configuration.testing.effectiveTestBatchSize > 1 {
+            // Stop dequeuing before waiting for control connections to deliver cancellation markers.
+            super.cancel()
+            if isExecuting { batchExecutor.cancel() }
+            return
+        }
         if isExecuting {
             pool.terminate()
         }
@@ -198,6 +235,7 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
 
     private enum State {
         case execute(TestCase)
+        case executeBatch([TestCase])
         case waitingCompletion
         case quarantinedWaiting
         case recover
@@ -218,6 +256,15 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
             if let quarantineStart = quarantinedRunners[runnerIndex] {
                 let elapsed = CFAbsoluteTimeGetCurrent() - quarantineStart
                 return elapsed >= quarantineCooldown ? .recover : .quarantinedWaiting
+            }
+
+            if configuration.testing.effectiveTestBatchSize > 1 {
+                var tests = testQueue.dequeueBatch(for: runnerIndex, maximumCount: configuration.testing.effectiveTestBatchSize)
+                if tests.isEmpty, !queueEmpty, !hasRunnerAvailableForQueuedTestCases(excluding: runnerIndex) {
+                    tests = testQueue.dequeueBatch(for: runnerIndex, maximumCount: configuration.testing.effectiveTestBatchSize, ignoringExclusions: true)
+                }
+                testRunners?[runnerIndex].idle = tests.isEmpty
+                return tests.isEmpty ? .waitingCompletion : .executeBatch(tests)
             }
 
             if let testCase = testQueue.dequeue(for: runnerIndex) {

@@ -219,6 +219,25 @@ The string is passed to `xcodebuild` verbatim, so it takes the usual `KEY=value`
 
 Nothing is set by default, so your project's own build configuration is honoured.
 
+### Test batching
+
+`--test_batch_size` accepts `1` (the default) or `2`. Size `1` uses the single-test execution path. Size `2` runs up to two selected tests sequentially in one `xcodebuild test-without-building` invocation per iOS simulator. Simulators still run concurrently. The last batch may contain one test, and failed-test retries always run individually. Every execution node must have a Mendoza binary with batching support; the batch worker checks protocol compatibility before dispatch.
+
+```sh
+mendoza test --project SomeProject.xcodeproj --scheme SomeUITests \
+  --device_name "iPhone 17 Pro" --device_runtime "27.0" \
+  --local_destination_path /path/to/results --test_batch_size 2 \
+  --individual_test_coverage --test_covered_files
+```
+
+Test verdicts, durations, progress and retry limits remain per test. Xcode may execute selected tests in a different order. An interrupted batch preserves completed verdicts, fails the active test, and returns any unstarted sibling to the queue as a singleton without consuming a retry. A launch failure consumes one failed attempt; its untouched sibling is returned. Test plans that repeat tests are unsupported in batch mode.
+
+Coverage is extracted once after the invocation completes. Both `--individual_test_coverage` and `--test_covered_files` produce **combined batch coverage**: a passing test's report can include code executed by its sibling, including a failing sibling. Passing members receive the existing `Suite-test-timestamp.json` filenames containing the same combined report. Canonical reports live under `batches/<invocation UUID>/coverage.json` inside each coverage output directory, alongside `metadata.json` describing membership and possible incomplete coverage. Unstarted tests receive no report. Each batch enters aggregate session coverage exactly once. Missing coverage for a started batch, failed merges, and failed requested exports fail the session explicitly; valid partial coverage from interrupted tests is marked in metadata.
+
+With `--skip_result_merge`, both members reference the same xcresult. A batch owns one result bundle and transfers it once. Raw batch output and invocation metadata are collected into `results/batch_logs/<invocation UUID>`.
+
+In batch mode, `--stdout_timeout` applies only while a test is active and resets for each test. Separate limits bound startup (180 seconds), the gap between tests (120 seconds), and result finalization (900 seconds). On interruption Mendoza sends INT to cancel the invocation and terminates the apps on that simulator, then escalates to TERM after 10 seconds and KILL after 15 seconds if necessary. Signals target the invocation's own process group. Other simulators' xcodebuild processes are unaffected. Batch mode is supported only for iOS simulators.
+
 ### Test diagnostics collection
 
 By default Mendoza passes `-collect-test-diagnostics never` to `xcodebuild`, which disables the collection of verbose diagnostics (sysdiagnoses, log archives).

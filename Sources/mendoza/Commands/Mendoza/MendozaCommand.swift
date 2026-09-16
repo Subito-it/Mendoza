@@ -21,6 +21,28 @@ class MendozaCommand: Command {
 
     func run() -> Bool {
         switch commandName.value {
+        case "cleanup_batch_xcresult":
+            guard let values = parameters.value?.filter({ !$0.isEmpty }), values.count == 2, let threshold = Int(values[1]) else { return false }
+            do {
+                try BatchXCResultCleaner(path: values[0]).clean(minimumSizeKB: threshold)
+                print("MENDOZA_BATCH_CLEANED")
+                return true
+            } catch {
+                print("Batch xcresult cleanup skipped: \(error)")
+                return false
+            }
+        case "batch_protocol":
+            print(BatchRequest.protocolVersion)
+            return true
+        case "run_test_batch":
+            guard let paths = parameters.value?.filter({ !$0.isEmpty }), paths.count == 1 else { return false }
+            do {
+                try BatchWorker.run(requestPath: paths[0])
+                return true
+            } catch {
+                print("Batch worker failed: \(error)")
+                return false
+            }
         case "screen_point_size":
             let mainID = CGMainDisplayID()
             let maxDisplays: UInt32 = 16

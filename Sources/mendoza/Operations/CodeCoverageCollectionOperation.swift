@@ -39,13 +39,15 @@ class CodeCoverageCollectionOperation: BaseOperation<Coverage?> {
 
             let resultPath = "\(resultDestination.path)/\(timestamp)"
 
-            let coverageFiles = try executer.execute(
+            let batchEnabled = configuration.testing.effectiveTestBatchSize > 1
+            let profileExecuter = batchEnabled ? destinationExecuter : executer
+            let coverageFiles = try profileExecuter.execute(
                 "find '\(resultPath)' -type f -name '*.profdata'"
             ).components(separatedBy: "\n")
 
             var coverage: Coverage? = nil
             let coverageMerger = CodeCoverageMerger(executer: destinationExecuter)
-            if let mergedPath = try coverageMerger.merge(coverageFiles: coverageFiles) {
+            if let mergedPath = try coverageMerger.merge(coverageFiles: coverageFiles, strict: batchEnabled) {
                 let localCoverageUrl = Path.temp.url.appendingPathComponent(
                     "\(UUID().uuidString).profdata")
                 try destinationExecuter.download(remotePath: mergedPath, localUrl: localCoverageUrl)
@@ -53,11 +55,11 @@ class CodeCoverageCollectionOperation: BaseOperation<Coverage?> {
                 let pathEquivalence = configuration.testing.codeCoveragePathEquivalence
                 let jsonCoverageUrl = try codeCoverageGenerator.generateJsonCoverage(
                     executer: executer, coverageUrl: localCoverageUrl, summary: false,
-                    pathEquivalence: pathEquivalence
+                    pathEquivalence: pathEquivalence, strict: batchEnabled
                 )
                 let jsonCoverageSummaryUrl = try codeCoverageGenerator.generateJsonCoverage(
                     executer: executer, coverageUrl: localCoverageUrl, summary: true,
-                    pathEquivalence: pathEquivalence
+                    pathEquivalence: pathEquivalence, strict: batchEnabled
                 )
                 let htmlCoverageSummaryUrl = try codeCoverageGenerator.generateHtmlCoverage(
                     executer: executer, coverageUrl: localCoverageUrl,
@@ -83,11 +85,12 @@ class CodeCoverageCollectionOperation: BaseOperation<Coverage?> {
                 if let coverageData = try? Data(contentsOf: jsonCoverageSummaryUrl) {
                     coverage = try? JSONDecoder().decode(Coverage.self, from: coverageData)
                 }
+                if batchEnabled, coverage == nil { throw Error("Invalid final batch coverage summary") }
 
                 _ = try destinationExecuter.execute("rm -f \(mergedPath)")
             }
 
-            if configuration.testing.extractIndividualTestCoverage {
+            if configuration.testing.extractIndividualTestCoverage, !batchEnabled {
                 let pathEquivalence = configuration.testing.codeCoveragePathEquivalence
 
                 let coverageFiles = try executer.execute(

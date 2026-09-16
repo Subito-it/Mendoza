@@ -16,7 +16,7 @@ class CodeCoverageGenerator {
         self.baseUrl = baseUrl
     }
 
-    func generateJsonCoverage(executer: Executer, coverageUrl: URL, summary: Bool, pathEquivalence: String?) throws -> URL {
+    func generateJsonCoverage(executer: Executer, coverageUrl: URL, summary: Bool, pathEquivalence: String?, strict: Bool = false) throws -> URL {
         let executablePath = try findExecutablePath(executer: executer, buildBundleIdentifier: configuration.building.buildBundleIdentifier)
         let summaryParameter = summary ? "--summary-only" : ""
         let truncateDecimals = #"| sed -E 's/(percent":[0-9]*\.[0-9])[0-9]*/\1/g'"#
@@ -30,7 +30,7 @@ class CodeCoverageGenerator {
         cmd += stripBasePath
 
         let url = Path.temp.url.appendingPathComponent("\(UUID().uuidString).json")
-        _ = try executer.execute("\(cmd) > \(url.path)")
+        _ = try executer.execute((strict ? "set -o pipefail; " : "") + "\(cmd) > \(url.path)")
 
         return url
     }

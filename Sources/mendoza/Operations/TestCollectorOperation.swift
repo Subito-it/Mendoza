@@ -51,6 +51,11 @@ class TestCollectorOperation: BaseOperation<[TestCaseResult]> {
                 let logPath = "\(Path.logs.rawValue)/"
                 try executer.rsync(sourcePath: logPath, destinationPath: destinationPath, include: ["*/", "*.profdata"], exclude: ["*"], on: destinationNode)
 
+                if configuration.testing.effectiveTestBatchSize > 1,
+                   try executer.fileExists(atPath: Path.logs.rawValue + "/batches") {
+                    try executer.rsync(sourcePath: Path.logs.rawValue + "/batches/", destinationPath: destinationPath + "/batch_logs", on: destinationNode)
+                }
+
                 if configuration.testing.extractIndividualTestCoverage {
                     let path = "\(Path.individualCoverage.rawValue)/"
                     try executer.rsync(sourcePath: path, destinationPath: "\(destinationPath)/\(URL(filePath: Path.individualCoverage.rawValue).lastPathComponent)", include: ["*/", "*.json"], exclude: ["*"], on: destinationNode)
@@ -73,13 +78,14 @@ class TestCollectorOperation: BaseOperation<[TestCaseResult]> {
             for (index, result) in results.enumerated() where !result.isEmpty {
                 moveCommands.append("mv '\(result)' '\(destinationPath)/\(index).profdata'")
             }
-            _ = try executer.execute(moveCommands.joined(separator: "; "))
+            _ = try executer.execute(moveCommands.joined(separator: configuration.testing.effectiveTestBatchSize > 1 ? " && " : "; "))
 
             if !configuration.testing.skipResultMerge {
                 try mergeResults(destinationNode: destinationNode, destinationPath: destinationPath, destinationName: Environment.xcresultFilename)
 
                 let totalResults = testCaseResults.count
                 for index in 0 ..< totalResults {
+                    if configuration.testing.effectiveTestBatchSize > 1, testCaseResults[index].xcResultPath.isEmpty { continue }
                     testCaseResults[index].xcResultPath = Environment.xcresultFilename
                 }
             } else {
@@ -95,11 +101,13 @@ class TestCollectorOperation: BaseOperation<[TestCaseResult]> {
                 for (index, result) in results.enumerated() {
                     let updatedResultPath = "\(destinationPath)/\(index).xcresult"
                     moveCommands.append("mv '\(result)' '\(updatedResultPath)'")
-                    if let index = testCaseResults.firstIndex(where: { lastTwoPathComponents($0.xcResultPath) == lastTwoPathComponents(result) }) {
+                    if configuration.testing.effectiveTestBatchSize > 1 {
+                        Self.updateBatchResultPaths(&testCaseResults, sourcePath: result, destinationPath: lastTwoPathComponents(updatedResultPath))
+                    } else if let index = testCaseResults.firstIndex(where: { lastTwoPathComponents($0.xcResultPath) == lastTwoPathComponents(result) }) {
                         testCaseResults[index].xcResultPath = lastTwoPathComponents(updatedResultPath)
                     }
                 }
-                _ = try executer.execute(moveCommands.joined(separator: "; "))
+                _ = try executer.execute(moveCommands.joined(separator: configuration.testing.effectiveTestBatchSize > 1 ? " && " : "; "))
             }
 
             try cleanupEmptyFolders(executer: executer, destinationPath: destinationPath)
@@ -115,6 +123,14 @@ class TestCollectorOperation: BaseOperation<[TestCaseResult]> {
             pool.terminate()
         }
         super.cancel()
+    }
+
+    /// Several test rows can refer to one invocation bundle. Empty paths retain their missing-artifact meaning.
+    static func updateBatchResultPaths(_ results: inout [TestCaseResult], sourcePath: String, destinationPath: String) {
+        let key = sourcePath.split(separator: "/").suffix(2)
+        for index in results.indices where !results[index].xcResultPath.isEmpty && results[index].xcResultPath.split(separator: "/").suffix(2) == key {
+            results[index].xcResultPath = destinationPath
+        }
     }
 
     private func cleanupEmptyFolders(executer: Executer, destinationPath: String) throws {

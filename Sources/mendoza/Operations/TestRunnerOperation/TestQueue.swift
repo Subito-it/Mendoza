@@ -15,6 +15,31 @@ class TestQueue {
     private let maxRetryCount: Int
     /// Runner indexes a test case must not be dequeued by, so a retry lands on a different node.
     private var excludedRunners = [TestCase: Set<Int>]()
+    private var singletonTests = Set<TestCase>()
+
+    /// One reservation holds the queue lock for both members. Retries and returned work stay singletons.
+    func dequeueBatch(for runnerIndex: Int, maximumCount: Int, ignoringExclusions: Bool = false) -> [TestCase] {
+        syncQueue.sync {
+            let eligible: (TestCase) -> Bool = { ignoringExclusions || self.excludedRunners[$0]?.contains(runnerIndex) != true }
+            guard let firstIndex = testCases.firstIndex(where: eligible) else { return [] }
+            let first = testCases.remove(at: firstIndex)
+            guard maximumCount > 1, retryCountMap.count(for: first) == 0, !singletonTests.contains(first) else { return [first] }
+            var batch = [first]
+            while batch.count < maximumCount,
+                  let index = testCases.firstIndex(where: { eligible($0) && retryCountMap.count(for: $0) == 0 && !singletonTests.contains($0) }) {
+                batch.append(testCases.remove(at: index))
+            }
+            return batch
+        }
+    }
+
+    /// These tests never started, so this is not a failed attempt and consumes no retry budget.
+    func returnUnstarted(_ tests: [TestCase]) {
+        syncQueue.sync {
+            singletonTests.formUnion(tests)
+            testCases.insert(contentsOf: tests, at: 0)
+        }
+    }
 
     var count: Int {
         syncQueue.sync { testCases.count }

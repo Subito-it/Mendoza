@@ -15,6 +15,7 @@ class TestCommand: Command {
 
     let pluginReplayPath = Argument<URL>(name: "path", kind: .named(short: nil, long: "plugin_replay_path"), optional: true, help: "Folder where every plugin invocation's stdin envelope is written, as `<PluginName>.<timestamp>.json`, so a failing plugin can be re-run against the exact input it received. Default: the session logs folder, which is wiped when the next session starts", autocomplete: .directories)
     let verboseFlag = Flag(short: nil, long: "verbose", help: "Dump debug messages")
+    let testBatchSize = Argument<Int>(name: "count", kind: .named(short: nil, long: "test_batch_size"), optional: true, help: "Tests per xcodebuild invocation: 1 (default) or 2. Coverage reports contain the combined coverage of the batch. Retries run individually. iOS only.")
 
     let remoteNodesConfigurationPath = Argument<URL>(name: "path", kind: .named(short: nil, long: "remote_nodes_configuration"), optional: true, help: "Path to remote configuration file containing the list of remote nodes to use and destination path")
     let localDestinationPath = Argument<URL>(name: "path", kind: .named(short: nil, long: "local_destination_path"), optional: true, help: "Specify location to store tests results that will be executed locally")
@@ -32,10 +33,10 @@ class TestCommand: Command {
     let pluginCustom = Argument<String>(name: "data", kind: .named(short: nil, long: "plugin_data"), optional: true, help: "A custom string that can be used to inject data to plugins")
     let failingTestsRetryCount = Argument<Int>(name: "count", kind: .named(short: nil, long: "failure_retry"), optional: true, help: "Number of times a failing tests should be repeated")
     let codeCoveragePathEquivalence = Argument<String>(name: "path", kind: .named(short: nil, long: "llvm_cov_equivalence_path"), optional: true, help: "Path equivalence path passed to 'llvm-cov show' when extracting code coverage (<from1>,<to1>,<from2>,<to2>...)")
-    let extractIndividualTestCoverage = Flag(short: nil, long: "individual_test_coverage", help: "Extract individual test coverage .jsons to results/individual_coverage")
-    let extractTestCoveredFiles = Flag(short: nil, long: "test_covered_files", help: "Extract list of files covered by each test to results/test_covered_files")
+    let extractIndividualTestCoverage = Flag(short: nil, long: "individual_test_coverage", help: "Extract test coverage .jsons to results/individual_coverage. With batching, each member report contains combined batch coverage")
+    let extractTestCoveredFiles = Flag(short: nil, long: "test_covered_files", help: "Extract covered-file lists to results/test_file_coverage. With batching, each member report contains combined batch coverage")
     let xcodeBuildNumber = Argument<String>(name: "number", kind: .named(short: nil, long: "xcode_buildnumber"), optional: true, help: "Build number of the Xcode version to use (e.g. 12E507)")
-    let skipResultMerge = Flag(short: nil, long: "skip_result_merge", help: "Skip xcresult merge (keep one xcresult per test in the result folder)")
+    let skipResultMerge = Flag(short: nil, long: "skip_result_merge", help: "Skip xcresult merge (keep one xcresult per invocation in the result folder)")
     let clearDerivedDataOnCompilationFailure = Flag(short: nil, long: "clear_derived_data_on_failure", help: "On compilation failure derived data will be cleared and compilation will be retried once")
     let xcresultBlobThresholdKB = Argument<Int>(name: "size", kind: .named(short: nil, long: "xcresult_blob_threshold_kb"), optional: true, help: "Delete data blobs larger than the specified threshold")
     let excludeNodes = Argument<String>(name: "nodes", kind: .named(short: nil, long: "exclude_nodes"), optional: true, help: "Specify which nodes (by name or address) specified in the configuration should be excluded from the dispatch. Accepts comma separated values. Default: ''")
@@ -77,6 +78,9 @@ class TestCommand: Command {
     }
 
     private func makeConfiguration() throws -> Configuration {
+        guard (1 ... 2).contains(testBatchSize.value ?? 1) else {
+            throw Error("test_batch_size must be 1 or 2")
+        }
         if remoteNodesConfigurationPath.value?.path.isEmpty == true, localDestinationPath.value?.path.isEmpty == true {
             throw Error("Missing required arguments: `\(remoteNodesConfigurationPath.longDescription)=\(remoteNodesConfigurationPath.name)` or `\(localDestinationPath.longDescription)=\(localDestinationPath.name)`".red)
         } else if remoteNodesConfigurationPath.value?.path.isEmpty == localDestinationPath.value?.path.isEmpty {
@@ -128,7 +132,7 @@ class TestCommand: Command {
         let disabledServices = disabledSimulatorServices.value?.components(separatedBy: ",").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty } ?? []
         _ = try SimulatorServiceCatalog.resolveLabels(for: disabledServices) // validate tokens up front
 
-        let testing = Configuration.Testing(maximumStdOutIdleTime: maximumStdOutIdleTime.value,
+        var testing = Configuration.Testing(maximumStdOutIdleTime: maximumStdOutIdleTime.value,
                                             maximumTestExecutionTime: maximumTestExecutionTime.value,
                                             failingTestsRetryCount: failingTestsRetryCount.value,
                                             xcresultBlobThresholdKB: xcresultBlobThresholdKB.value,
@@ -142,6 +146,10 @@ class TestCommand: Command {
                                             skipResultMerge: skipResultMerge.value,
                                             disabledSimulatorServices: disabledServices,
                                             collectTestDiagnosticsOnFailure: collectTestDiagnosticsOnFailure.value)
+        if testBatchSize.value == 2 {
+            guard sdk == .ios else { throw Error("test_batch_size 2 requires iOS simulators") }
+            testing.testBatchSize = 2
+        }
 
         let plugins = Configuration.Plugins(data: pluginCustom.value ?? "", replayPath: pluginReplayPath.value?.path)
 
