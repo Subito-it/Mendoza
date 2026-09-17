@@ -136,9 +136,9 @@ final class BatchTestExecutor {
         var results = completion.results
         if hasResult {
             if let threshold = configuration.testing.xcresultBlobThresholdKB {
-                // A failed cleanup preserves the bundle. The batch cleaner visits every member before deleting blobs.
-                let cleaned = try? executer.execute(q(worker) + " mendoza cleanup_batch_xcresult " + q(resultPath) + " " + String(threshold))
-                if cleaned?.contains("MENDOZA_BATCH_CLEANED") != true {
+                // Both execution modes use the same cleaner, which visits every test summary in the bundle.
+                let cleaned = try? executer.execute(q(worker) + " mendoza cleaunp_xcresult " + q(resultPath) + " " + String(threshold))
+                if cleaned?.contains("MENDOZA_XCRESULT_CLEANED") != true {
                     executer.logger?.log(exception: "Batch blob cleanup skipped; preserving xcresult metadata and attachments")
                 }
             }

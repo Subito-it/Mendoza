@@ -21,16 +21,6 @@ class MendozaCommand: Command {
 
     func run() -> Bool {
         switch commandName.value {
-        case "cleanup_batch_xcresult":
-            guard let values = parameters.value?.filter({ !$0.isEmpty }), values.count == 2, let threshold = Int(values[1]) else { return false }
-            do {
-                try BatchXCResultCleaner(path: values[0]).clean(minimumSizeKB: threshold)
-                print("MENDOZA_BATCH_CLEANED")
-                return true
-            } catch {
-                print("Batch xcresult cleanup skipped: \(error)")
-                return false
-            }
         case "batch_protocol":
             print(BatchRequest.protocolVersion)
             return true
@@ -159,9 +149,11 @@ class MendozaCommand: Command {
             do {
                 try cleaner.clean(minimumSizeKB: sizeKb)
             } catch {
+                print("xcresult cleanup failed: \(error)")
                 return false
             }
 
+            print("MENDOZA_XCRESULT_CLEANED")
             return true
         case "extract_files_coverage":
             guard let parameters = parameters.value?.filter({ !$0.isEmpty }), parameters.count == 2 else {
@@ -209,43 +201,24 @@ class MendozaCommand: Command {
 
 class XcResultCleaner {
     let url: URL
+    private let reader: XcResultReader
 
-    init(path: String) {
+    init(path: String, readObject: ((String?) throws -> Data)? = nil) {
         url = URL(fileURLWithPath: path)
+        reader = XcResultReader(url: url, readObject: readObject)
     }
 
     func clean(minimumSizeKB: Int) throws {
-        let cachi = CachiKit(url: url)
-
-        let invocationRecord = try cachi.actionsInvocationRecord()
+        guard minimumSizeKB > 1, minimumSizeKB <= Int.max / 1024 else { throw "Invalid xcresult cleanup threshold" }
+        let invocationRecord = try reader.decode(ActionsInvocationRecord.self)
 
         var attachmentIdentifiers = [String]()
 
         for action in invocationRecord.actions {
             guard let testRef = action.actionResult.testsRef else { continue }
-
-            guard let testPlanSummaries = (try? cachi.actionTestPlanRunSummaries(identifier: testRef.id))?.summaries,
-                  let testPlanSummary = testPlanSummaries.first,
-                  testPlanSummaries.count == 1,
-                  let testableSummary = testPlanSummary.testableSummaries.first,
-                  testPlanSummary.testableSummaries.count == 1
-            else {
-                throw "Failed extracting test testPlanSummary"
-            }
-
-            let testSummaryIdentifiers = extractTestSummaryIdentifiers(actionTestSummariesGroup: testableSummary.tests)
-            guard testSummaryIdentifiers.count == 1,
-                  let testSummaryIdentifier = testSummaryIdentifiers.first,
-                  let testSummary = try? cachi.actionTestSummary(identifier: testSummaryIdentifier)
-            else {
-                throw "Failed extracting test testSummary"
-            }
-
-            attachmentIdentifiers += extractActivitiesAttachmentIdentifiers(testSummary.activitySummaries)
-            for failureSummary in testSummary.failureSummaries {
-                attachmentIdentifiers += extractAttachmentIdentifiers(failureSummary.attachments)
-            }
+            attachmentIdentifiers += try protectedTestIdentifiers(for: testRef.id)
         }
+        guard !attachmentIdentifiers.isEmpty else { throw "No test summaries; preserving all blobs" }
 
         var urls = extractFiles(at: url.appendingPathComponent("Data"), recursively: true)
 
@@ -256,9 +229,27 @@ class XcResultCleaner {
             guard let size = try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize else { continue }
 
             if size > minimumSizeKB * 1024 {
-                try? Data("content replaced by mendoza because original file was larger than \(minimumSizeKB)KB".utf8).write(to: url)
+                try Data("content replaced by mendoza because original file was larger than \(minimumSizeKB)KB".utf8).write(to: url, options: .atomic)
             }
         }
+    }
+
+    /// Resolve every summary before modifying any blob, so a decoding failure cannot cause partial cleanup.
+    func protectedTestIdentifiers(for testRef: String) throws -> [String] {
+        let plans = try reader.decode(ActionTestPlanRunSummaries.self, identifier: testRef)
+        let identifiers = plans.summaries.flatMap { plan in
+            plan.testableSummaries.flatMap { extractTestSummaryIdentifiers(actionTestSummariesGroup: $0.tests) }
+        }
+        guard !identifiers.isEmpty else { throw "Failed extracting test summaries; preserving all blobs" }
+        var protected = [testRef] + identifiers
+        for identifier in Set(identifiers) {
+            let summary = try reader.decode(ActionTestSummary.self, identifier: identifier)
+            protected += extractActivitiesAttachmentIdentifiers(summary.activitySummaries)
+            for failure in summary.failureSummaries {
+                protected += extractAttachmentIdentifiers(failure.attachments)
+            }
+        }
+        return protected
     }
 
     func extractFiles(at url: URL, recursively: Bool) -> [URL] {
@@ -285,12 +276,12 @@ class XcResultCleaner {
         var result = [String]()
 
         for group in actionTestSummariesGroup {
-            if let tests = group.subtests as? [ActionTestMetadata] {
-                result += tests.compactMap { $0.summaryRef?.id }
-            } else if let subGroups = group.subtests as? [ActionTestSummaryGroup] {
-                result += extractTestSummaryIdentifiers(actionTestSummariesGroup: subGroups)
-            } else {
-                print("Unsupported groups", String(describing: type(of: group.subtests)))
+            for child in group.subtests {
+                if let test = child as? ActionTestMetadata, let identifier = test.summaryRef?.id {
+                    result.append(identifier)
+                } else if let group = child as? ActionTestSummaryGroup {
+                    result += extractTestSummaryIdentifiers(actionTestSummariesGroup: [group])
+                }
             }
         }
 

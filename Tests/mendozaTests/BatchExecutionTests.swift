@@ -304,13 +304,4 @@ final class BatchExecutionTests: XCTestCase {
         XCTAssertEqual(try Data(contentsOf: first), bytes)
         XCTAssertEqual(try Data(contentsOf: second), bytes)
     }
-
-    func testBatchCleanerCollectsEveryMembersAttachmentsAndAcceptsEmptyArrays() {
-        let first: [String: Any] = ["summaryRef": ["id": ["_value": "test-a"]], "payloadRef": ["id": ["_value": "image-a"]]]
-        let second: [String: Any] = ["summaryRef": ["id": ["_value": "test-b"]], "payloadRef": ["id": ["_value": "image-b"]]]
-        let object: [String: Any] = ["subtests": ["_values": [first, second]], "analyzerWarningSummaries": ["_type": ["_name": "Array"]]]
-        let references = BatchXCResultCleaner.references(in: object)
-        XCTAssertEqual(references.objects, ["test-a", "test-b"])
-        XCTAssertEqual(references.attachments, ["image-a", "image-b"])
-    }
 }
