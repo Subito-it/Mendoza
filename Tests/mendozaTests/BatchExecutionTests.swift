@@ -197,7 +197,7 @@ final class BatchExecutionTests: XCTestCase {
     }
 
     private func request(directory: String, idle: Int? = nil) -> BatchRequest {
-        BatchRequest(version: 1, identifier: "example", tests: [a, b], target: "UITests", node: "localhost", runnerName: "Simulator", runnerIdentifier: "runner", xctestrun: "/tmp/example.xctestrun", directory: directory, resultPath: directory + "/result.xcresult", idleTimeout: idle, executionTimeout: nil, collectDiagnostics: false, appBundleIdentifier: "example.app", testBundleIdentifier: "example.tests")
+        BatchRequest(version: BatchRequest.protocolVersion, identifier: "example", tests: [a, b], target: "UITests", node: "localhost", runnerName: "Simulator", runnerIdentifier: "runner", xctestrun: "/tmp/example.xctestrun", directory: directory, resultPath: directory + "/result.xcresult", idleTimeout: idle, executionTimeout: nil, collectDiagnostics: false, appBundleIdentifier: "example.app", testBundleIdentifier: "example.tests")
     }
 
     func testCommandHasBothSelectionsAndAnExplicitSharedResult() {
@@ -205,6 +205,27 @@ final class BatchExecutionTests: XCTestCase {
         XCTAssertEqual(value.arguments.filter { $0.hasPrefix("-only-testing:") }, ["-only-testing:UITests/ExampleTests/testA", "-only-testing:UITests/ExampleTests/testB"])
         XCTAssertTrue(value.arguments.contains(value.resultPath))
         XCTAssertEqual(value.arguments.filter { $0 == "-resultBundlePath" }.count, 1)
+    }
+
+    func testSingleTestUsesWorkerCompletionAndCoverageArgumentsOnBothPlatforms() throws {
+        for simulator in [true, false] {
+            let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+            defer { try? FileManager.default.removeItem(at: directory) }
+            let value = BatchRequest(version: BatchRequest.protocolVersion, identifier: "single", tests: [a], target: "UITests", node: "localhost", runnerName: "Runner", runnerIdentifier: "runner", xctestrun: "/tmp/example.xctestrun", directory: directory.path, resultPath: directory.path + "/result.xcresult", idleTimeout: 5, executionTimeout: 10, collectDiagnostics: false, appBundleIdentifier: "example.app", testBundleIdentifier: "example.tests", isSimulator: simulator)
+            let roundTrip = try JSONDecoder().decode(BatchRequest.self, from: JSONEncoder().encode(value))
+            XCTAssertEqual(roundTrip.isSimulator, simulator)
+            XCTAssertEqual(value.arguments.filter { $0.hasPrefix("-only-testing:") }, ["-only-testing:UITests/ExampleTests/testA"])
+            XCTAssertTrue(value.arguments.contains(simulator ? "platform=iOS Simulator,id=runner" : "platform=OS X,arch=x86_64"))
+            XCTAssertTrue(value.arguments.contains("-enableCodeCoverage"))
+            let script = "printf \"Test Case '-[UITests.ExampleTests testA]' started.\\nTest Case '-[UITests.ExampleTests testA]' passed (1.0 seconds).\\n\""
+            var previews = [TestCaseResult]()
+            let completion = try BatchWorker.execute(value, executable: "/bin/sh", arguments: ["-c", script], emit: { previews.append($0) })
+            XCTAssertEqual(completion.results.map(\.status), [.passed])
+            XCTAssertEqual(completion.started, [a])
+            XCTAssertTrue(completion.unstarted.isEmpty)
+            XCTAssertEqual(previews.count, 1)
+            XCTAssertNil(completion.interruption)
+        }
     }
 
     func testWorkerReadsChunkedReorderedOutputAndNonzeroExit() throws {

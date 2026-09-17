@@ -1,319 +1,261 @@
-//
-//  TestExecuter.swift
-//  Mendoza
-//
-//  Created by tomas.camin on 01/06/22.
-//
-
 import Foundation
 
-class TestExecuter {
-    private let executer: Executer
-
-    private let testCase: TestCase
-    private let testTarget: String
-
-    private let node: Node
-    private let testRunner: TestRunner
-    private let runnerIndex: Int
-
-    private let building: Configuration.Building
-    private let testing: Configuration.Testing
-    private let xcodebuildDestination: String
-    private let outputParser: XcodebuildOutputParser
-
-    private let verbose: Bool
-
-    private let timerQueue = DispatchQueue(label: "com.mendoza.stdoutTimeout")
-    private let syncQueue = DispatchQueue(label: "com.mendoza.stdoutTimeout.sync")
-
-    private var _timerSource: DispatchSourceTimer?
-    private var timerSource: DispatchSourceTimer? {
-        get { syncQueue.sync { _timerSource } }
-        set { syncQueue.sync { _timerSource = newValue } }
+/// Executes one or more tests through the same node-local worker and artifact pipeline.
+final class TestExecuter {
+    struct Outcome {
+        let results: [TestCaseResult]
+        let unstarted: [TestCase]
+        let requiresQuarantine: Bool
     }
 
-    private var _lastStdOutputUpdateTimeInterval: TimeInterval = 0
-    private var lastStdOutputUpdateTimeInterval: TimeInterval {
-        get { syncQueue.sync { _lastStdOutputUpdateTimeInterval } }
-        set { syncQueue.sync { _lastStdOutputUpdateTimeInterval = newValue } }
+    private let configuration: Configuration
+    private let target: String
+    private let baseUrl: URL
+    private let destinationPath: String
+    private let jobs: ThreadQueue
+    private let addLogger: (ExecuterLogger) -> Void
+    private let sync = DispatchQueue(label: "mendoza.batch.jobs")
+    private var controls = [String: Executer]()
+    private var cancelled = false
+    private var jobErrors = [String]()
+    private var checkpoints = [String: String]()
+
+    init(configuration: Configuration, target: String, baseUrl: URL, destinationPath: String, jobs: ThreadQueue, addLogger: @escaping (ExecuterLogger) -> Void) {
+        self.configuration = configuration
+        self.target = target
+        self.baseUrl = baseUrl
+        self.destinationPath = destinationPath
+        self.jobs = jobs
+        self.addLogger = addLogger
     }
 
-    private var _stdOutIdleTimes: [TimeInterval] = []
-    private var stdOutIdleTimes: [TimeInterval] {
-        get { syncQueue.sync { _stdOutIdleTimes } }
-        set { syncQueue.sync { _stdOutIdleTimes = newValue } }
+    static func quote(_ string: String) -> String {
+        "'" + string.replacingOccurrences(of: "'", with: "'\\''") + "'"
     }
 
-    private var _didTriggerTimeout = false
-    private var didTriggerTimeout: Bool {
-        get { syncQueue.sync { _didTriggerTimeout } }
-        set { syncQueue.sync { _didTriggerTimeout = newValue } }
-    }
-
-    private var testCaseStartTimeInterval: TimeInterval = 0
-    private var previewCompletionBlock: ((TestCaseResult) -> Void)?
-
-    /// True once the test method actually started executing (a `Test Case ... started` line was
-    /// parsed). Distinguishes a genuine test failure from a simulator-level launch failure where
-    /// the test never ran. Only valid to read after `launch(...)` returns.
-    var didStartTest: Bool {
-        testCaseStartTimeInterval > 0
-    }
-
-    init(executer: Executer,
-         testCase: TestCase,
-         testTarget: String,
-         building: Configuration.Building,
-         testing: Configuration.Testing,
-         node: Node,
-         testRunner: TestRunner,
-         runnerIndex: Int,
-         verbose: Bool) {
-        self.executer = executer
-        self.testCase = testCase
-        self.testTarget = testTarget
-        self.building = building
-        self.testing = testing
-        self.testRunner = testRunner
-        self.node = node
-        self.runnerIndex = runnerIndex
-        self.verbose = verbose
-        self.outputParser = XcodebuildOutputParser(testTarget: testTarget)
-
-        switch XcodeProject.SDK(rawValue: building.sdk)! {
-        case .ios:
-            self.xcodebuildDestination = "platform=iOS Simulator,id=\(testRunner.id)"
-        case .macos:
-            self.xcodebuildDestination = "platform=OS X,arch=x86_64"
+    func cancel() {
+        let active = sync.sync { () -> [String: Executer] in
+            guard !cancelled else { return [:] }
+            cancelled = true
+            return controls
+        }
+        for (directory, executer) in active {
+            do { _ = try executer.execute("touch " + Self.quote(directory + "/cancel")) }
+            catch { executer.logger?.log(exception: "Failed to signal batch cancellation: \(error)") }
         }
     }
 
-    /// Execute the test case by invoking xcodebuild with test-without-building
-    ///
-    /// It can take a significant amount of time, up to 30s, for xcodebuild to produce the .xcresult on failure.
-    /// A plausible explanation is that on failure xcodebuild need to embed (compress?) screenshots into the final result bundle.
-    /// This can cause delays on the overall dispatch time particularly when failures occur near the end of the dispatch
-    ///
-    /// ```
-    ///   SIM1   |--✅--| |---✅---| |--✅--|
-    ///   SIM2      |---✅---| |--❌--|-delay-|
-    ///   SIM3     |-----✅-----|     A       B
-    /// ```
-    ///
-    /// From the console output at t = A we know that the last test of SIM2 failed and we pass that information to the previewCompletionBlock to the `previewCompletionBlock`
-    /// which allows to reenconde the failing test without having to wait for the entire xcodebuild process to compleete
-    ///
-    /// - Parameter previewCompletionBlock: a preview of the test case result as soon as the information is extracted from the console output which can occur well before  the xcodebuild process is completed
-    /// - Returns: the console output and the full test case result
-    func launch(previewCompletionBlock: @escaping (TestCaseResult) -> Void) throws -> (output: String, testResult: TestCaseResult) {
-        self.previewCompletionBlock = previewCompletionBlock
-
-        var output = ""
-        var testResult: TestCaseResult?
-
-        defer { stopStdOutTimeoutHandler() }
-
-        let result = try? testWithoutBuilding(executer: executer)
-        output = result?.output ?? ""
-        testResult = result?.testCaseResult
-
-        // Logged only now that xcodebuild has returned: ExecuterLogger expects strictly alternating
-        // start/end events, so appending an exception while the command is still in flight would
-        // break the pairing when the log is written out.
-        if didTriggerTimeout {
-            executer.logger?.log(exception: "no stdout updates for more than \(testing.maximumStdOutIdleTime ?? 0)s, terminated app on \(testRunner.name)")
-        }
-
-        if testResult == nil {
-            if verbose {
-                print("🚨", "No test case result for \(testCase.suite)/\(testCase.name)!".red)
-            }
-
-            let startInterval: TimeInterval = CFAbsoluteTimeGetCurrent()
-            let endInterval: TimeInterval = startInterval
-
-            testResult = TestCaseResult(node: node.address, runnerName: testRunner.name, runnerIdentifier: testRunner.id, xcResultPath: "", suite: testCase.suite, name: testCase.name, status: .failed, startInterval: startInterval, endInterval: endInterval, averageStdOutIdleTime: nil, maxStdOutIdleTime: nil)
-            previewCompletionBlock(testResult!)
-        }
-
-        return (output: output, testResult: testResult!)
+    func finish() throws {
+        jobs.waitUntilAllOperationsAreFinished()
+        let errors = sync.sync { jobErrors }
+        guard errors.isEmpty else { throw Error("Batch artifact processing failed:\n" + errors.joined(separator: "\n")) }
     }
 
-    private func startStdOutTimeoutHandler() {
-        guard let maximumStdOutIdleTime = testing.maximumStdOutIdleTime else { return }
+    func execute(tests: [TestCase], executer: Executer, node: Node, runner: TestRunner,
+                 preview: @escaping (TestCaseResult, TestCase) -> Void) throws -> Outcome {
+        let q = Self.quote
+        guard let executablePath = Bundle.main.executableURL?.path else { throw Error("Cannot locate the Mendoza batch worker executable") }
+        let worker = executer is LocalExecuter ? executablePath : "mendoza"
+        let capability = try executer.execute(q(worker) + " mendoza batch_protocol").trimmingCharacters(in: .whitespacesAndNewlines)
+        guard capability == String(BatchRequest.protocolVersion) else {
+            throw Error("Node \(node.address) needs a Mendoza binary supporting batch protocol \(BatchRequest.protocolVersion)")
+        }
+        let testRuns = try executer.execute("find \(q(Path.testBundle.rawValue)) -type f -name \(q(configuration.building.scheme + "*.xctestrun"))")
+            .components(separatedBy: "\n").filter { !$0.isEmpty }
+        guard testRuns.count == 1 else { throw Error("Expected exactly one xctestrun for batch execution") }
+        let identifier = UUID().uuidString
+        let directory = Path.temp.rawValue + "/batches/" + identifier
+        let resultPath = Path.results.rawValue + "/" + runner.id + "/" + identifier + ".xcresult"
+        _ = try executer.execute("mkdir -p \(q(directory)) \(q(URL(fileURLWithPath: resultPath).deletingLastPathComponent().path))")
+        let request = BatchRequest(version: BatchRequest.protocolVersion, identifier: identifier, tests: tests, target: target, node: node.address, runnerName: runner.name, runnerIdentifier: runner.id, xctestrun: testRuns[0], directory: directory, resultPath: resultPath, idleTimeout: configuration.testing.maximumStdOutIdleTime, executionTimeout: configuration.testing.maximumTestExecutionTime, collectDiagnostics: configuration.testing.collectTestDiagnosticsOnFailure, appBundleIdentifier: configuration.building.buildBundleIdentifier, testBundleIdentifier: configuration.building.testBundleIdentifier, isSimulator: configuration.device != nil)
+        try upload(JSONEncoder().encode(request), to: directory + "/request.json", executer: executer)
+        let control = try executer.clone()
+        let shouldCancel = sync.sync { () -> Bool in
+            controls[directory] = control
+            return cancelled
+        }
+        defer { _ = sync.sync { controls.removeValue(forKey: directory) } }
+        if shouldCancel {
+            _ = try control.execute("touch " + q(directory + "/cancel"))
+        }
 
-        lastStdOutputUpdateTimeInterval = CFAbsoluteTimeGetCurrent()
-
-        let source = DispatchSource.makeTimerSource(queue: timerQueue)
-        source.schedule(deadline: .now() + 1, repeating: 1.0)
-        source.setEventHandler { [weak self] in
-            guard let self = self, !self.didTriggerTimeout else { return }
-
-            let idleTime = CFAbsoluteTimeGetCurrent() - self.lastStdOutputUpdateTimeInterval
-            if idleTime > TimeInterval(maximumStdOutIdleTime) {
-                // Mark as triggered to prevent multiple firings
-                self.didTriggerTimeout = true
-                source.cancel()
-
-                guard let simulator = self.testRunner as? Simulator,
-                      let localExecuter = try? self.executer.clone() else { return }
-
-                self.print("⏰", "no stdout updates for more than \(maximumStdOutIdleTime)s, stopping test", color: { $0.red })
-
-                // Terminating the app will make the test fail
-                let proxy = CommandLineProxy.Simulators(executer: localExecuter, verbose: self.verbose)
-                try? proxy.terminateApp(identifier: self.building.buildBundleIdentifier, on: simulator)
-                try? proxy.terminateApp(identifier: self.building.testBundleIdentifier, on: simulator)
-                if self.verbose {
-                    self.print("⏰", "did terminate application", color: { $0.yellow })
+        var framer = BatchLineFramer()
+        var emitted = Set<String>()
+        let progressLock = NSLock()
+        func deliver(_ result: TestCaseResult) {
+            guard let test = tests.first(where: { $0.testIdentifier == result.testCaseIdentifier }), emitted.insert(result.testCaseIdentifier).inserted else { return }
+            preview(result, test)
+        }
+        // Final JSON reconciles previews if the transport splits, pads or drops progress chunks.
+        _ = try executer.execute(q(worker) + " mendoza run_test_batch " + q(directory + "/request.json"), progress: { chunk in
+            progressLock.lock()
+            defer { progressLock.unlock() }
+            for line in framer.append(Data(chunk.replacingOccurrences(of: "\0", with: "").utf8)) where line.hasPrefix(BatchWorker.previewPrefix) {
+                let json = String(line.dropFirst(BatchWorker.previewPrefix.count))
+                if let result = try? JSONDecoder().decode(TestCaseResult.self, from: Data(json.utf8)) {
+                    deliver(result)
                 }
             }
+        })
+        let completionData = try download(directory + "/completion.json", executer: executer)
+        let completion = try JSONDecoder().decode(BatchCompletion.self, from: completionData)
+        guard completion.identifier == identifier,
+              Set(completion.results.map(\.testCaseIdentifier)).count == completion.results.count,
+              Set(completion.unstarted).count == completion.unstarted.count,
+              completion.results.count + completion.unstarted.count == tests.count,
+              Set(completion.results.map(\.testCaseIdentifier) + completion.unstarted.map(\.testIdentifier)) == Set(tests.map(\.testIdentifier)) else {
+            throw Error("Invalid batch completion for \(identifier)")
         }
-        source.resume()
-        timerSource = source
-    }
+        progressLock.lock()
+        completion.results.forEach(deliver)
+        progressLock.unlock()
 
-    /// Disarm the stdout watchdog. Must be called as soon as the test verdict is known: after that
-    /// point xcodebuild is in its post-test phase (finalizing the xcresult, collecting simulator
-    /// diagnostics) where stdout is legitimately silent for far longer than `maximumStdOutIdleTime`.
-    /// Terminating the test runner host during that phase breaks xcodebuild's diagnostics collection,
-    /// which then blocks for its own 600s timeout while holding the runner slot.
-    private func stopStdOutTimeoutHandler() {
-        timerSource?.cancel()
-        timerSource = nil
-    }
-
-    private func print(_ prefix: String, _ txt: String, color: (String) -> String = { $0.magenta }) {
-        let txt = "\(prefix) \(txt) {\(runnerIndex)}"
-        Swift.print(color(txt))
-    }
-
-    private func printIfVerbose(_ prefix: String, _ txt: String, color: (String) -> String = { $0.magenta }) {
-        if verbose {
-            print(prefix + "[\(Date().description)] Node \(node.address)", txt, color: color)
+        let output = try String(decoding: download(directory + "/xcodebuild.log", executer: executer), as: UTF8.self)
+        let logDirectory = Path.logs.rawValue + "/batches/" + identifier
+        _ = try executer.execute("mkdir -p \(q(logDirectory)) && cp \(q(directory + "/xcodebuild.log")) \(q(directory + "/request.json")) \(q(directory + "/completion.json")) \(q(logDirectory))")
+        if let interruption = completion.interruption {
+            executer.logger?.log(exception: "Batch \(identifier): \(interruption)")
         }
-    }
-}
+        if completion.results.allSatisfy({ $0.status == .passed }), completion.exitStatus != 0 || completion.interruption != nil {
+            sync.sync { jobErrors.append("Batch \(identifier) did not finalize successfully (exit \(completion.exitStatus), \(completion.interruption ?? "xcodebuild error"))") }
+        }
+        let analysis = OutputAnalyzer().analyze(output)
+        try OutputAnalyzer().assertAccessibilityPermissions(in: output)
+        let recovery = SimulatorRecovery(verbose: configuration.verbose)
+        if analysis.damagedBuild {
+            try recovery.handleDamagedBuild(executer: executer)
+        }
+        if configuration.device != nil, analysis.requiresSimulatorReset {
+            recovery.forceReset(executer: executer, testRunner: runner)
+        }
+        if analysis.requiresBootstrapWait {
+            Thread.sleep(forTimeInterval: 10)
+        }
 
-extension TestExecuter {
-    private func findTestRun(executer: Executer) throws -> String {
-        let testBundlePath = Path.testBundle.rawValue
-
-        let testRuns = try executer.execute("find '\(testBundlePath)' -type f -name '\(building.scheme)*.xctestrun'").components(separatedBy: "\n")
-        guard let testRun = testRuns.first, !testRun.isEmpty else { throw Error("No test bundle found", logger: executer.logger) }
-        guard testRuns.count == 1 else { throw Error("Too many xctestrun bundles found:\n\(testRuns)", logger: executer.logger) }
-
-        return testRun
-    }
-
-    private func testWithoutBuilding(executer: Executer) throws -> (output: String, testCaseResult: TestCaseResult?) {
-        var testCaseResult: TestCaseResult?
-
-        let testWithoutBuilding = try xcodebuildCommand(executer: executer)
-
-        var parsedProgress = ""
-        var partialProgress = ""
-        let progressHandler: ((String) -> Void) = { [weak self] progress in
-            guard let self else { return }
-
-            // Only collect idle times after test has started
-            if testCaseStartTimeInterval > 0 {
-                let currentTime = CFAbsoluteTimeGetCurrent()
-                let lastUpdate = self.lastStdOutputUpdateTimeInterval
-                if lastUpdate > 0 {
-                    let idleTime = currentTime - lastUpdate
-                    self.stdOutIdleTimes.append(idleTime)
+        let hasResult = try executer.fileExists(atPath: resultPath)
+        var results = completion.results
+        if hasResult {
+            if let threshold = configuration.testing.xcresultBlobThresholdKB {
+                // Both execution modes use the same cleaner, which visits every test summary in the bundle.
+                let cleaned = try? executer.execute(q(worker) + " mendoza cleaunp_xcresult " + q(resultPath) + " " + String(threshold))
+                if cleaned?.contains("MENDOZA_XCRESULT_CLEANED") != true {
+                    executer.logger?.log(exception: "Batch blob cleanup skipped; preserving xcresult metadata and attachments")
                 }
-                self.lastStdOutputUpdateTimeInterval = currentTime
             }
+            for index in results.indices {
+                results[index].xcResultPath = resultPath
+            }
+        } else if results.contains(where: { $0.status == .passed }) {
+            throw Error("Batch \(identifier) passed tests but produced no xcresult")
+        }
 
-            parsedProgress += progress
-            partialProgress += progress
-            let lines = partialProgress.components(separatedBy: "\n")
-            let events = lines.compactMap(self.outputParser.event)
+        // Each invocation has its own DerivedData directory: no previous profile can enter this snapshot.
+        let files = try CoverageHandler(verbose: false).findCoverageFiles(executer: executer, coveragePath: directory)
+        let profile: String?
+        if files.isEmpty {
+            profile = nil
+            let message = "Batch \(identifier) has no coverage profile (started \(completion.started.count) tests, exit \(completion.exitStatus))"
+            executer.logger?.log(exception: message)
+            if !completion.started.isEmpty {
+                sync.sync { jobErrors.append(message) }
+            }
+        } else {
+            let immutable = directory + "/coverage.profdata"
+            _ = try executer.execute("xcrun llvm-profdata merge -sparse \(files.map(q).joined(separator: " ")) -o \(q(immutable))")
+            // Only the checkpoint lives under Path.logs, the collector's profile sweep root.
+            let checkpointDirectory = Path.logs.rawValue + "/batch-checkpoints"
+            // Simulator identifiers can repeat on cloned nodes. Globally unique filenames prevent rsync overwrites.
+            let checkpoint = sync.sync { () -> String in
+                let key = node.address + "/" + runner.id
+                if let path = checkpoints[key] {
+                    return path
+                }
+                let path = checkpointDirectory + "/" + UUID().uuidString + ".profdata"
+                checkpoints[key] = path
+                return path
+            }
+            _ = try executer.execute("mkdir -p " + q(checkpointDirectory))
+            let inputs = try executer.fileExists(atPath: checkpoint) ? [checkpoint, immutable] : [immutable]
+            let temporary = checkpoint + ".tmp"
+            _ = try executer.execute("xcrun llvm-profdata merge -sparse \(inputs.map(q).joined(separator: " ")) -o \(q(temporary)) && mv \(q(temporary)) \(q(checkpoint))")
+            profile = immutable
+        }
 
-            for event in events {
-                switch event {
-                case let .testStart(startedTestCase):
-                    if startedTestCase.name != testCase.name || startedTestCase.suite != testCase.suite {
-                        fatalError("Unexpected test case found! Got \(startedTestCase) expected \(testCase)")
+        let jobResults = results
+        // ThreadQueue acquires capacity before the block creates a connection.
+        jobs.addOperation { [self] in
+            do {
+                let background = try executer.clone()
+                let logger = ExecuterLogger(name: "BatchArtifacts-" + identifier, address: node.address)
+                background.logger = logger
+                addLogger(logger)
+                if hasResult {
+                    do {
+                        try background.rsync(sourcePath: resultPath, destinationPath: destinationPath + "/" + runner.id, on: configuration.resultDestination.node)
+                        _ = try background.execute("rm -rf " + q(resultPath))
+                    } catch {
+                        logger.log(exception: "Batch transfer failed; preserving source for collector: \(error)")
                     }
-
-                    testCaseStartTimeInterval = CFAbsoluteTimeGetCurrent()
-                    self.startStdOutTimeoutHandler()
-
-                    self.printIfVerbose("🛫", "\(testCase.description) started", color: { $0.yellow })
-                case .testPassed:
-                    self.stopStdOutTimeoutHandler()
-
-                    let idleTimes = self.stdOutIdleTimes
-                    let avgIdleTime = idleTimes.isEmpty ? nil : idleTimes.reduce(0, +) / Double(idleTimes.count)
-                    let maxIdleTime = idleTimes.max()
-                    let result = TestCaseResult(node: self.node.address, runnerName: self.testRunner.name, runnerIdentifier: self.testRunner.id, xcResultPath: "-", suite: self.testCase.suite, name: self.testCase.name, status: .passed, startInterval: testCaseStartTimeInterval, endInterval: CFAbsoluteTimeGetCurrent(), averageStdOutIdleTime: avgIdleTime, maxStdOutIdleTime: maxIdleTime)
-                    previewCompletionBlock?(result); previewCompletionBlock = nil // call preview at most once
-
-                    testCaseResult = result
-                case .testFailed, .testCrashed, .testTimedOut:
-                    self.stopStdOutTimeoutHandler()
-
-                    let idleTimes = self.stdOutIdleTimes
-                    let avgIdleTime = idleTimes.isEmpty ? nil : idleTimes.reduce(0, +) / Double(idleTimes.count)
-                    let maxIdleTime = idleTimes.max()
-                    let result = TestCaseResult(node: self.node.address, runnerName: self.testRunner.name, runnerIdentifier: self.testRunner.id, xcResultPath: "-", suite: self.testCase.suite, name: self.testCase.name, status: .failed, startInterval: testCaseStartTimeInterval, endInterval: CFAbsoluteTimeGetCurrent(), averageStdOutIdleTime: avgIdleTime, maxStdOutIdleTime: maxIdleTime)
-                    previewCompletionBlock?(result); previewCompletionBlock = nil // call preview at most once
-
-                    testCaseResult = result
-                case .noSpaceOnDevice:
-                    fatalError("💣 No space left on \(executer.address).")
                 }
-            }
-
-            partialProgress = lines.last ?? ""
-        }
-
-        var output = try executer.execute(testWithoutBuilding, progress: progressHandler) { _, originalError in
-            if !self.shouldIgnoreTestExecutionError(originalError) {
-                throw originalError
+                if let profile {
+                    try exportCoverage(profile: profile, identifier: identifier, results: jobResults, completion: completion, worker: worker, executer: background)
+                }
+                _ = try background.execute("rm -rf " + q(directory))
+            } catch {
+                sync.sync { jobErrors.append("\(identifier): \(error)") }
             }
         }
-
-        // It should be rare but it may happen that stdout content is not processed by the progressHandler
-        output = (output.trimmingCharacters(in: .whitespacesAndNewlines)).replacingOccurrences(of: parsedProgress.trimmingCharacters(in: .whitespacesAndNewlines), with: "") + "\n"
-        progressHandler(output)
-
-        return (output: output, testCaseResult: testCaseResult)
+        return Outcome(results: results, unstarted: completion.unstarted, requiresQuarantine: configuration.device != nil && completion.started.isEmpty && analysis.isInfrastructureLaunchFailure)
     }
 
-    private func xcodebuildCommand(executer: Executer) throws -> String {
-        let testRun = try findTestRun(executer: executer)
-        let onlyTesting = "-only-testing:'\(testTarget)/\(testCase.testIdentifier)'"
-        let destinationPath = Path.logs.url.appendingPathComponent(testRunner.id).path
-
-        var maxAllowedTestExecutionTimeParameter = ""
-        if let maximumTestExecutionTime = testing.maximumTestExecutionTime {
-            maxAllowedTestExecutionTimeParameter = "-maximum-test-execution-time-allowance \(maximumTestExecutionTime)"
+    private func exportCoverage(profile: String, identifier: String, results: [TestCaseResult], completion: BatchCompletion, worker: String, executer: Executer) throws {
+        let testing = configuration.testing
+        guard testing.extractIndividualTestCoverage || testing.extractTestCoveredFiles else { return }
+        let q = Self.quote
+        let json = try CodeCoverageGenerator(configuration: configuration, baseUrl: baseUrl).generateJsonCoverage(executer: executer, coverageUrl: URL(fileURLWithPath: profile), summary: true, pathEquivalence: testing.codeCoveragePathEquivalence, strict: true)
+        // The legacy exporter uses pipelines. Validate the produced document so an earlier pipeline failure cannot look successful.
+        let data = try download(json.path, executer: executer)
+        guard let document = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let records = document["data"] as? [[String: Any]],
+              let files = records.first?["files"] as? [[String: Any]], !files.isEmpty else {
+            throw Error("Empty or invalid batch coverage report: \(identifier)")
         }
-
-        // Diagnostics collection is opt-in because it is very expensive: xcodebuild shells out to
-        // `simctl diagnose --timeout=600`, which spends minutes gathering a ~280MB sysdiagnose into
-        // the .xcresult *after* the verdict has already been parsed from stdout. The runner slot stays
-        // held for the whole collection, so a single failure can take a simulator out of rotation for
-        // up to 10 minutes. Passing the flag explicitly also overrides whatever the test plan sets.
-        let collectDiagnosticsParameter = "-collect-test-diagnostics \(testing.collectTestDiagnosticsOnFailure ? "on-failure" : "never")"
-
-        return #"$(xcode-select -p)/usr/bin/xcodebuild -parallel-testing-enabled NO -disable-concurrent-destination-testing -xctestrun '\#(testRun)' -destination '\#(xcodebuildDestination)' -derivedDataPath '\#(destinationPath)' \#(onlyTesting) -enableCodeCoverage YES -destination-timeout 60 -test-timeouts-enabled YES \#(collectDiagnosticsParameter) \#(maxAllowedTestExecutionTimeParameter) test-without-building 2>&1 || true"#
-    }
-
-    private func shouldIgnoreTestExecutionError(_ error: Error) -> Bool {
-        let ignoreErrors = ["Failed to require the PTY package", "Unable to send channel-open request"]
-
-        for ignoreError in ignoreErrors {
-            if error.errorDescription?.contains(ignoreError) == true {
-                return true
+        let coveredFiles = URL(fileURLWithPath: profile).deletingLastPathComponent().appendingPathComponent("covered-files.json").path
+        if testing.extractTestCoveredFiles {
+            _ = try executer.execute(q(worker) + " mendoza extract_files_coverage " + q(json.path) + " " + q(coveredFiles))
+        }
+        for (enabled, root, source) in [(testing.extractIndividualTestCoverage, Path.individualCoverage.rawValue, json.path),
+                                        (testing.extractTestCoveredFiles, Path.testFileCoverage.rawValue, coveredFiles)] where enabled {
+            let canonical = root + "/batches/" + identifier
+            _ = try executer.execute("mkdir -p \(q(canonical)) && cp \(q(source)) \(q(canonical + "/coverage.json"))")
+            // Membership and interruption status are kept separately from the existing report schema.
+            let metadata: [String: Any] = ["scope": "batch", "invocation": identifier,
+                                           "members": completion.started.map(\.testIdentifier),
+                                           "coverageMayBeIncomplete": completion.interruption != nil || completion.results.contains { $0.status == .failed },
+                                           "aliases": results.filter { $0.status == .passed }.map(Self.coverageAlias)]
+            try upload(JSONSerialization.data(withJSONObject: metadata, options: [.sortedKeys]), to: canonical + "/metadata.json", executer: executer)
+            for result in results where result.status == .passed {
+                _ = try executer.execute("cp \(q(source)) \(q(root + "/" + Self.coverageAlias(result)))")
             }
         }
+        _ = try executer.execute("rm -f " + q(json.path))
+    }
 
-        return false
+    static func coverageAlias(_ result: TestCaseResult) -> String {
+        "\(result.suite)-\(result.name)-\(Int(result.startInterval)).json"
+    }
+
+    private func upload(_ data: Data, to path: String, executer: Executer) throws {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: url) }
+        try data.write(to: url, options: .atomic)
+        try executer.upload(localUrl: url, remotePath: path)
+    }
+
+    private func download(_ path: String, executer: Executer) throws -> Data {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: url) }
+        try executer.download(remotePath: path, localUrl: url)
+        return try Data(contentsOf: url)
     }
 }

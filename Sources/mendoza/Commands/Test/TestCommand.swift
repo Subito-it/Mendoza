@@ -15,7 +15,7 @@ class TestCommand: Command {
 
     let pluginReplayPath = Argument<URL>(name: "path", kind: .named(short: nil, long: "plugin_replay_path"), optional: true, help: "Folder where every plugin invocation's stdin envelope is written, as `<PluginName>.<timestamp>.json`, so a failing plugin can be re-run against the exact input it received. Default: the session logs folder, which is wiped when the next session starts", autocomplete: .directories)
     let verboseFlag = Flag(short: nil, long: "verbose", help: "Dump debug messages")
-    let testBatchSize = Argument<Int>(name: "count", kind: .named(short: nil, long: "test_batch_size"), optional: true, help: "Tests per xcodebuild invocation: 1 (default) or 2. Coverage reports contain the combined coverage of the batch. Retries run individually. iOS only.")
+    let testBatchSize = Argument<Int>(name: "count", kind: .named(short: nil, long: "test_batch_size"), optional: true, help: "Tests per xcodebuild invocation: 1 (default) or 2. Coverage reports contain the combined coverage of the batch. Retries run individually. Size 2 requires iOS simulators.")
 
     let remoteNodesConfigurationPath = Argument<URL>(name: "path", kind: .named(short: nil, long: "remote_nodes_configuration"), optional: true, help: "Path to remote configuration file containing the list of remote nodes to use and destination path")
     let localDestinationPath = Argument<URL>(name: "path", kind: .named(short: nil, long: "local_destination_path"), optional: true, help: "Specify location to store tests results that will be executed locally")

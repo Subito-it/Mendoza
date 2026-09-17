@@ -2,7 +2,7 @@ import Darwin
 import Foundation
 
 struct BatchRequest: Codable {
-    static let protocolVersion = 1
+    static let protocolVersion = 2
     let version: Int
     let identifier: String
     let tests: [TestCase]
@@ -18,10 +18,11 @@ struct BatchRequest: Codable {
     let collectDiagnostics: Bool
     let appBundleIdentifier: String
     let testBundleIdentifier: String
+    var isSimulator: Bool = true
 
     var arguments: [String] {
         var args = ["xcodebuild", "-parallel-testing-enabled", "NO", "-disable-concurrent-destination-testing",
-                    "-xctestrun", xctestrun, "-destination", "platform=iOS Simulator,id=\(runnerIdentifier)",
+                    "-xctestrun", xctestrun, "-destination", isSimulator ? "platform=iOS Simulator,id=\(runnerIdentifier)" : "platform=OS X,arch=x86_64",
                     "-derivedDataPath", directory + "/derived", "-resultBundlePath", resultPath,
                     "-enableCodeCoverage", "YES", "-destination-timeout", "60", "-test-timeouts-enabled", "YES",
                     "-collect-test-diagnostics", collectDiagnostics ? "on-failure" : "never"]
@@ -198,7 +199,7 @@ enum BatchWorker {
                 // Cancel xcodebuild immediately so it cannot schedule an untouched sibling while we flush artifacts.
                 kill(-pid, SIGINT)
                 // Terminate only applications on this simulator first, allowing xcodebuild to flush coverage/results.
-                if executable == "/usr/bin/xcrun" {
+                if request.isSimulator, executable == "/usr/bin/xcrun" {
                     for bundle in terminationBundles {
                         let process = Process()
                         process.executableURL = URL(fileURLWithPath: "/usr/bin/xcrun")

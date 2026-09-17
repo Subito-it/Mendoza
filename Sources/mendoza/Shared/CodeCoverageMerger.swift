@@ -19,7 +19,7 @@ class CodeCoverageMerger {
             let files = coverageFiles.filter { !$0.isEmpty }
             guard let first = files.first else { return nil }
             let destination = URL(fileURLWithPath: first).deletingLastPathComponent().appendingPathComponent(UUID().uuidString + ".profdata").path
-            let quote = BatchTestExecutor.quote
+            let quote = TestExecuter.quote
             _ = try executer.execute("xcrun llvm-profdata merge -sparse \(files.map(quote).joined(separator: " ")) -o \(quote(destination))")
             // Preserve all inputs on merge failure. Publish the merged file before deleting sources.
             _ = try executer.execute("rm -f " + files.map(quote).joined(separator: " "))

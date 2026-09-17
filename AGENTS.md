@@ -296,11 +296,13 @@ Core test execution engine implementing **work-stealing queue** pattern:
    }
    ```
 3. **Retry logic**: Failed tests re-enqueued at position 1 (runs on different simulator)
-4. **Progressive coverage merge**: Merges `.profdata` after each test for efficiency
+4. **Progressive coverage merge**: Merges each invocation's immutable `.profdata` into a per-runner checkpoint
 
 #### TestExecuter (`Operations/TestRunnerOperation/TestExecuter.swift`)
 
-Executes single test via xcodebuild:
+Executes one or two selected tests per xcodebuild invocation through the node-local worker.
+Both batch sizes share the same executor, watchdog, and coverage pipeline. The worker
+uses an isolated DerivedData directory and one explicit result bundle per invocation:
 
 ```swift
 xcodebuild -parallel-testing-enabled NO \
@@ -314,7 +316,7 @@ xcodebuild -parallel-testing-enabled NO \
 **Features:**
 - Parses stdout for test start/pass/fail/crash events via regex
 - Preview callback fires immediately on test completion (before xcresult finalized)
-- Stdout timeout handler terminates hung tests
+- Worker phase watchdogs and process-group cancellation terminate hung invocations
 - Handles: accessibility failures, preflight failures, damaged builds, crashes
 
 #### DistributeTestBundleOperation

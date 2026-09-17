@@ -37,7 +37,7 @@ class TestCollectorOperation: BaseOperation<[TestCaseResult]> {
                 guard testNodes.contains(source.node.address) else { return }
 
                 // Sweep up any xcresult that failed to transfer during the test run.
-                // PostExecutionHandler rsyncs each result to the destination as tests
+                // TestExecuter rsyncs each result to the destination as tests
                 // finish, but keeps the local copy when that transfer fails. Those
                 // leftovers live under Path.results/<runnerId>/; copying the whole tree
                 // preserves the <runnerId>/<basename> layout the merge/rename logic below
@@ -51,8 +51,7 @@ class TestCollectorOperation: BaseOperation<[TestCaseResult]> {
                 let logPath = "\(Path.logs.rawValue)/"
                 try executer.rsync(sourcePath: logPath, destinationPath: destinationPath, include: ["*/", "*.profdata"], exclude: ["*"], on: destinationNode)
 
-                if configuration.testing.effectiveTestBatchSize > 1,
-                   try executer.fileExists(atPath: Path.logs.rawValue + "/batches") {
+                if try executer.fileExists(atPath: Path.logs.rawValue + "/batches") {
                     try executer.rsync(sourcePath: Path.logs.rawValue + "/batches/", destinationPath: destinationPath + "/batch_logs", on: destinationNode)
                 }
 
@@ -78,14 +77,14 @@ class TestCollectorOperation: BaseOperation<[TestCaseResult]> {
             for (index, result) in results.enumerated() where !result.isEmpty {
                 moveCommands.append("mv '\(result)' '\(destinationPath)/\(index).profdata'")
             }
-            _ = try executer.execute(moveCommands.joined(separator: configuration.testing.effectiveTestBatchSize > 1 ? " && " : "; "))
+            _ = try executer.execute(moveCommands.joined(separator: " && "))
 
             if !configuration.testing.skipResultMerge {
                 try mergeResults(destinationNode: destinationNode, destinationPath: destinationPath, destinationName: Environment.xcresultFilename)
 
                 let totalResults = testCaseResults.count
                 for index in 0 ..< totalResults {
-                    if configuration.testing.effectiveTestBatchSize > 1, testCaseResults[index].xcResultPath.isEmpty { continue }
+                    if testCaseResults[index].xcResultPath.isEmpty { continue }
                     testCaseResults[index].xcResultPath = Environment.xcresultFilename
                 }
             } else {
@@ -101,13 +100,9 @@ class TestCollectorOperation: BaseOperation<[TestCaseResult]> {
                 for (index, result) in results.enumerated() {
                     let updatedResultPath = "\(destinationPath)/\(index).xcresult"
                     moveCommands.append("mv '\(result)' '\(updatedResultPath)'")
-                    if configuration.testing.effectiveTestBatchSize > 1 {
-                        Self.updateBatchResultPaths(&testCaseResults, sourcePath: result, destinationPath: lastTwoPathComponents(updatedResultPath))
-                    } else if let index = testCaseResults.firstIndex(where: { lastTwoPathComponents($0.xcResultPath) == lastTwoPathComponents(result) }) {
-                        testCaseResults[index].xcResultPath = lastTwoPathComponents(updatedResultPath)
-                    }
+                    Self.updateBatchResultPaths(&testCaseResults, sourcePath: result, destinationPath: lastTwoPathComponents(updatedResultPath))
                 }
-                _ = try executer.execute(moveCommands.joined(separator: configuration.testing.effectiveTestBatchSize > 1 ? " && " : "; "))
+                _ = try executer.execute(moveCommands.joined(separator: " && "))
             }
 
             try cleanupEmptyFolders(executer: executer, destinationPath: destinationPath)
