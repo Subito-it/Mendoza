@@ -84,16 +84,19 @@ class ExecuterLogger: Logger, CustomDebugStringConvertible {
     }
 
     func log(command: String) {
-        logs.append(LoggerEvent(date: Date(), kind: .start(command: redact(command))))
-        if dumpToStandardOutput { print(redact(command)) }
+        let redacted = redact(command)
+        syncQueue.sync { _logs.append(LoggerEvent(date: Date(), kind: .start(command: redacted))) }
+        if dumpToStandardOutput { print(redacted) }
     }
 
     func log(output: String, statusCode: Int32) {
-        logs.append(LoggerEvent(date: Date(), kind: .end(output: redact(output), statusCode: statusCode)))
+        let redacted = redact(output)
+        syncQueue.sync { _logs.append(LoggerEvent(date: Date(), kind: .end(output: redacted, statusCode: statusCode))) }
     }
 
     func log(exception: String) {
-        logs.append(LoggerEvent(date: Date(), kind: .exception(error: redact(exception))))
+        let redacted = redact(exception)
+        syncQueue.sync { _logs.append(LoggerEvent(date: Date(), kind: .exception(error: redacted))) }
     }
 
     func addIgnoreList(_ word: String) {
@@ -119,9 +122,8 @@ class ExecuterLogger: Logger, CustomDebugStringConvertible {
     }
 
     func prefixLogs(from logger: ExecuterLogger) {
-        let currentLogs = logs
-        let prefixLogs = logger.logs
-        logs = prefixLogs + currentLogs
+        let prefixLogs = logger.syncQueue.sync { logger._logs }
+        syncQueue.sync { _logs = prefixLogs + _logs }
     }
 
     private func write(to: URL) throws {
