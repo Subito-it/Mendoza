@@ -43,7 +43,7 @@ struct BatchOutputParser {
             default: return .interrupted(test)
             }
         }
-        // Named crash messages can arrive after the active test's terminal line. Never apply those to its sibling.
+        // Named crash messages can arrive after the active test's terminal line. Never apply those to another member.
         for pattern in [#"Restarting after unexpected exit or crash in ([^/ ]+)/([^ (]+)\(\)"#,
                         #"Restarting after unexpected exit, crash, or test timeout in (\S+)\.([^ .(]+)\(\)"#] {
             if let groups = try? line.capturedGroups(withRegexString: pattern), groups.count == 2 {
@@ -172,12 +172,12 @@ struct BatchTestState {
         if let active {
             finish(active, passed: false, at: now)
         }
-        // A launch failure must consume an attempt to ensure bounded retries. Untouched siblings are deferred.
+        // A launch failure must consume an attempt to ensure bounded retries. Untouched members are deferred.
         if results.isEmpty, let first = remaining.first {
             finish(first, passed: false, at: now)
             return
         }
-        // Any untouched sibling is returned once as a singleton. A singleton launch failure above consumes an attempt.
+        // Every untouched member is returned once as a singleton. A singleton launch failure above consumes an attempt.
     }
 
     private mutating func finish(_ test: TestCase, passed: Bool, at now: TimeInterval) {

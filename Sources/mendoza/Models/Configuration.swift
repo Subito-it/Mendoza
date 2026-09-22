@@ -77,8 +77,8 @@ extension Configuration {
         var effectiveTestBatchSize: Int { testBatchSize ?? 1 }
 
         func validateBatchSize() throws {
-            guard (1 ... 2).contains(effectiveTestBatchSize) else {
-                throw Error("test_batch_size must be 1 or 2")
+            guard effectiveTestBatchSize > 0 else {
+                throw Error("test_batch_size must be greater than zero")
             }
         }
     }

@@ -21,9 +21,6 @@ class MendozaCommand: Command {
 
     func run() -> Bool {
         switch commandName.value {
-        case "batch_protocol":
-            print(BatchRequest.protocolVersion)
-            return true
         case "run_test_batch":
             guard let paths = parameters.value?.filter({ !$0.isEmpty }), paths.count == 1 else { return false }
             do {
@@ -201,16 +198,31 @@ class MendozaCommand: Command {
 
 class XcResultCleaner {
     let url: URL
-    private let reader: XcResultReader
+    private let readInvocationRecord: () throws -> ActionsInvocationRecord
+    private let readPlanSummaries: (String) throws -> ActionTestPlanRunSummaries
+    private let readTestSummary: (String) throws -> ActionTestSummary
 
-    init(path: String, readObject: ((String?) throws -> Data)? = nil) {
+    init(path: String) {
         url = URL(fileURLWithPath: path)
-        reader = XcResultReader(url: url, readObject: readObject)
+        let reader = CachiKit(url: url)
+        readInvocationRecord = reader.actionsInvocationRecord
+        readPlanSummaries = reader.actionTestPlanRunSummaries
+        readTestSummary = reader.actionTestSummary
+    }
+
+    init(path: String, readObject: @escaping (String?) throws -> Data) {
+        url = URL(fileURLWithPath: path)
+        func decode<T: Decodable>(_ type: T.Type, identifier: String?) throws -> T {
+            try JSONDecoder().decode(type, from: readObject(identifier))
+        }
+        readInvocationRecord = { try decode(ActionsInvocationRecord.self, identifier: nil) }
+        readPlanSummaries = { try decode(ActionTestPlanRunSummaries.self, identifier: $0) }
+        readTestSummary = { try decode(ActionTestSummary.self, identifier: $0) }
     }
 
     func clean(minimumSizeKB: Int) throws {
         guard minimumSizeKB > 1, minimumSizeKB <= Int.max / 1024 else { throw "Invalid xcresult cleanup threshold" }
-        let invocationRecord = try reader.decode(ActionsInvocationRecord.self)
+        let invocationRecord = try readInvocationRecord()
 
         var attachmentIdentifiers = [String]()
 
@@ -236,14 +248,14 @@ class XcResultCleaner {
 
     /// Resolve every summary before modifying any blob, so a decoding failure cannot cause partial cleanup.
     func protectedTestIdentifiers(for testRef: String) throws -> [String] {
-        let plans = try reader.decode(ActionTestPlanRunSummaries.self, identifier: testRef)
+        let plans = try readPlanSummaries(testRef)
         let identifiers = plans.summaries.flatMap { plan in
             plan.testableSummaries.flatMap { extractTestSummaryIdentifiers(actionTestSummariesGroup: $0.tests) }
         }
         guard !identifiers.isEmpty else { throw "Failed extracting test summaries; preserving all blobs" }
         var protected = [testRef] + identifiers
         for identifier in Set(identifiers) {
-            let summary = try reader.decode(ActionTestSummary.self, identifier: identifier)
+            let summary = try readTestSummary(identifier)
             protected += extractActivitiesAttachmentIdentifiers(summary.activitySummaries)
             for failure in summary.failureSummaries {
                 protected += extractAttachmentIdentifiers(failure.attachments)

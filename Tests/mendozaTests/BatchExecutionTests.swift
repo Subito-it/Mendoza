@@ -157,6 +157,13 @@ final class BatchExecutionTests: XCTestCase {
         XCTAssertFalse(queue.enqueueForRetry(a, excludedRunnerIndexes: []))
     }
 
+    func testQueueUsesTheUserSelectedBatchSize() {
+        let tests = (0 ..< 25).map { TestCase(name: "test\($0)", suite: "Suite") }
+        let queue = TestQueue(testCases: tests, maxRetryCount: 0)
+        XCTAssertEqual(queue.dequeueBatch(for: 0, maximumCount: 17), Array(tests.prefix(17)))
+        XCTAssertEqual(queue.dequeueBatch(for: 0, maximumCount: 17), Array(tests.dropFirst(17)))
+    }
+
     func testConcurrentReservationsLoseOrDuplicateNoTests() {
         let tests = (0 ..< 2_000).map { TestCase(name: "test\($0)", suite: "Suite") }
         let queue = TestQueue(testCases: tests, maxRetryCount: 0)
@@ -188,16 +195,18 @@ final class BatchExecutionTests: XCTestCase {
         try config.validateBatchSize()
         let encoded = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(config)) as? [String: Any])
         XCTAssertNil(encoded["testBatchSize"])
-        for value in [-1, 0, 3, 100] {
+        for value in [-1, 0] {
             config.testBatchSize = value
             XCTAssertThrowsError(try config.validateBatchSize())
         }
-        config.testBatchSize = 2
-        try config.validateBatchSize()
+        for value in [1, 2, 3, 100, Int.max] {
+            config.testBatchSize = value
+            try config.validateBatchSize()
+        }
     }
 
     private func request(directory: String, idle: Int? = nil) -> BatchRequest {
-        BatchRequest(version: BatchRequest.protocolVersion, identifier: "example", tests: [a, b], target: "UITests", node: "localhost", runnerName: "Simulator", runnerIdentifier: "runner", xctestrun: "/tmp/example.xctestrun", directory: directory, resultPath: directory + "/result.xcresult", idleTimeout: idle, executionTimeout: nil, collectDiagnostics: false, appBundleIdentifier: "example.app", testBundleIdentifier: "example.tests")
+        BatchRequest(identifier: "example", tests: [a, b], target: "UITests", node: "localhost", runnerName: "Simulator", runnerIdentifier: "runner", xctestrun: "/tmp/example.xctestrun", directory: directory, resultPath: directory + "/result.xcresult", idleTimeout: idle, executionTimeout: nil, collectDiagnostics: false, appBundleIdentifier: "example.app", testBundleIdentifier: "example.tests")
     }
 
     func testCommandHasBothSelectionsAndAnExplicitSharedResult() {
@@ -207,11 +216,17 @@ final class BatchExecutionTests: XCTestCase {
         XCTAssertEqual(value.arguments.filter { $0 == "-resultBundlePath" }.count, 1)
     }
 
+    func testCommandIncludesEveryMemberOfAnArbitraryBatch() {
+        let tests = (0 ..< 12).map { TestCase(name: "test\($0)", suite: "ExampleTests") }
+        let value = BatchRequest(identifier: "large", tests: tests, target: "UITests", node: "localhost", runnerName: "Simulator", runnerIdentifier: "runner", xctestrun: "/tmp/example.xctestrun", directory: "/tmp/example", resultPath: "/tmp/example/result.xcresult", idleTimeout: nil, executionTimeout: nil, collectDiagnostics: false, appBundleIdentifier: "example.app", testBundleIdentifier: "example.tests")
+        XCTAssertEqual(value.arguments.filter { $0.hasPrefix("-only-testing:") }.count, tests.count)
+    }
+
     func testSingleTestUsesWorkerCompletionAndCoverageArgumentsOnBothPlatforms() throws {
         for simulator in [true, false] {
             let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
             defer { try? FileManager.default.removeItem(at: directory) }
-            let value = BatchRequest(version: BatchRequest.protocolVersion, identifier: "single", tests: [a], target: "UITests", node: "localhost", runnerName: "Runner", runnerIdentifier: "runner", xctestrun: "/tmp/example.xctestrun", directory: directory.path, resultPath: directory.path + "/result.xcresult", idleTimeout: 5, executionTimeout: 10, collectDiagnostics: false, appBundleIdentifier: "example.app", testBundleIdentifier: "example.tests", isSimulator: simulator)
+            let value = BatchRequest(identifier: "single", tests: [a], target: "UITests", node: "localhost", runnerName: "Runner", runnerIdentifier: "runner", xctestrun: "/tmp/example.xctestrun", directory: directory.path, resultPath: directory.path + "/result.xcresult", idleTimeout: 5, executionTimeout: 10, collectDiagnostics: false, appBundleIdentifier: "example.app", testBundleIdentifier: "example.tests", isSimulator: simulator)
             let roundTrip = try JSONDecoder().decode(BatchRequest.self, from: JSONEncoder().encode(value))
             XCTAssertEqual(roundTrip.isSimulator, simulator)
             XCTAssertEqual(value.arguments.filter { $0.hasPrefix("-only-testing:") }, ["-only-testing:UITests/ExampleTests/testA"])

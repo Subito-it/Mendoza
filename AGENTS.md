@@ -300,8 +300,8 @@ Core test execution engine implementing **work-stealing queue** pattern:
 
 #### TestExecuter (`Operations/TestRunnerOperation/TestExecuter.swift`)
 
-Executes one or two selected tests per xcodebuild invocation through the node-local worker.
-Both batch sizes share the same executor, watchdog, and coverage pipeline. The worker
+Executes one or more selected tests per xcodebuild invocation through the node-local worker.
+All batch sizes share the same executor, watchdog, and coverage pipeline. The worker
 uses an isolated DerivedData directory and one explicit result bundle per invocation:
 
 ```swift

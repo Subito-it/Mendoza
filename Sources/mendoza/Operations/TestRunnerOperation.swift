@@ -85,9 +85,6 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
 
         do {
             try configuration.testing.validateBatchSize()
-            if configuration.testing.effectiveTestBatchSize > 1, configuration.device == nil {
-                throw Error("test_batch_size 2 requires iOS simulators")
-            }
             didStart?()
 
             var results = [TestCaseResult]()

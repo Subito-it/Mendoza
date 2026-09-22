@@ -2,8 +2,6 @@ import Darwin
 import Foundation
 
 struct BatchRequest: Codable {
-    static let protocolVersion = 2
-    let version: Int
     let identifier: String
     let tests: [TestCase]
     let target: String
@@ -50,8 +48,9 @@ enum BatchWorker {
 
     static func run(requestPath: String) throws {
         let request = try JSONDecoder().decode(BatchRequest.self, from: Data(contentsOf: URL(fileURLWithPath: requestPath)))
-        guard request.version == BatchRequest.protocolVersion, (1 ... 2).contains(request.tests.count),
-              Set(request.tests).count == request.tests.count else { throw Error("Invalid batch request") }
+        guard !request.tests.isEmpty, Set(request.tests).count == request.tests.count else {
+            throw Error("Invalid batch request")
+        }
         try validateTestRun(request.xctestrun)
         // SSH hangup or a terminated controller must enter the same cleanup path as a watchdog.
         // Swift cleanup cannot run from a POSIX signal handler; dispatch sources write the cancellation marker.
@@ -196,7 +195,7 @@ enum BatchWorker {
             state.checkTimeout(now: now, idleLimit: request.idleTimeout.map(Double.init), executionLimit: request.executionTimeout.map(Double.init))
             if state.abortReason != nil, interruptTime == nil {
                 interruptTime = now
-                // Cancel xcodebuild immediately so it cannot schedule an untouched sibling while we flush artifacts.
+                // Cancel xcodebuild immediately so it cannot schedule an untouched member while we flush artifacts.
                 kill(-pid, SIGINT)
                 // Terminate only applications on this simulator first, allowing xcodebuild to flush coverage/results.
                 if request.isSimulator, executable == "/usr/bin/xcrun" {

@@ -17,7 +17,7 @@ class TestQueue {
     private var excludedRunners = [TestCase: Set<Int>]()
     private var singletonTests = Set<TestCase>()
 
-    /// One reservation holds the queue lock for both members. Retries and returned work stay singletons.
+    /// One reservation holds the queue lock for all members. Retries and returned work stay singletons.
     func dequeueBatch(for runnerIndex: Int, maximumCount: Int, ignoringExclusions: Bool = false) -> [TestCase] {
         syncQueue.sync {
             let eligible: (TestCase) -> Bool = { ignoringExclusions || self.excludedRunners[$0]?.contains(runnerIndex) != true }

@@ -56,10 +56,6 @@ final class TestExecuter {
         let q = Self.quote
         guard let executablePath = Bundle.main.executableURL?.path else { throw Error("Cannot locate the Mendoza batch worker executable") }
         let worker = executer is LocalExecuter ? executablePath : "mendoza"
-        let capability = try executer.execute(q(worker) + " mendoza batch_protocol").trimmingCharacters(in: .whitespacesAndNewlines)
-        guard capability == String(BatchRequest.protocolVersion) else {
-            throw Error("Node \(node.address) needs a Mendoza binary supporting batch protocol \(BatchRequest.protocolVersion)")
-        }
         let testRuns = try executer.execute("find \(q(Path.testBundle.rawValue)) -type f -name \(q(configuration.building.scheme + "*.xctestrun"))")
             .components(separatedBy: "\n").filter { !$0.isEmpty }
         guard testRuns.count == 1 else { throw Error("Expected exactly one xctestrun for batch execution") }
@@ -67,7 +63,7 @@ final class TestExecuter {
         let directory = Path.temp.rawValue + "/batches/" + identifier
         let resultPath = Path.results.rawValue + "/" + runner.id + "/" + identifier + ".xcresult"
         _ = try executer.execute("mkdir -p \(q(directory)) \(q(URL(fileURLWithPath: resultPath).deletingLastPathComponent().path))")
-        let request = BatchRequest(version: BatchRequest.protocolVersion, identifier: identifier, tests: tests, target: target, node: node.address, runnerName: runner.name, runnerIdentifier: runner.id, xctestrun: testRuns[0], directory: directory, resultPath: resultPath, idleTimeout: configuration.testing.maximumStdOutIdleTime, executionTimeout: configuration.testing.maximumTestExecutionTime, collectDiagnostics: configuration.testing.collectTestDiagnosticsOnFailure, appBundleIdentifier: configuration.building.buildBundleIdentifier, testBundleIdentifier: configuration.building.testBundleIdentifier, isSimulator: configuration.device != nil)
+        let request = BatchRequest(identifier: identifier, tests: tests, target: target, node: node.address, runnerName: runner.name, runnerIdentifier: runner.id, xctestrun: testRuns[0], directory: directory, resultPath: resultPath, idleTimeout: configuration.testing.maximumStdOutIdleTime, executionTimeout: configuration.testing.maximumTestExecutionTime, collectDiagnostics: configuration.testing.collectTestDiagnosticsOnFailure, appBundleIdentifier: configuration.building.buildBundleIdentifier, testBundleIdentifier: configuration.building.testBundleIdentifier, isSimulator: configuration.device != nil)
         try upload(JSONEncoder().encode(request), to: directory + "/request.json", executer: executer)
         let control = try executer.clone()
         let shouldCancel = sync.sync { () -> Bool in

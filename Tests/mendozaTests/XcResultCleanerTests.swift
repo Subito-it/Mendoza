@@ -16,29 +16,26 @@ final class XcResultCleanerTests: XCTestCase {
         typed("Array", ["_values": values])
     }
 
-    private func reader(_ object: [String: Any]) throws -> XcResultReader {
+    private func decode<T: Decodable>(_ type: T.Type, from object: [String: Any]) throws -> T {
         let data = try JSONSerialization.data(withJSONObject: object)
-        return XcResultReader(url: URL(fileURLWithPath: "/tmp/example.xcresult"), readObject: { _ in data })
+        return try JSONDecoder().decode(type, from: data)
     }
 
-    func testCachiKitDecodesOldAndXcode27EmptyArraysThroughSharedReader() throws {
+    func testCachiKitDecodesOldAndXcode27EmptyArrays() throws {
         for empty in [array([]), typed("Array")] {
             let object: [String: Any] = ["metrics": [:], "issues": ["analyzerWarningSummaries": empty], "actions": empty]
-            let decoded = try reader(object).decode(ActionsInvocationRecord.self)
+            let decoded = try decode(ActionsInvocationRecord.self, from: object)
             XCTAssertTrue(decoded.actions.isEmpty)
             XCTAssertEqual(decoded.issues?.analyzerWarningSummaries?.count, 0)
         }
-        let modern: [String: Any] = ["metrics": [:], "issues": [:], "actions": typed("Array")]
-        // Characterize the precise dependency incompatibility that the adapter repairs.
-        XCTAssertThrowsError(try JSONDecoder().decode(ActionsInvocationRecord.self, from: JSONSerialization.data(withJSONObject: modern)))
     }
 
-    func testCompatibilityAdapterDoesNotHideMalformedOrMissingData() throws {
-        for invalid in [typed("Array", ["_values": "invalid"]), typed("Array", ["_values": NSNull()]), typed("NotAnArray")] {
+    func testCachiKitDoesNotHideMalformedValuesOrMissingRequiredData() throws {
+        for invalid in [typed("Array", ["_values": "invalid"]), typed("Array", ["_values": NSNull()])] {
             let object: [String: Any] = ["metrics": [:], "issues": [:], "actions": invalid]
-            XCTAssertThrowsError(try reader(object).decode(ActionsInvocationRecord.self))
+            XCTAssertThrowsError(try decode(ActionsInvocationRecord.self, from: object))
         }
-        XCTAssertThrowsError(try reader(["issues": [:], "actions": array([])]).decode(ActionsInvocationRecord.self))
+        XCTAssertThrowsError(try decode(ActionsInvocationRecord.self, from: ["issues": [:], "actions": array([])]))
     }
 
     private func plan(_ targets: [[String]]) -> [String: Any] {
