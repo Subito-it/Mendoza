@@ -266,8 +266,6 @@ InitialSetupOperation
     └── TestExtractionOperation → TestSortingOperation
                                         ↓
 SimulatorSetupOperation ────────────────┤
-        ↓                               │
-ProcessKillerOperation (optional)       │
                                         ↓
                             TestRunnerOperation
                                     ↓

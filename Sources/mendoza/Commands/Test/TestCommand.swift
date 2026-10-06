@@ -39,7 +39,6 @@ class TestCommand: Command {
     let clearDerivedDataOnCompilationFailure = Flag(short: nil, long: "clear_derived_data_on_failure", help: "[xcodebuild] On compilation failure derived data will be cleared and compilation will be retried once. Ignored with --bazel_target")
     let xcresultBlobThresholdKB = Argument<Int>(name: "size", kind: .named(short: nil, long: "xcresult_blob_threshold_kb"), optional: true, help: "Delete data blobs larger than the specified threshold")
     let excludeNodes = Argument<String>(name: "nodes", kind: .named(short: nil, long: "exclude_nodes"), optional: true, help: "Specify which nodes (by name or address) specified in the configuration should be excluded from the dispatch. Accepts comma separated values. Default: ''")
-    let killSimulatorProcesses = Flag(short: nil, long: "kill_sim_procs", help: "Automatically kill Simulator's CPU intensive processes, see https://github.com/biscuitehh/yeetd")
     let disabledSimulatorServices = Argument<String>(name: "services", kind: .named(short: nil, long: "disable_sim_services"), optional: true, help: "Comma separated list of simulator background services to disable to slim down memory usage. Accepts groups or individual services. Requires iOS 18+ (ignored with a warning on older runtimes). \(SimulatorServiceCatalog.helpDescription)")
     let keepBuildFolderOnFailure = Flag(short: nil, long: "keep_build_folder_on_failure", help: "Keep build folder on failure")
     let collectTestDiagnosticsOnFailure = Flag(short: nil, long: "collect_test_diagnostics_on_failure", help: "Collect verbose xcodebuild diagnostics (sysdiagnose, log archives) when a test fails. ⚠️ Significant performance regression: xcodebuild runs `simctl diagnose` with a 600s timeout after the test verdict is known, writing ~280MB into the .xcresult while the simulator stays out of rotation. Default: diagnostics collection is disabled")
@@ -179,7 +178,6 @@ class TestCommand: Command {
                                             maximumTestExecutionTime: maximumTestExecutionTime.value,
                                             failingTestsRetryCount: failingTestsRetryCount.value,
                                             xcresultBlobThresholdKB: xcresultBlobThresholdKB.value,
-                                            killSimulatorProcesses: killSimulatorProcesses.value,
                                             alwaysRebootSimulators: alwaysRebootSimulators.value,
                                             autodeleteSlowDevices: autodeleteSlowDevices.value,
                                             codeCoveragePathEquivalence: codeCoveragePathEquivalence.value,

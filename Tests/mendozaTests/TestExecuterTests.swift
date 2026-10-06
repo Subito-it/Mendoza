@@ -46,7 +46,6 @@ final class TestExecuterTests: XCTestCase {
             maximumTestExecutionTime: nil,
             failingTestsRetryCount: nil,
             xcresultBlobThresholdKB: nil,
-            killSimulatorProcesses: false,
             alwaysRebootSimulators: false,
             autodeleteSlowDevices: false,
             codeCoveragePathEquivalence: nil,

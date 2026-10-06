@@ -63,7 +63,6 @@ extension Configuration {
         let maximumTestExecutionTime: Int?
         let failingTestsRetryCount: Int?
         let xcresultBlobThresholdKB: Int?
-        let killSimulatorProcesses: Bool
         let alwaysRebootSimulators: Bool
         let autodeleteSlowDevices: Bool
         let codeCoveragePathEquivalence: String?

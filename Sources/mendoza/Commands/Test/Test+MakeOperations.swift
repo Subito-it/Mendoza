@@ -53,7 +53,6 @@ extension Test {
         let testExtractionOperation = TestExtractionOperation(baseUrl: gitBaseUrl, testTargetSourceFiles: testTargetSourceFiles, filePatterns: filePatterns, device: device, plugin: testExtractionPlugin)
         let testSortingOperation = TestSortingOperation(device: device, plugin: testSortingPlugin, verbose: configuration.verbose)
         let simulatorSetupOperation = SimulatorSetupOperation(buildBundleIdentifier: configuration.building.buildBundleIdentifier, testBundleIdentifier: configuration.building.testBundleIdentifier, nodes: uniqueNodes, device: device, alwaysRebootSimulators: configuration.testing.alwaysRebootSimulators, disabledSimulatorServices: configuration.testing.disabledSimulatorServices, verbose: configuration.verbose)
-        let processKillerOperation = ProcessKillerOperation(nodes: uniqueNodes)
         let distributeTestBundleOperation = DistributeTestBundleOperation(nodes: uniqueNodes)
         let testRunnerOperation = TestRunnerOperation(configuration: configuration, baseUrl: gitBaseUrl, destinationPath: resultDestinationPath, testTarget: testTarget, productNames: productNames)
         let testCollectorOperation = TestCollectorOperation(configuration: configuration, destinationPath: resultDestinationPath, productNames: productNames)
@@ -63,7 +62,7 @@ extension Test {
         let simulatorTearDownOperation = SimulatorTearDownOperation(nodes: uniqueNodes, verbose: configuration.verbose)
         let tearDownOperation = TearDownOperation(configuration: configuration, git: gitStatus, timestamp: timestamp, plugin: tearDownPlugin)
 
-        var operations: [RunOperation] =
+        let operations: [RunOperation] =
             [initialSetupOperation,
              compileOperation,
              validationOperation,
@@ -107,10 +106,6 @@ extension Test {
         testExtractionOperation.addDependency(localSetupOperation)
 
         simulatorSetupOperation.addDependencies([localSetupOperation, remoteSetupOperation])
-        processKillerOperation.addDependency(simulatorSetupOperation)
-        if configuration.testing.killSimulatorProcesses {
-            operations.append(processKillerOperation)
-        }
 
         testSortingOperation.addDependency(testExtractionOperation)
 
