@@ -2,7 +2,49 @@
 
 The architecture of Mendoza is based on a set of NSOperations orchestrated by a single NSOperationQueue. The chart below shows operation's dependencies and external plugins support.
 
-<img src='pipeline.svg' width='640'>
+```mermaid
+flowchart TD
+    initialSetup[Initial setup]
+    localSetup[Setup local environment]
+    validation[Validations]
+    macOsValidation["macOS validations<br/>(macOS only)"]
+    remoteSetup[Setup remote environment]
+    compile["Compile<br/>(xcodebuild or Bazel)"]
+    extract[Extract test cases]
+    sort[Sort test cases]
+    simulatorSetup["Setup simulators<br/>(iOS only)"]
+    distribute[Distribute test bundle]
+    run[Execute tests]
+    collect[Collect test results]
+    coverage[Collect code coverage]
+    simulatorTearDown["Simulators tear down<br/>(iOS only)"]
+    cleanup[Cleanup test results]
+    tearDown[Tear down]
+
+    initialSetup --> localSetup & validation & macOsValidation
+    validation --> remoteSetup
+    localSetup -->|with a local node| remoteSetup
+    localSetup --> compile & extract & simulatorSetup
+    remoteSetup --> simulatorSetup
+    compile --> distribute
+    extract --> sort
+    distribute & sort & simulatorSetup --> run
+    run --> collect
+    collect --> coverage & simulatorTearDown
+    coverage --> cleanup
+    cleanup & simulatorTearDown --> tearDown
+
+    preCompilation([PreCompilationPlugin]) -.- compile
+    compile -.- postCompilation([PostCompilationPlugin])
+    extractionPlugin([TestExtractionPlugin]) -.- extract
+    sortingPlugin([TestSortingPlugin]) -.- sort
+    tearDown -.- tearDownPlugin([TearDownPlugin])
+
+    classDef plugin fill:#44b8b8,stroke:#44b8b8,color:#fff
+    class preCompilation,postCompilation,extractionPlugin,sortingPlugin,tearDownPlugin plugin
+```
+
+The `EventPlugin` is notified as the session progresses: when validation starts, when compilation starts and stops, when test execution starts and stops, on errors and when the session ends.
 
 ## Operations
 
@@ -32,7 +74,7 @@ Extract test methods from UI test target files. Can be overridden by plugin impl
 
 ### compileOperation
 
-Compile project using xcodebuild's `build-for-testing` which will produce a test bundle that will be later sent to remote nodes. Pre/post compilation can be customize with plugins. 
+Compile project using xcodebuild's `build-for-testing` which will produce a test bundle that will be later sent to remote nodes. With `--bazel_target` the target is built with `bazel build` instead, and its products are laid out the same way. Pre/post compilation can be customize with plugins. 
 
 ### testSortingOperation
 
@@ -41,10 +83,6 @@ Returning a sorted list of tests from longest to shortest execution time will op
 ### simulatorSetupOperation (iOS projects only)
 
 Prepares simulators on testing nodes by installing missing runtimes or simulator devices.
-
-### processKillerOperation (iOS projects only, optional)
-
-Kills leftover simulator-related processes on testing nodes before tests run. Only added to the pipeline when enabled in the configuration.
 
 ### distributeTestBundleOperation
 

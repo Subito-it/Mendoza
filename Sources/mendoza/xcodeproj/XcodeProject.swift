@@ -134,21 +134,16 @@ class XcodeProject: NSObject {
         }
 
         let testableTargetNames = scheme.testAction?.testables.map(\.buildableReference.blueprintName) ?? []
-        guard testableTargetNames.count == 1 else {
-            throw Error("Expecting 1 testing target in scheme \(name). Check that you have an executable selected in the info section of the run settings in the selected scheme.")
-        }
 
         let targets = project.pbxproj.nativeTargets
 
-        let schemeTargets = [runTargetName, testableTargetNames[0]]
-        let targetsByBundle: (PBXProductType) -> [PBXNativeTarget] = { type in
-            targets.filter { $0.productType == type }.filter { schemeTargets.contains($0.name) }
+        // A scheme may also test unit test bundles, which Mendoza ignores.
+        let uitestTargets = targets.filter { $0.productType == .uiTestBundle && testableTargetNames.contains($0.name) }
+        let buildTargets = targets.filter { $0.productType == .application && $0.name == runTargetName }
+
+        guard uitestTargets.count == 1 else {
+            throw Error("Expecting 1 uitest target in scheme \(name), found \(uitestTargets.count) among its testables: \(testableTargetNames.joined(separator: ", "))")
         }
-
-        let uitestTargets = targetsByBundle(.uiTestBundle)
-        let buildTargets = targetsByBundle(.application)
-
-        guard uitestTargets.count == 1 else { throw Error("Expecting 1 uitest target in scheme \(name), found \(uitestTargets.count)") }
         guard buildTargets.count == 1 else { throw Error("Expecting 1 application target in scheme \(name), found \(buildTargets.count)") }
 
         return (build: buildTargets.first!, test: uitestTargets.first!) // swiftlint:disable:this force_unwrapping
@@ -181,16 +176,24 @@ class XcodeProject: NSObject {
     func getBuildSDK(scheme: String) throws -> SDK {
         let (buildTarget, _) = try getTargetsInScheme(scheme)
 
-        guard let buildProject = project.pbxproj.projects.first(where: { project in project.targets.map(\.name).contains(buildTarget.name) }) else {
-            throw Error("Failed to extract build project")
-        }
+        // Target settings override the project's, and rules_xcodeproj only sets SDKROOT on targets.
+        let rawSdk: String
+        if let targetSdk = buildTarget.buildConfigurationList?.buildConfigurations.first?.buildSettings["SDKROOT"] as? String {
+            rawSdk = targetSdk
+        } else {
+            guard let buildProject = project.pbxproj.projects.first(where: { project in project.targets.map(\.name).contains(buildTarget.name) }) else {
+                throw Error("Failed to extract build project")
+            }
 
-        guard let buildConfiguration = buildProject.buildConfigurationList?.buildConfigurations.first else {
-            throw Error("No build configuration found in \(buildProject.uuid)")
-        }
+            guard let buildConfiguration = buildProject.buildConfigurationList?.buildConfigurations.first else {
+                throw Error("No build configuration found in \(buildProject.uuid)")
+            }
 
-        guard let rawSdk = buildConfiguration.buildSettings["SDKROOT"] as? String else {
-            throw Error("No SDKROOT in \(buildConfiguration.uuid)")
+            guard let projectSdk = buildConfiguration.buildSettings["SDKROOT"] as? String else {
+                throw Error("No SDKROOT in \(buildConfiguration.uuid)")
+            }
+
+            rawSdk = projectSdk
         }
 
         guard let sdk = SDK(rawValue: rawSdk) else {

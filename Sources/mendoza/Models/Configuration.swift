@@ -21,18 +21,20 @@ struct Configuration: Codable {
 
 extension Configuration {
     struct Building: Codable {
-        let projectPath: String // .xcworkspace or .xcodeproj
+        let projectPath: String // .xcworkspace or .xcodeproj, or the Bazel workspace
+        let bazel: Bazel?
         let buildBundleIdentifier: String
         let testBundleIdentifier: String
-        let scheme: String
+        let scheme: String // For Bazel builds, the UI test module, which names the .xctestrun
         let buildConfiguration: String
         let sdk: String
         let settings: Settings // Using defaults should work for the time being
         let filePatterns: FilePatterns
         let xcodeBuildNumber: String?
 
-        init(projectPath: String, buildBundleIdentifier: String, testBundleIdentifier: String, scheme: String, buildConfiguration: String, sdk: String, settings: Settings = Settings(), filePatterns: FilePatterns, xcodeBuildNumber: String?) {
+        init(projectPath: String, bazel: Bazel? = nil, buildBundleIdentifier: String, testBundleIdentifier: String, scheme: String, buildConfiguration: String, sdk: String, settings: Settings = Settings(), filePatterns: FilePatterns, xcodeBuildNumber: String?) {
             self.projectPath = projectPath
+            self.bazel = bazel
             self.buildBundleIdentifier = buildBundleIdentifier
             self.testBundleIdentifier = testBundleIdentifier
             self.scheme = scheme
@@ -61,7 +63,6 @@ extension Configuration {
         let maximumTestExecutionTime: Int?
         let failingTestsRetryCount: Int?
         let xcresultBlobThresholdKB: Int?
-        let killSimulatorProcesses: Bool
         let alwaysRebootSimulators: Bool
         let autodeleteSlowDevices: Bool
         let codeCoveragePathEquivalence: String?
@@ -75,6 +76,11 @@ extension Configuration {
 }
 
 extension Configuration.Building {
+    struct Bazel: Codable {
+        let target: String
+        let configs: [String]
+    }
+
     struct Settings: Codable {
         let buildSettings: String
         let onlyActiveArchitecture: String

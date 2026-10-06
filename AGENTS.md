@@ -65,9 +65,10 @@ mendoza plugin describe TearDownPlugin
 
 # Documentation Conventions
 
-## `README.md` documents current behaviour
+## `README.md` and `docs/` document current behaviour
 
-The README describes how Mendoza behaves **now**, and every section must stand on its own.
+The README and the guides in `docs/` describe how Mendoza behaves **now**, and every section
+must stand on its own.
 Do not write anything whose meaning depends on the reader knowing an earlier version:
 
 - no "X is no longer Y", "X used to Z", "the previous default was W"
@@ -88,11 +89,11 @@ Nothing is set by default, so your project's own build configuration is honoured
 ```
 
 Documenting a mechanic a user can trip over is reference material, not a delta, and belongs
-in the README — for example "if you pass the individual Watch services without
+in the docs — for example "if you pass the individual Watch services without
 `nanoregistrylaunchd`, every run pays an extra simulator reboot". The test is whether
 understanding the sentence requires knowing an older Mendoza.
 
-The existing `# Migrating to 27.0.0` section is a deliberate exception carrying the plugin
+`docs/migrating-to-27.0.0.md` is a deliberate exception carrying the plugin
 system rewrite, a breaking change to a documented public contract. It is not licence to log
 every behaviour change there; an undocumented internal default has no prior contract to
 migrate from.
@@ -122,9 +123,9 @@ exists elsewhere.
 
 ## Keep docs in sync with the catalogs they mirror
 
-Several README tables restate values defined in code — most notably the simulator service
-groups in `Sources/mendoza/Models/SimulatorService.swift`, mirrored in the README's
-`--disable_sim_services` table and in `docs/ios27-simulator-services.md`. Editing a group
+Several doc tables restate values defined in code — most notably the simulator service
+groups in `Sources/mendoza/Models/SimulatorService.swift`, mirrored in
+`docs/simulator-services.md` and in `docs/ios27-simulator-services.md`. Editing a group
 means editing the matching table in the same change, otherwise the docs go stale without any
 test failing.
 
@@ -142,6 +143,7 @@ Sources/mendoza/
 │   ├── Simulator/         # Simulator service and window subcommands
 │   ├── Plugins/           # `plugin describe` and plugin type listing
 │   └── Mendoza/           # Root command wiring
+├── Bazel/                 # Bazel workspace queries and test product assembly
 ├── Executer/              # Command execution abstraction
 │   ├── Executer.swift     # Protocol definition
 │   ├── LocalExecuter.swift
@@ -213,6 +215,10 @@ protocol Executer: AnyObject {
 - `LocalExecuter`: Uses Foundation's `Process` for shell commands
 - `RemoteExecuter`: Uses libssh2 (Shout wrapper) for SSH/SFTP
 
+`LocalExecuter` runs commands through the user's shell, zsh on macOS, and merges stderr into the
+captured output. Avoid names zsh reserves in inline scripts (`status` is read-only), and redirect
+stderr when parsing a command's stdout.
+
 ### 3. ConnectionPool<T> (`Executer/ConnectionPool.swift`)
 
 Generic pool for parallel execution across nodes:
@@ -257,12 +263,10 @@ InitialSetupOperation
 ├── MacOsValidationOperation (cancelled for iOS)
 └── LocalSetupOperation
         ↓
-    ├── CompileOperation → DistributeTestBundleOperation
+    ├── XcodebuildCompileOperation / BazelCompileOperation → DistributeTestBundleOperation
     └── TestExtractionOperation → TestSortingOperation
                                         ↓
 SimulatorSetupOperation ────────────────┤
-        ↓                               │
-ProcessKillerOperation (optional)       │
                                         ↓
                             TestRunnerOperation
                                     ↓
@@ -348,6 +352,26 @@ Each writer reports whether it changed anything, and those results feed a single
 1. Collects `.profdata` and `.xcresult` files from all nodes via rsync
 2. **Batch merging**: Splits xcresults into ~50-result batches, merges in parallel
 3. Final merge using `xcrun xcresulttool merge`
+
+## Bazel Builds
+
+`--bazel_target` swaps `XcodebuildCompileOperation` for `BazelCompileOperation`; nothing else in
+the pipeline knows how the app was built. The contract between the two halves is the
+`Build/Products` folder: the app, `<TestBundle>-Runner.app` and a `<scheme>*.xctestrun`, where
+`scheme` holds the UI test module in Bazel mode.
+
+- Metadata that `XcodeProject` reads for Xcode builds (bundle identifiers, test sources, module
+  name) comes from `bazel query`/`cquery` (`Bazel/BazelWorkspace.swift`). Every command that
+  analyzes must use the build's exact `--config` values: Bazel discards its analysis cache when
+  build options change between invocations.
+- Bazel produces no runner and no `.xctestrun`, so `BazelTestProducts` assembles them the way
+  rules_apple's `ios_xctestrun_runner` does. Two `.xctestrun` keys are required for coverage:
+  `CodeCoverageBuildableInfos` (without it no profile data is written) and
+  `ClangProfileDataDirectoryPath` (without it xcodebuild refuses `-enableCodeCoverage`). The
+  latter is `Path.logs`: xcodebuild writes into a subfolder named after the simulator's
+  identifier, which is the per-runner folder `TestCaseExecutor` collects coverage from.
+- Bazel outputs are read-only. Copies must be made writable or the next session's `rm -rf` of
+  `Path.base` fails.
 
 ## Simulator Service Slimming
 

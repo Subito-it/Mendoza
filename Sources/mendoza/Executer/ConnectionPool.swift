@@ -24,15 +24,19 @@ class ConnectionPool<SourceValue> {
     var endIntervals = [String: TimeInterval]()
 
     private let sources: [Source<SourceValue>]
+    private let makeExecuter: (Source<SourceValue>) throws -> Executer
     private let syncQueue = DispatchQueue(label: String(describing: ConnectionPool.self))
     private var executers = [Executer]()
     private let operationQueue = ThreadQueue()
 
-    init(sources: [Source<SourceValue>]) {
+    init(sources: [Source<SourceValue>], makeExecuter: @escaping (Source<SourceValue>) throws -> Executer = { try $0.node.makeExecuter(logger: $0.logger, environment: $0.environment) }) {
         self.sources = sources
+        self.makeExecuter = makeExecuter
     }
 
-    func execute(block: @escaping (_ executer: Executer, _ source: Source<SourceValue>) throws -> Void) throws {
+    /// - Parameter sourceDidExit: called once per source when it is done, including when its
+    ///   connection could not be established and `block` never ran for it
+    func execute(block: @escaping (_ executer: Executer, _ source: Source<SourceValue>) throws -> Void, sourceDidExit: ((Source<SourceValue>) -> Void)? = nil) throws {
         var errors = [Swift.Error]()
 
         for source in sources {
@@ -41,9 +45,10 @@ class ConnectionPool<SourceValue> {
 
                 self.syncQueue.sync { [unowned self] in self.startIntervals[source.node.address] = CFAbsoluteTimeGetCurrent() }
                 defer { self.syncQueue.sync { [unowned self] in self.endIntervals[source.node.address] = CFAbsoluteTimeGetCurrent() } }
+                defer { sourceDidExit?(source) }
 
                 do {
-                    let executer = try source.node.makeExecuter(logger: source.logger, environment: source.environment)
+                    let executer = try self.makeExecuter(source)
                     self.syncQueue.sync { [unowned self] in self.executers.append(executer) }
 
                     try block(executer, source)

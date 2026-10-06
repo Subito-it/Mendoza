@@ -1,5 +1,5 @@
 //
-//  CompileOperation.swift
+//  XcodebuildCompileOperation.swift
 //  Mendoza
 //
 //  Created by Tomas Camin on 17/01/2019.
@@ -7,7 +7,7 @@
 
 import Foundation
 
-class CompileOperation: BaseOperation<AppInfo> {
+class XcodebuildCompileOperation: BaseOperation<AppInfo> {
     private let building: Configuration.Building
     private let git: GitStatus?
     private let baseUrl: URL
@@ -64,18 +64,7 @@ class CompileOperation: BaseOperation<AppInfo> {
                                              git: self.git))
                 }
 
-                var appSize: UInt64 = 0
-                var dynamicFrameworkCount = 0
-                if let executablePath = try? findExecutablePath(executer: executer, buildBundleIdentifier: building.buildBundleIdentifier) {
-                    let executableUrl = URL(fileURLWithPath: executablePath)
-                    let appUrl = executableUrl.deletingLastPathComponent()
-                    appSize = (try? folderSize(appUrl.path)) ?? 0
-                    let dynamicFrameworkUrl = appUrl.appendingPathComponent("Frameworks")
-                    let dirContents = try? FileManager.default.contentsOfDirectory(atPath: dynamicFrameworkUrl.path)
-                    dynamicFrameworkCount = dirContents?.filter { $0.hasSuffix(".framework") }.count ?? 0
-                }
-
-                didEnd?(AppInfo(size: appSize, dynamicFrameworkCount: dynamicFrameworkCount))
+                didEnd?(AppInfo.measure(executer: executer, buildBundleIdentifier: building.buildBundleIdentifier))
             }
 
             let command: String
@@ -129,32 +118,5 @@ class CompileOperation: BaseOperation<AppInfo> {
     private func clearDerivedData(executer: Executer) {
         _ = try? executer.execute("rm -rf '\(Path.build.rawValue)'")
         print("💣 Compilation did fail, clearing derived data".red)
-    }
-
-    private func folderSize(_ path: String) throws -> UInt64 {
-        let contents = try FileManager.default.contentsOfDirectory(atPath: path)
-
-        var totalSize: UInt64 = 0
-        for content in contents {
-            do {
-                let fullContentPath = path + "/" + content
-                let attributes = try FileManager.default.attributesOfItem(atPath: fullContentPath)
-
-                guard let contentType = attributes[.type] as? FileAttributeType else { continue }
-
-                switch contentType {
-                case .typeRegular:
-                    totalSize += attributes[.size] as? UInt64 ?? 0
-                case .typeDirectory:
-                    totalSize += try folderSize(fullContentPath)
-                default:
-                    continue
-                }
-            } catch _ {
-                continue
-            }
-        }
-
-        return totalSize
     }
 }

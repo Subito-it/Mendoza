@@ -52,11 +52,11 @@ class TestExecuter {
     }
 
     private var testCaseStartTimeInterval: TimeInterval = 0
-    private var previewCompletionBlock: ((TestCaseResult) -> Void)?
+    private var previewCompletionBlock: ((TestCaseResult, _ didStartTest: Bool) -> Void)?
 
     /// True once the test method actually started executing (a `Test Case ... started` line was
     /// parsed). Distinguishes a genuine test failure from a simulator-level launch failure where
-    /// the test never ran. Only valid to read after `launch(...)` returns.
+    /// the test never ran. Final once a preview has been delivered or `launch(...)` has returned.
     var didStartTest: Bool {
         testCaseStartTimeInterval > 0
     }
@@ -104,9 +104,9 @@ class TestExecuter {
     /// From the console output at t = A we know that the last test of SIM2 failed and we pass that information to the previewCompletionBlock to the `previewCompletionBlock`
     /// which allows to reenconde the failing test without having to wait for the entire xcodebuild process to compleete
     ///
-    /// - Parameter previewCompletionBlock: a preview of the test case result as soon as the information is extracted from the console output which can occur well before  the xcodebuild process is completed
+    /// - Parameter previewCompletionBlock: a preview of the test case result, and whether the test method started, as soon as the information is extracted from the console output which can occur well before  the xcodebuild process is completed
     /// - Returns: the console output and the full test case result
-    func launch(previewCompletionBlock: @escaping (TestCaseResult) -> Void) throws -> (output: String, testResult: TestCaseResult) {
+    func launch(previewCompletionBlock: @escaping (TestCaseResult, _ didStartTest: Bool) -> Void) throws -> (output: String, testResult: TestCaseResult) {
         self.previewCompletionBlock = previewCompletionBlock
 
         var output = ""
@@ -134,7 +134,7 @@ class TestExecuter {
             let endInterval: TimeInterval = startInterval
 
             testResult = TestCaseResult(node: node.address, runnerName: testRunner.name, runnerIdentifier: testRunner.id, xcResultPath: "", suite: testCase.suite, name: testCase.name, status: .failed, startInterval: startInterval, endInterval: endInterval, averageStdOutIdleTime: nil, maxStdOutIdleTime: nil)
-            previewCompletionBlock(testResult!)
+            previewCompletionBlock(testResult!, didStartTest)
         }
 
         return (output: output, testResult: testResult!)
@@ -250,8 +250,10 @@ extension TestExecuter {
                     let idleTimes = self.stdOutIdleTimes
                     let avgIdleTime = idleTimes.isEmpty ? nil : idleTimes.reduce(0, +) / Double(idleTimes.count)
                     let maxIdleTime = idleTimes.max()
-                    let result = TestCaseResult(node: self.node.address, runnerName: self.testRunner.name, runnerIdentifier: self.testRunner.id, xcResultPath: "-", suite: self.testCase.suite, name: self.testCase.name, status: .passed, startInterval: testCaseStartTimeInterval, endInterval: CFAbsoluteTimeGetCurrent(), averageStdOutIdleTime: avgIdleTime, maxStdOutIdleTime: maxIdleTime)
-                    previewCompletionBlock?(result); previewCompletionBlock = nil // call preview at most once
+                    let endInterval = CFAbsoluteTimeGetCurrent()
+                    let startInterval = didStartTest ? testCaseStartTimeInterval : endInterval
+                    let result = TestCaseResult(node: self.node.address, runnerName: self.testRunner.name, runnerIdentifier: self.testRunner.id, xcResultPath: "-", suite: self.testCase.suite, name: self.testCase.name, status: .passed, startInterval: startInterval, endInterval: endInterval, averageStdOutIdleTime: avgIdleTime, maxStdOutIdleTime: maxIdleTime)
+                    previewCompletionBlock?(result, didStartTest); previewCompletionBlock = nil // call preview at most once
 
                     testCaseResult = result
                 case .testFailed, .testCrashed, .testTimedOut:
@@ -260,8 +262,12 @@ extension TestExecuter {
                     let idleTimes = self.stdOutIdleTimes
                     let avgIdleTime = idleTimes.isEmpty ? nil : idleTimes.reduce(0, +) / Double(idleTimes.count)
                     let maxIdleTime = idleTimes.max()
-                    let result = TestCaseResult(node: self.node.address, runnerName: self.testRunner.name, runnerIdentifier: self.testRunner.id, xcResultPath: "-", suite: self.testCase.suite, name: self.testCase.name, status: .failed, startInterval: testCaseStartTimeInterval, endInterval: CFAbsoluteTimeGetCurrent(), averageStdOutIdleTime: avgIdleTime, maxStdOutIdleTime: maxIdleTime)
-                    previewCompletionBlock?(result); previewCompletionBlock = nil // call preview at most once
+                    // A failure reported before the test method started (e.g. "Testing failed:" after a
+                    // runner launch failure) has no start time; report it as instantaneous.
+                    let endInterval = CFAbsoluteTimeGetCurrent()
+                    let startInterval = didStartTest ? testCaseStartTimeInterval : endInterval
+                    let result = TestCaseResult(node: self.node.address, runnerName: self.testRunner.name, runnerIdentifier: self.testRunner.id, xcResultPath: "-", suite: self.testCase.suite, name: self.testCase.name, status: .failed, startInterval: startInterval, endInterval: endInterval, averageStdOutIdleTime: avgIdleTime, maxStdOutIdleTime: maxIdleTime)
+                    previewCompletionBlock?(result, didStartTest); previewCompletionBlock = nil // call preview at most once
 
                     testCaseResult = result
                 case .noSpaceOnDevice:
@@ -272,15 +278,16 @@ extension TestExecuter {
             partialProgress = lines.last ?? ""
         }
 
-        var output = try executer.execute(testWithoutBuilding, progress: progressHandler) { _, originalError in
+        let output = try executer.execute(testWithoutBuilding, progress: progressHandler) { _, originalError in
             if !self.shouldIgnoreTestExecutionError(originalError) {
                 throw originalError
             }
         }
 
-        // It should be rare but it may happen that stdout content is not processed by the progressHandler
-        output = (output.trimmingCharacters(in: .whitespacesAndNewlines)).replacingOccurrences(of: parsedProgress.trimmingCharacters(in: .whitespacesAndNewlines), with: "") + "\n"
-        progressHandler(output)
+        // It should be rare but it may happen that stdout content is not processed by the progressHandler.
+        // Only that remainder is fed to the parser; the full output is returned for failure analysis.
+        let unprocessedOutput = (output.trimmingCharacters(in: .whitespacesAndNewlines)).replacingOccurrences(of: parsedProgress.trimmingCharacters(in: .whitespacesAndNewlines), with: "") + "\n"
+        progressHandler(unprocessedOutput)
 
         return (output: output, testCaseResult: testCaseResult)
     }

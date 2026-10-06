@@ -174,12 +174,47 @@ extension CommandLineProxy {
                 let deviceIdentifier = "com.apple.CoreSimulator.SimDeviceType." + captureGroups[0]
                 let runtimeIdentifier = "com.apple.CoreSimulator.SimRuntime.iOS-" + device.runtime.replacingOccurrences(of: ".", with: "-")
 
+                try verifyRuntime(runtimeIdentifier, supports: deviceIdentifier, device: device)
+
                 let simulatorIdentifier = try executer.execute("xcrun simctl create '\(name)' \(deviceIdentifier) \(runtimeIdentifier) 2>/dev/null")
 
                 return Simulator(id: simulatorIdentifier, name: name, device: device)
             }
 
             throw Error("Failed making Simulator", logger: executer.logger)
+        }
+
+        /// Runtimes shipped for newly released hardware (e.g. iOS 27.1 build 24A94401, iPhone Duo only)
+        /// declare `restrictedToDeviceTypes`, making `simctl create` fail with "Incompatible device"
+        /// for every other device type even though the runtime identifier matches.
+        private func verifyRuntime(_ runtimeIdentifier: String, supports deviceIdentifier: String, device: Device) throws {
+            struct RuntimeList: Decodable {
+                struct Runtime: Decodable {
+                    struct DeviceType: Decodable {
+                        let identifier: String
+                        let name: String
+                    }
+
+                    let identifier: String
+                    let buildversion: String
+                    let supportedDeviceTypes: [DeviceType]?
+                }
+
+                let runtimes: [Runtime]
+            }
+
+            let json = try executer.execute("xcrun simctl list runtimes -j 2>/dev/null")
+            let runtimes = try JSONDecoder().decode(RuntimeList.self, from: Data(json.utf8)).runtimes.filter { $0.identifier == runtimeIdentifier }
+
+            guard !runtimes.isEmpty, !runtimes.contains(where: { $0.supportedDeviceTypes?.contains { $0.identifier == deviceIdentifier } ?? true }) else {
+                return
+            }
+
+            let installed = runtimes
+                .map { "\($0.buildversion) (supports: \(($0.supportedDeviceTypes ?? []).map(\.name).joined(separator: ", ")))" }
+                .joined(separator: "; ")
+
+            throw Error("iOS \(device.runtime) runtime on node \(executer.address) does not support \(device.name). Installed builds: \(installed). Install the general purpose runtime with `xcodebuild -downloadPlatform iOS -buildVersion \(device.runtime)`", logger: executer.logger)
         }
 
         func installedSimulators(cachedSimulatorStatus: String? = nil) throws -> [Simulator] {

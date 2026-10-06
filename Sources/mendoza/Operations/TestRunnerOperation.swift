@@ -9,7 +9,7 @@ import Foundation
 
 class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
     var sortedTestCases: [TestCase]?
-    var testRunners: [(testRunner: TestRunner, node: Node, idle: Bool)]?
+    var testRunners: [(testRunner: TestRunner, node: Node)]?
 
     private let configuration: Configuration
 
@@ -17,47 +17,27 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
     private var testCasesCount = 0
     private var testCasesCompletedCount = 0
 
-    private lazy var testQueue: TestQueue = .init(
-        testCases: sortedTestCases ?? [],
-        maxRetryCount: configuration.testing.failingTestsRetryCount ?? 0
-    )
-
     private let resultHandler: TestResultHandler
     private let testCaseExecutor: TestCaseExecutor
     private let simulatorRecovery: SimulatorRecovery
     private let diagnosticReporter: DiagnosticReporter
 
-    /// A simulator that fails to launch the test runner (e.g. "Application failed preflight checks")
-    /// is wedged at the host level and keeps failing every test routed to it. When that happens we
-    /// quarantine the runner: shut its simulator down and stop pulling tests onto it. After a cooldown
-    /// it is fully cycled (shutdown -> boot) and rejoins. Keyed by the runner's stable index in
-    /// `testRunners` rather than testRunner.id, which is not guaranteed unique (an empty or
-    /// duplicate id would let two runners alias the same dictionary entry). Value is the quarantine
-    /// start time (CFAbsoluteTime).
-    private var quarantinedRunners = [Int: TimeInterval]()
-    /// Runners that left the execution loop, by index in `testRunners`. A runner whose test throws
-    /// exits early while the others keep going, and it will never dequeue again: retry exclusions
-    /// must not wait on it.
-    private var exitedRunners = Set<Int>()
-    private let quarantineCooldown: TimeInterval = 120
     /// Bounded so the per-test result transfers don't open an unbounded burst of
     /// SSH connections to the single result destination, which can exceed its sshd
     /// MaxStartups limit and cause transfers to be silently dropped.
     private let postExecutionQueue = ThreadQueue(maxConcurrentOperations: 8)
 
     private lazy var pool: ConnectionPool<(index: Int, testRunner: TestRunner)> = {
-        guard let sortedTestCases = sortedTestCases else { fatalError("💣 Required field `distributedTestCases` not set") }
         guard let testRunners = testRunners else { fatalError("💣 Required field `testRunner` not set") }
 
-        // Each source carries the index of its runner in `testRunners`, assigned once here. Every
-        // read/write of the runner's `idle` flag keys off this index instead of matching on
-        // (id, name), which is not guaranteed unique across nodes (simulator names repeat per node,
-        // and a wedged simulator can have an empty id). A mismatched lookup would leave a runner
-        // stuck at idle=false forever, so the `allRunnersIdle` completion barrier could never
-        // release and every runner thread would spin in `.waitingCompletion`.
-        let input = zip(testRunners, sortedTestCases).enumerated()
-        return makeConnectionPool(sources: input.map { offset, pair in
-            (node: pair.0.node, value: (index: offset, testRunner: pair.0.testRunner))
+        // Each source carries the index of its runner in `testRunners`, which is how the scheduler
+        // identifies runners. Matching on (id, name) instead is not safe: simulator names repeat per
+        // node, and a wedged simulator can have an empty id.
+        //
+        // Every runner gets a worker, even with fewer tests than runners: the scheduler expects
+        // every runner it knows of to poll it.
+        return makeConnectionPool(sources: testRunners.enumerated().map { offset, runner in
+            (node: runner.node, value: (index: offset, testRunner: runner.testRunner))
         })
     }()
 
@@ -128,23 +108,18 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                 return
             }
 
-            try pool.execute { [weak self] executer, source in
+            let scheduler = TestScheduler(testCases: sortedTestCases ?? [],
+                                          runnerNodes: testRunners?.map(\.node) ?? [],
+                                          maxRetryCount: configuration.testing.failingTestsRetryCount ?? 0)
+
+            try pool.execute(block: { [weak self] executer, source in
                 guard let self = self else { return }
 
                 let runnerIndex = source.value.index
                 let testRunner = source.value.testRunner
 
-                defer {
-                    self.syncQueue.sync {
-                        self.testRunners?[runnerIndex].idle = true
-                        self.exitedRunners.insert(runnerIndex)
-                    }
-                }
-
                 while true {
-                    let state = self.determineRunnerState(runnerIndex: runnerIndex, testRunner: testRunner)
-
-                    switch state {
+                    switch scheduler.nextState(for: runnerIndex) {
                     case .allRunnersCompleted:
                         return
                     case .waitingCompletion, .quarantinedWaiting:
@@ -152,7 +127,8 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                         continue
                     case .recover:
                         self.simulatorRecovery.boot(executer: executer, testRunner: testRunner)
-                        self.endQuarantine(for: testRunner, runnerIndex: runnerIndex, node: source.node)
+                        scheduler.endQuarantine(runnerIndex)
+                        print("🚧 Recovered runner \(testRunner.name) on \(source.node.address), resuming test execution {\(runnerIndex)}".green)
                         continue
                     case let .execute(testCase):
                         let outcome = try self.testCaseExecutor.execute(
@@ -161,8 +137,8 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                             node: source.node,
                             testRunner: testRunner,
                             runnerIndex: runnerIndex,
-                            previewHandler: { [weak self] previewResult in
-                                self?.handleTestCaseResultPreview(previewResult, testCase: testCase, runnerIndex: runnerIndex)
+                            previewHandler: { [weak self] previewResult, didStartTest in
+                                self?.handleTestCaseResultPreview(previewResult, didStartTest: didStartTest, testCase: testCase, runnerIndex: runnerIndex, scheduler: scheduler)
                             }
                         )
 
@@ -171,13 +147,22 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                         }
 
                         if outcome.requiresQuarantine {
-                            self.beginQuarantine(for: testRunner, runnerIndex: runnerIndex, node: source.node, executer: executer)
+                            // Take the wedged simulator out of rotation and shut it down. The boot is
+                            // deferred to the recovery step after the cooldown, by which point the
+                            // shutdown has completed.
+                            self.simulatorRecovery.forceReset(executer: executer, testRunner: testRunner)
+                            scheduler.beginQuarantine(runnerIndex)
+                            print("🚧 Quarantined runner \(testRunner.name) on \(source.node.address) after simulator launch failure {\(runnerIndex)}".yellow)
                         }
                     }
                 }
 
                 try self.diagnosticReporter.copyDiagnosticReports(executer: executer, testRunner: testRunner)
-            }
+            }, sourceDidExit: { source in
+                // Also reached when the runner's connection fails, before any of the above runs: the
+                // scheduler would otherwise keep waiting for a runner that will never poll it.
+                scheduler.runnerExited(source.value.index)
+            })
 
             postExecutionQueue.waitUntilAllOperationsAreFinished()
 
@@ -196,84 +181,7 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
 
     // MARK: - Private
 
-    private enum State {
-        case execute(TestCase)
-        case waitingCompletion
-        case quarantinedWaiting
-        case recover
-        case allRunnersCompleted
-    }
-
-    private func determineRunnerState(runnerIndex: Int, testRunner: TestRunner) -> State {
-        syncQueue.sync {
-            // A quarantined runner is idle, so completion can only be declared once the queue is
-            // also drained. Otherwise, if every runner were quarantined while tests remain, the
-            // run would terminate and silently drop the pending tests.
-            let queueEmpty = testQueue.count == 0
-            let allRunnersIdle = testRunners?.allSatisfy(\.idle) == true
-            if queueEmpty, allRunnersIdle {
-                return .allRunnersCompleted
-            }
-
-            if let quarantineStart = quarantinedRunners[runnerIndex] {
-                let elapsed = CFAbsoluteTimeGetCurrent() - quarantineStart
-                return elapsed >= quarantineCooldown ? .recover : .quarantinedWaiting
-            }
-
-            if let testCase = testQueue.dequeue(for: runnerIndex) {
-                testRunners?[runnerIndex].idle = false
-                return .execute(testCase)
-            }
-
-            // Every queued test case is excluded on this runner's node. If no runner that could
-            // still pick one up is available, nothing will ever dequeue them and all threads would
-            // spin in `.waitingCompletion`, so honor the exclusion only while such a runner exists.
-            if !queueEmpty, !hasRunnerAvailableForQueuedTestCases(excluding: runnerIndex), let testCase = testQueue.dequeueIgnoringExclusions() {
-                testRunners?[runnerIndex].idle = false
-                return .execute(testCase)
-            }
-
-            testRunners?[runnerIndex].idle = true
-            return .waitingCompletion
-        }
-    }
-
-    /// Must be called while holding `syncQueue`. `TestQueue` has its own lock, so querying it here is safe.
-    private func hasRunnerAvailableForQueuedTestCases(excluding runnerIndex: Int) -> Bool {
-        // Busy and quarantined runners count as available: both return for more work later. Runners
-        // that left the loop do not.
-        let otherRunnerIndexes = (testRunners?.indices ?? (0 ..< 0)).filter { $0 != runnerIndex && !exitedRunners.contains($0) }
-        return testQueue.containsTestCase(eligibleForAnyOf: Array(otherRunnerIndexes))
-    }
-
-    private func runnerIndexes(onNodeOf runnerIndex: Int) -> Set<Int> {
-        guard let testRunners = testRunners, testRunners.indices.contains(runnerIndex) else { return [runnerIndex] }
-        let node = testRunners[runnerIndex].node
-        return Set(testRunners.indices.filter { testRunners[$0].node == node })
-    }
-
-    private func beginQuarantine(for testRunner: TestRunner, runnerIndex: Int, node: Node, executer: Executer) {
-        // Take the wedged simulator out of rotation and shut it down. The boot is deferred to the
-        // recovery step after the cooldown, by which point the shutdown has completed.
-        simulatorRecovery.forceReset(executer: executer, testRunner: testRunner)
-
-        syncQueue.sync {
-            quarantinedRunners[runnerIndex] = CFAbsoluteTimeGetCurrent()
-            testRunners?[runnerIndex].idle = true
-        }
-
-        print("🚧 Quarantined runner \(testRunner.name) on \(node.address) after simulator launch failure {\(runnerIndex)}".yellow)
-    }
-
-    private func endQuarantine(for testRunner: TestRunner, runnerIndex: Int, node: Node) {
-        syncQueue.sync {
-            quarantinedRunners[runnerIndex] = nil
-        }
-
-        print("🚧 Recovered runner \(testRunner.name) on \(node.address), resuming test execution {\(runnerIndex)}".green)
-    }
-
-    private func handleTestCaseResultPreview(_ previewResult: TestCaseResult, testCase: TestCase, runnerIndex: Int) {
+    private func handleTestCaseResultPreview(_ previewResult: TestCaseResult, didStartTest: Bool, testCase: TestCase, runnerIndex: Int, scheduler: TestScheduler) {
         syncQueue.sync {
             testCasesCompletedCount += 1
 
@@ -282,15 +190,21 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                 testCase: testCase,
                 completedCount: testCasesCompletedCount,
                 totalCount: testCasesCount,
-                retryCount: testQueue.retryCount,
+                retryCount: scheduler.retryCount,
                 runnerIndex: runnerIndex
             )
 
-            if previewResult.status == .failed {
-                if testQueue.enqueueForRetry(testCase, excludedRunnerIndexes: runnerIndexes(onNodeOf: runnerIndex)) {
-                    testCasesCount += 1
-                    resultHandler.printRetryEnqueue(testCase, retryCount: testQueue.retryCount(for: testCase))
-                }
+            guard previewResult.status == .failed else { return }
+
+            switch scheduler.requeue(testCase, didStartTest: didStartTest, runnerIndex: runnerIndex) {
+            case let .relaunch(count):
+                testCasesCount += 1
+                resultHandler.printRelaunchEnqueue(testCase, relaunchCount: count)
+            case let .retry(count):
+                testCasesCount += 1
+                resultHandler.printRetryEnqueue(testCase, retryCount: count)
+            case nil:
+                break
             }
         }
     }

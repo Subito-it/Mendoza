@@ -36,29 +36,31 @@ class TestCommand: Command {
     let extractTestCoveredFiles = Flag(short: nil, long: "test_covered_files", help: "Extract list of files covered by each test to results/test_covered_files")
     let xcodeBuildNumber = Argument<String>(name: "number", kind: .named(short: nil, long: "xcode_buildnumber"), optional: true, help: "Build number of the Xcode version to use (e.g. 12E507)")
     let skipResultMerge = Flag(short: nil, long: "skip_result_merge", help: "Skip xcresult merge (keep one xcresult per test in the result folder)")
-    let clearDerivedDataOnCompilationFailure = Flag(short: nil, long: "clear_derived_data_on_failure", help: "On compilation failure derived data will be cleared and compilation will be retried once")
+    let clearDerivedDataOnCompilationFailure = Flag(short: nil, long: "clear_derived_data_on_failure", help: "[xcodebuild] On compilation failure derived data will be cleared and compilation will be retried once. Ignored with --bazel_target")
     let xcresultBlobThresholdKB = Argument<Int>(name: "size", kind: .named(short: nil, long: "xcresult_blob_threshold_kb"), optional: true, help: "Delete data blobs larger than the specified threshold")
     let excludeNodes = Argument<String>(name: "nodes", kind: .named(short: nil, long: "exclude_nodes"), optional: true, help: "Specify which nodes (by name or address) specified in the configuration should be excluded from the dispatch. Accepts comma separated values. Default: ''")
-    let killSimulatorProcesses = Flag(short: nil, long: "kill_sim_procs", help: "Automatically kill Simulator's CPU intensive processes, see https://github.com/biscuitehh/yeetd")
     let disabledSimulatorServices = Argument<String>(name: "services", kind: .named(short: nil, long: "disable_sim_services"), optional: true, help: "Comma separated list of simulator background services to disable to slim down memory usage. Accepts groups or individual services. Requires iOS 18+ (ignored with a warning on older runtimes). \(SimulatorServiceCatalog.helpDescription)")
     let keepBuildFolderOnFailure = Flag(short: nil, long: "keep_build_folder_on_failure", help: "Keep build folder on failure")
     let collectTestDiagnosticsOnFailure = Flag(short: nil, long: "collect_test_diagnostics_on_failure", help: "Collect verbose xcodebuild diagnostics (sysdiagnose, log archives) when a test fails. ⚠️ Significant performance regression: xcodebuild runs `simctl diagnose` with a 600s timeout after the test verdict is known, writing ~280MB into the .xcresult while the simulator stays out of rotation. Default: diagnostics collection is disabled")
 
-    let projectPath = Argument<URL>(name: "path", kind: .named(short: nil, long: "project"), optional: false, help: "The path to the .xcworkspace or .xcodeproj to build")
-    let scheme = Argument<String>(name: "name", kind: .named(short: nil, long: "scheme"), optional: false, help: "The scheme to build")
+    let projectPath = Argument<URL>(name: "path", kind: .named(short: nil, long: "project"), optional: true, help: "The path to the .xcworkspace or .xcodeproj to build. Required unless building with --bazel_target")
+    let scheme = Argument<String>(name: "name", kind: .named(short: nil, long: "scheme"), optional: true, help: "The scheme to build. Required unless building with --bazel_target")
+    let bazelTarget = Argument<String>(name: "label", kind: .named(short: nil, long: "bazel_target"), optional: true, help: "Build with Bazel instead of xcodebuild: the ios_ui_test target to run, e.g. //App:AppUITests. Run mendoza from inside the Bazel workspace. Replaces --project and --scheme")
+    let bazelConfigs = Argument<String>(name: "configs", kind: .named(short: nil, long: "bazel_config"), optional: true, help: "Comma separated Bazel configs (as in --config) applied to the build, e.g. ci,remote_cache. Pass the configs your other builds use to reuse their cache. Default: ''")
     let buildConfiguration = Argument<String>(name: "name", kind: .named(short: nil, long: "build_configuration"), optional: true, help: "Build configuration. Default: Debug")
     let buildSettings = Argument<String>(name: "settings", kind: .named(short: nil, long: "build_settings"), optional: true, help: "Additional build settings passed to xcodebuild, e.g. \"SWIFT_COMPILATION_MODE=wholemodule COMPILATION_CACHE_CAS_PATH=/path/to/cas\". These outrank the project's own settings, so only pass what you intend to override. Default: ''")
     let pluginsBasePath = Argument<URL>(name: "path", kind: .named(short: nil, long: "plugins_path"), optional: true, help: "The path to the folder containing Mendoza's plugins")
 
     func run() -> Bool {
         do {
-            let configuration = try makeConfiguration()
+            let (configuration, bazelTest) = try makeConfiguration()
 
             let pluginUrl = pluginsBasePath.value ?? remoteConfigurationUrl()
 
-            FileManager.default.changeCurrentDirectoryPath(URL(filePath: configuration.building.projectPath).deletingLastPathComponent().path)
+            let projectUrl = URL(filePath: configuration.building.projectPath)
+            FileManager.default.changeCurrentDirectoryPath(bazelTest == nil ? projectUrl.deletingLastPathComponent().path : projectUrl.path)
 
-            let test = try Test(configuration: configuration, pluginUrl: pluginUrl)
+            let test = try Test(configuration: configuration, pluginUrl: pluginUrl, bazelTest: bazelTest)
 
             test.didFail = { [weak self] in self?.handleError($0) }
             try test.run()
@@ -76,23 +78,62 @@ class TestCommand: Command {
         return true
     }
 
-    private func makeConfiguration() throws -> Configuration {
+    private func makeConfiguration() throws -> (Configuration, BazelUITest?) {
         if remoteNodesConfigurationPath.value?.path.isEmpty == true, localDestinationPath.value?.path.isEmpty == true {
             throw Error("Missing required arguments: `\(remoteNodesConfigurationPath.longDescription)=\(remoteNodesConfigurationPath.name)` or `\(localDestinationPath.longDescription)=\(localDestinationPath.name)`".red)
         } else if remoteNodesConfigurationPath.value?.path.isEmpty == localDestinationPath.value?.path.isEmpty {
             throw Error("Incompatible arguments: pass `\(remoteNodesConfigurationPath.longDescription)=\(remoteNodesConfigurationPath.name)` or `\(localDestinationPath.longDescription)=\(localDestinationPath.name)`".red)
         }
 
-        let projectUrl = projectPath.value!
-        let project = try XcodeProject(url: projectUrl)
-        let scheme = self.scheme.value!
-
+        let projectUrl: URL
+        let scheme: String
         let sdk: XcodeProject.SDK
-        if deviceName.value != nil {
+        let bundleIdentifiers: (build: String, test: String)
+        let bazel: Configuration.Building.Bazel?
+        let bazelTest: BazelUITest?
+
+        if let bazelTargetValue = bazelTarget.value {
+            let xcodeOnlyArguments = [projectPath.value == nil ? nil : projectPath.longDescription,
+                                      self.scheme.value == nil ? nil : self.scheme.longDescription,
+                                      buildConfiguration.value == nil ? nil : buildConfiguration.longDescription,
+                                      buildSettings.value == nil ? nil : buildSettings.longDescription].compactMap { $0 }
+            guard xcodeOnlyArguments.isEmpty else {
+                throw Error("Incompatible arguments: \(xcodeOnlyArguments.joined(separator: ", ")) only apply to xcodebuild builds, configure the Bazel build with `\(bazelConfigs.longDescription)`".red)
+            }
+
+            let configs = try parseBazelConfigs()
+            guard !bazelTargetValue.contains("'") else { throw Error("Invalid Bazel target \(bazelTargetValue)".red) }
+
+            let workspace = try BazelWorkspace.locate(directoryUrl: URL(filePath: FileManager.default.currentDirectoryPath), configs: configs, executer: LocalExecuter())
+            let test = try workspace.describeUITest(bazelTargetValue)
+            guard test.tests.platformType == "ios" else {
+                throw Error("Unsupported Bazel target \(test.label): only iOS UI tests are supported, got platform \(test.tests.platformType)".red)
+            }
+
+            projectUrl = workspace.url
+            scheme = test.moduleName
             sdk = .ios
+            bundleIdentifiers = (build: test.app.bundleIdentifier, test: test.tests.bundleIdentifier)
+            bazel = .init(target: test.label, configs: configs)
+            bazelTest = test
         } else {
-            sdk = try project.getBuildSDK(scheme: scheme)
+            guard let projectPathValue = projectPath.value, let schemeValue = self.scheme.value else {
+                throw Error("Missing required arguments `\(projectPath.longDescription)=\(projectPath.name)` and `\(self.scheme.longDescription)=\(self.scheme.name)`, or `\(bazelTarget.longDescription)=\(bazelTarget.name)` to build with Bazel".red)
+            }
+            guard bazelConfigs.value == nil else {
+                throw Error("Incompatible arguments: `\(bazelConfigs.longDescription)` requires `\(bazelTarget.longDescription)`".red)
+            }
+
+            let project = try XcodeProject(url: projectPathValue)
+
+            projectUrl = projectPathValue
+            scheme = schemeValue
+            sdk = deviceName.value != nil ? .ios : try project.getBuildSDK(scheme: schemeValue)
+            bundleIdentifiers = try project.getTargetsBundleIdentifiers(scheme: schemeValue)
+            bazel = nil
+            bazelTest = nil
         }
+
         let device: Device?
         switch sdk {
         case .ios:
@@ -109,7 +150,6 @@ class TestCommand: Command {
             device = nil
         }
 
-        let bundleIdentifiers = try project.getTargetsBundleIdentifiers(scheme: scheme)
         let buildConfiguration = self.buildConfiguration.value ?? "Debug"
         let xcodeBuildNumber = self.xcodeBuildNumber.value
 
@@ -117,12 +157,18 @@ class TestCommand: Command {
 
         let settings = Configuration.Building.Settings(buildSettings: buildSettings.value ?? "")
 
-        let building = Configuration.Building(projectPath: projectUrl.path, buildBundleIdentifier: bundleIdentifiers.build, testBundleIdentifier: bundleIdentifiers.test, scheme: scheme, buildConfiguration: buildConfiguration, sdk: sdk.rawValue, settings: settings, filePatterns: filePatterns, xcodeBuildNumber: xcodeBuildNumber)
+        let building = Configuration.Building(projectPath: projectUrl.path, bazel: bazel, buildBundleIdentifier: bundleIdentifiers.build, testBundleIdentifier: bundleIdentifiers.test, scheme: scheme, buildConfiguration: buildConfiguration, sdk: sdk.rawValue, settings: settings, filePatterns: filePatterns, xcodeBuildNumber: xcodeBuildNumber)
 
         if let codeCoveragePathEquivalenceValue = codeCoveragePathEquivalence.value {
             if codeCoveragePathEquivalenceValue.components(separatedBy: ",").count % 2 != 0 {
                 throw Error("Invalid format for \(codeCoveragePathEquivalence.longDescription) parameter, expecting \(codeCoveragePathEquivalence.longDescription)=<from>,<to> with even number of pairs".red)
             }
+        }
+
+        var clearDerivedData = clearDerivedDataOnCompilationFailure.value
+        if clearDerivedData, bazel != nil {
+            print("⚠️  \(clearDerivedDataOnCompilationFailure) is ignored when building with Bazel, which keeps its build state in its output base".yellow)
+            clearDerivedData = false
         }
 
         let disabledServices = disabledSimulatorServices.value?.components(separatedBy: ",").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty } ?? []
@@ -132,13 +178,12 @@ class TestCommand: Command {
                                             maximumTestExecutionTime: maximumTestExecutionTime.value,
                                             failingTestsRetryCount: failingTestsRetryCount.value,
                                             xcresultBlobThresholdKB: xcresultBlobThresholdKB.value,
-                                            killSimulatorProcesses: killSimulatorProcesses.value,
                                             alwaysRebootSimulators: alwaysRebootSimulators.value,
                                             autodeleteSlowDevices: autodeleteSlowDevices.value,
                                             codeCoveragePathEquivalence: codeCoveragePathEquivalence.value,
                                             extractIndividualTestCoverage: extractIndividualTestCoverage.value,
                                             extractTestCoveredFiles: extractTestCoveredFiles.value,
-                                            clearDerivedDataOnCompilationFailure: clearDerivedDataOnCompilationFailure.value,
+                                            clearDerivedDataOnCompilationFailure: clearDerivedData,
                                             skipResultMerge: skipResultMerge.value,
                                             disabledSimulatorServices: disabledServices,
                                             collectTestDiagnosticsOnFailure: collectTestDiagnosticsOnFailure.value)
@@ -173,7 +218,17 @@ class TestCommand: Command {
             throw Error("Missing required arguments `\(deviceName.longDescription)=\(deviceName.name)`, `\(deviceRuntime.longDescription)=\(deviceRuntime.name)`".red)
         }
 
-        return Configuration(building: building, testing: testing, device: device, plugins: plugins, resultDestination: resultDestination, nodes: nodes, verbose: verboseFlag.value)
+        return (Configuration(building: building, testing: testing, device: device, plugins: plugins, resultDestination: resultDestination, nodes: nodes, verbose: verboseFlag.value), bazelTest)
+    }
+
+    private func parseBazelConfigs() throws -> [String] {
+        let configs = bazelConfigs.value?.components(separatedBy: ",").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty } ?? []
+        let invalidConfigs = configs.filter { $0.range(of: #"^[A-Za-z0-9_.-]+$"#, options: .regularExpression) == nil }
+        guard invalidConfigs.isEmpty else {
+            throw Error("Invalid \(bazelConfigs.longDescription) values: \(invalidConfigs.joined(separator: ", "))".red)
+        }
+
+        return configs
     }
 
     private func remoteConfigurationUrl() -> URL? {

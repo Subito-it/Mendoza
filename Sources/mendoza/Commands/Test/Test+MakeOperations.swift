@@ -20,16 +20,27 @@ extension Test {
         }
 
         let gitBaseUrl = gitStatus.url
-        let project = try localProject(baseUrl: gitBaseUrl, path: configuration.building.projectPath)
-
         let uniqueNodes = configuration.nodes.unique()
-        let targets = try project.getTargetsInScheme(configuration.building.scheme)
-        let testTargetSourceFiles = try project.testTargetSourceFilePaths(scheme: configuration.building.scheme)
-
-        let productNames = project.getProductNames()
 
         let preCompilationPlugin = PreCompilationPlugin(baseUrl: pluginUrl, plugin: configuration.plugins)
         let postCompilationPlugin = PostCompilationPlugin(baseUrl: pluginUrl, plugin: configuration.plugins)
+
+        let testTarget: String
+        let testTargetSourceFiles: [String]
+        let productNames: [String]
+        let compileOperation: BaseOperation<AppInfo>
+        if let bazelTest {
+            testTarget = bazelTest.moduleName
+            testTargetSourceFiles = bazelTest.sourceFiles
+            productNames = [bazelTest.app.executableName, BazelTestProducts.runnerExecutableName]
+            compileOperation = BazelCompileOperation(test: bazelTest, building: configuration.building, git: gitStatus, requiresCoverage: configuration.testing.extractIndividualTestCoverage || configuration.testing.extractTestCoveredFiles, preCompilationPlugin: preCompilationPlugin, postCompilationPlugin: postCompilationPlugin)
+        } else {
+            let project = try localProject(baseUrl: gitBaseUrl, path: configuration.building.projectPath)
+            testTarget = try project.getTargetsInScheme(configuration.building.scheme).test.name
+            testTargetSourceFiles = try project.testTargetSourceFilePaths(scheme: configuration.building.scheme)
+            productNames = project.getProductNames()
+            compileOperation = XcodebuildCompileOperation(building: configuration.building, git: gitStatus, baseUrl: gitBaseUrl, project: project, scheme: configuration.building.scheme, preCompilationPlugin: preCompilationPlugin, postCompilationPlugin: postCompilationPlugin, clearDerivedDataOnCompilationFailure: clearDerivedDataOnCompilationFailure)
+        }
         let testExtractionPlugin = TestExtractionPlugin(baseUrl: pluginUrl, plugin: configuration.plugins)
         let testSortingPlugin = TestSortingPlugin(baseUrl: pluginUrl, plugin: configuration.plugins)
         let tearDownPlugin = TearDownPlugin(baseUrl: pluginUrl, plugin: configuration.plugins)
@@ -39,13 +50,11 @@ extension Test {
         let macOsValidationOperation = MacOsValidationOperation(nodes: configuration.nodes)
         let localSetupOperation = LocalSetupOperation(clearDerivedDataOnCompilationFailure: clearDerivedDataOnCompilationFailure)
         let remoteSetupOperation = RemoteSetupOperation(nodes: uniqueNodes)
-        let compileOperation = CompileOperation(building: configuration.building, git: gitStatus, baseUrl: gitBaseUrl, project: project, scheme: configuration.building.scheme, preCompilationPlugin: preCompilationPlugin, postCompilationPlugin: postCompilationPlugin, clearDerivedDataOnCompilationFailure: clearDerivedDataOnCompilationFailure)
         let testExtractionOperation = TestExtractionOperation(baseUrl: gitBaseUrl, testTargetSourceFiles: testTargetSourceFiles, filePatterns: filePatterns, device: device, plugin: testExtractionPlugin)
         let testSortingOperation = TestSortingOperation(device: device, plugin: testSortingPlugin, verbose: configuration.verbose)
         let simulatorSetupOperation = SimulatorSetupOperation(buildBundleIdentifier: configuration.building.buildBundleIdentifier, testBundleIdentifier: configuration.building.testBundleIdentifier, nodes: uniqueNodes, device: device, alwaysRebootSimulators: configuration.testing.alwaysRebootSimulators, disabledSimulatorServices: configuration.testing.disabledSimulatorServices, verbose: configuration.verbose)
-        let processKillerOperation = ProcessKillerOperation(nodes: uniqueNodes)
         let distributeTestBundleOperation = DistributeTestBundleOperation(nodes: uniqueNodes)
-        let testRunnerOperation = TestRunnerOperation(configuration: configuration, baseUrl: gitBaseUrl, destinationPath: resultDestinationPath, testTarget: targets.test.name, productNames: productNames)
+        let testRunnerOperation = TestRunnerOperation(configuration: configuration, baseUrl: gitBaseUrl, destinationPath: resultDestinationPath, testTarget: testTarget, productNames: productNames)
         let testCollectorOperation = TestCollectorOperation(configuration: configuration, destinationPath: resultDestinationPath, productNames: productNames)
 
         let codeCoverageCollectionOperation = CodeCoverageCollectionOperation(configuration: configuration, baseUrl: gitBaseUrl, timestamp: timestamp)
@@ -53,7 +62,7 @@ extension Test {
         let simulatorTearDownOperation = SimulatorTearDownOperation(nodes: uniqueNodes, verbose: configuration.verbose)
         let tearDownOperation = TearDownOperation(configuration: configuration, git: gitStatus, timestamp: timestamp, plugin: tearDownPlugin)
 
-        var operations: [RunOperation] =
+        let operations: [RunOperation] =
             [initialSetupOperation,
              compileOperation,
              validationOperation,
@@ -97,10 +106,6 @@ extension Test {
         testExtractionOperation.addDependency(localSetupOperation)
 
         simulatorSetupOperation.addDependencies([localSetupOperation, remoteSetupOperation])
-        processKillerOperation.addDependency(simulatorSetupOperation)
-        if configuration.testing.killSimulatorProcesses {
-            operations.append(processKillerOperation)
-        }
 
         testSortingOperation.addDependency(testExtractionOperation)
 
@@ -192,10 +197,10 @@ extension Test {
 
         switch XcodeProject.SDK(rawValue: sdk)! {
         case .macos:
-            testRunnerOperation.testRunners = uniqueNodes.map { (testRunner: $0, node: $0, idle: true) }
+            testRunnerOperation.testRunners = uniqueNodes.map { (testRunner: $0, node: $0) }
         case .ios:
             simulatorSetupOperation.didEnd = { simulators in
-                testRunnerOperation.testRunners = simulators.map { (testRunner: $0.0, node: $0.1, idle: true) }
+                testRunnerOperation.testRunners = simulators.map { (testRunner: $0.0, node: $0.1) }
             }
         }
 
