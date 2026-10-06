@@ -32,7 +32,7 @@ Extract test methods from UI test target files. Can be overridden by plugin impl
 
 ### compileOperation
 
-Compile project using xcodebuild's `build-for-testing` which will produce a test bundle that will be later sent to remote nodes. Pre/post compilation can be customize with plugins. 
+Compile project using xcodebuild's `build-for-testing` which will produce a test bundle that will be later sent to remote nodes. With `--bazel_target` the target is built with `bazel build` instead, and its products are laid out the same way. Pre/post compilation can be customize with plugins. 
 
 ### testSortingOperation
 
