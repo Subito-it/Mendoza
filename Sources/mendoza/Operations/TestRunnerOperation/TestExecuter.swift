@@ -272,15 +272,16 @@ extension TestExecuter {
             partialProgress = lines.last ?? ""
         }
 
-        var output = try executer.execute(testWithoutBuilding, progress: progressHandler) { _, originalError in
+        let output = try executer.execute(testWithoutBuilding, progress: progressHandler) { _, originalError in
             if !self.shouldIgnoreTestExecutionError(originalError) {
                 throw originalError
             }
         }
 
-        // It should be rare but it may happen that stdout content is not processed by the progressHandler
-        output = (output.trimmingCharacters(in: .whitespacesAndNewlines)).replacingOccurrences(of: parsedProgress.trimmingCharacters(in: .whitespacesAndNewlines), with: "") + "\n"
-        progressHandler(output)
+        // It should be rare but it may happen that stdout content is not processed by the progressHandler.
+        // Only that remainder is fed to the parser; the full output is returned for failure analysis.
+        let unprocessedOutput = (output.trimmingCharacters(in: .whitespacesAndNewlines)).replacingOccurrences(of: parsedProgress.trimmingCharacters(in: .whitespacesAndNewlines), with: "") + "\n"
+        progressHandler(unprocessedOutput)
 
         return (output: output, testCaseResult: testCaseResult)
     }
