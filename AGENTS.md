@@ -65,9 +65,10 @@ mendoza plugin describe TearDownPlugin
 
 # Documentation Conventions
 
-## `README.md` documents current behaviour
+## `README.md` and `docs/` document current behaviour
 
-The README describes how Mendoza behaves **now**, and every section must stand on its own.
+The README and the guides in `docs/` describe how Mendoza behaves **now**, and every section
+must stand on its own.
 Do not write anything whose meaning depends on the reader knowing an earlier version:
 
 - no "X is no longer Y", "X used to Z", "the previous default was W"
@@ -88,11 +89,11 @@ Nothing is set by default, so your project's own build configuration is honoured
 ```
 
 Documenting a mechanic a user can trip over is reference material, not a delta, and belongs
-in the README — for example "if you pass the individual Watch services without
+in the docs — for example "if you pass the individual Watch services without
 `nanoregistrylaunchd`, every run pays an extra simulator reboot". The test is whether
 understanding the sentence requires knowing an older Mendoza.
 
-The existing `# Migrating to 27.0.0` section is a deliberate exception carrying the plugin
+`docs/migrating-to-27.0.0.md` is a deliberate exception carrying the plugin
 system rewrite, a breaking change to a documented public contract. It is not licence to log
 every behaviour change there; an undocumented internal default has no prior contract to
 migrate from.
@@ -122,9 +123,9 @@ exists elsewhere.
 
 ## Keep docs in sync with the catalogs they mirror
 
-Several README tables restate values defined in code — most notably the simulator service
-groups in `Sources/mendoza/Models/SimulatorService.swift`, mirrored in the README's
-`--disable_sim_services` table and in `docs/ios27-simulator-services.md`. Editing a group
+Several doc tables restate values defined in code — most notably the simulator service
+groups in `Sources/mendoza/Models/SimulatorService.swift`, mirrored in
+`docs/simulator-services.md` and in `docs/ios27-simulator-services.md`. Editing a group
 means editing the matching table in the same change, otherwise the docs go stale without any
 test failing.
 
