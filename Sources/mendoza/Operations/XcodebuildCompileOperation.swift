@@ -1,5 +1,5 @@
 //
-//  CompileOperation.swift
+//  XcodebuildCompileOperation.swift
 //  Mendoza
 //
 //  Created by Tomas Camin on 17/01/2019.
@@ -7,7 +7,7 @@
 
 import Foundation
 
-class CompileOperation: BaseOperation<AppInfo> {
+class XcodebuildCompileOperation: BaseOperation<AppInfo> {
     private let building: Configuration.Building
     private let git: GitStatus?
     private let baseUrl: URL

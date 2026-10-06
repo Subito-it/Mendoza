@@ -262,7 +262,7 @@ InitialSetupOperation
 ├── MacOsValidationOperation (cancelled for iOS)
 └── LocalSetupOperation
         ↓
-    ├── CompileOperation → DistributeTestBundleOperation
+    ├── XcodebuildCompileOperation / BazelCompileOperation → DistributeTestBundleOperation
     └── TestExtractionOperation → TestSortingOperation
                                         ↓
 SimulatorSetupOperation ────────────────┤
@@ -354,10 +354,10 @@ Each writer reports whether it changed anything, and those results feed a single
 
 ## Bazel Builds
 
-`--bazel_target` swaps `CompileOperation` for `BazelCompileOperation`; nothing else in the pipeline
-knows how the app was built. The contract between the two halves is the `Build/Products` folder:
-the app, `<TestBundle>-Runner.app` and a `<scheme>*.xctestrun`, where `scheme` holds the UI test
-module in Bazel mode.
+`--bazel_target` swaps `XcodebuildCompileOperation` for `BazelCompileOperation`; nothing else in
+the pipeline knows how the app was built. The contract between the two halves is the
+`Build/Products` folder: the app, `<TestBundle>-Runner.app` and a `<scheme>*.xctestrun`, where
+`scheme` holds the UI test module in Bazel mode.
 
 - Metadata that `XcodeProject` reads for Xcode builds (bundle identifiers, test sources, module
   name) comes from `bazel query`/`cquery` (`Bazel/BazelWorkspace.swift`). Every command that

@@ -39,7 +39,7 @@ extension Test {
             testTarget = try project.getTargetsInScheme(configuration.building.scheme).test.name
             testTargetSourceFiles = try project.testTargetSourceFilePaths(scheme: configuration.building.scheme)
             productNames = project.getProductNames()
-            compileOperation = CompileOperation(building: configuration.building, git: gitStatus, baseUrl: gitBaseUrl, project: project, scheme: configuration.building.scheme, preCompilationPlugin: preCompilationPlugin, postCompilationPlugin: postCompilationPlugin, clearDerivedDataOnCompilationFailure: clearDerivedDataOnCompilationFailure)
+            compileOperation = XcodebuildCompileOperation(building: configuration.building, git: gitStatus, baseUrl: gitBaseUrl, project: project, scheme: configuration.building.scheme, preCompilationPlugin: preCompilationPlugin, postCompilationPlugin: postCompilationPlugin, clearDerivedDataOnCompilationFailure: clearDerivedDataOnCompilationFailure)
         }
         let testExtractionPlugin = TestExtractionPlugin(baseUrl: pluginUrl, plugin: configuration.plugins)
         let testSortingPlugin = TestSortingPlugin(baseUrl: pluginUrl, plugin: configuration.plugins)
