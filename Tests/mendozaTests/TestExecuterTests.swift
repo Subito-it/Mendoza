@@ -17,6 +17,8 @@ final class TestExecuterTests: XCTestCase {
         XCTAssertEqual(previewDidStartTest, false)
         XCTAssertFalse(testExecuter.didStartTest)
         XCTAssertTrue(OutputAnalyzer().analyze(output).isInfrastructureLaunchFailure)
+        XCTAssertGreaterThan(result.startInterval, 0)
+        XCTAssertEqual(result.duration, 0)
     }
 
     func testPreviewReportsStartedTest() throws {
