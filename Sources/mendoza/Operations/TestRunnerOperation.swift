@@ -46,7 +46,6 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
     private let postExecutionQueue = ThreadQueue(maxConcurrentOperations: 8)
 
     private lazy var pool: ConnectionPool<(index: Int, testRunner: TestRunner)> = {
-        guard let sortedTestCases = sortedTestCases else { fatalError("💣 Required field `distributedTestCases` not set") }
         guard let testRunners = testRunners else { fatalError("💣 Required field `testRunner` not set") }
 
         // Each source carries the index of its runner in `testRunners`, assigned once here. Every
@@ -55,9 +54,11 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
         // and a wedged simulator can have an empty id). A mismatched lookup would leave a runner
         // stuck at idle=false forever, so the `allRunnersIdle` completion barrier could never
         // release and every runner thread would spin in `.waitingCompletion`.
-        let input = zip(testRunners, sortedTestCases).enumerated()
-        return makeConnectionPool(sources: input.map { offset, pair in
-            (node: pair.0.node, value: (index: offset, testRunner: pair.0.testRunner))
+        //
+        // Every runner gets a worker, even with fewer tests than runners: the scheduler counts all
+        // of them as available to pick up retries and relaunches excluded from the failing runner.
+        return makeConnectionPool(sources: testRunners.enumerated().map { offset, runner in
+            (node: runner.node, value: (index: offset, testRunner: runner.testRunner))
         })
     }()
 
