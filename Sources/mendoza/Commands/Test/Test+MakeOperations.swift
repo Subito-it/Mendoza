@@ -197,10 +197,10 @@ extension Test {
 
         switch XcodeProject.SDK(rawValue: sdk)! {
         case .macos:
-            testRunnerOperation.testRunners = uniqueNodes.map { (testRunner: $0, node: $0, idle: true) }
+            testRunnerOperation.testRunners = uniqueNodes.map { (testRunner: $0, node: $0) }
         case .ios:
             simulatorSetupOperation.didEnd = { simulators in
-                testRunnerOperation.testRunners = simulators.map { (testRunner: $0.0, node: $0.1, idle: true) }
+                testRunnerOperation.testRunners = simulators.map { (testRunner: $0.0, node: $0.1) }
             }
         }
 
