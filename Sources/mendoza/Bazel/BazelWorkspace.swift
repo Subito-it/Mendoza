@@ -67,7 +67,8 @@ struct BazelWorkspace {
         defer { try? FileManager.default.removeItem(at: formatUrl) }
 
         // Reaching the library through the test target configures it for the simulator, as the build does
-        let expression = "\(label) + \(hostLabel) + (deps(\(label), 2) intersect \(libraryLabel))"
+        let configuredLibrary = "deps(\(label), 2) intersect \(libraryLabel)"
+        let expression = "\(label) + \(hostLabel) + (\(configuredLibrary))"
         let targets = try Self.parseCQuery(bazel("cquery \(configFlags) '\(expression)' --output=starlark --starlark:file='\(formatUrl.path)'"))
 
         guard let tests = targets[label]?.bundle, let app = targets[hostLabel]?.bundle else {
@@ -77,7 +78,8 @@ struct BazelWorkspace {
             throw Error("Failed reading the Swift module of \(libraryLabel) from `bazel cquery`")
         }
 
-        let sourceLabels = try Self.lines(query(#"--notool_deps --noimplicit_deps 'kind("source file", deps(labels(srcs, \#(libraryLabel))))'"#))
+        // Configured, so a select() in srcs yields only the branch the build compiles
+        let sourceLabels = try Self.lines(bazel(#"cquery \#(configFlags) --notool_deps --noimplicit_deps 'kind("source file", deps(labels(srcs, \#(configuredLibrary))))'"#))
 
         return BazelUITest(workspace: self, label: label, hostLabel: hostLabel, app: app, tests: tests, moduleName: moduleName, sourceFiles: Self.swiftSourcePaths(fromLabels: sourceLabels))
     }
@@ -148,9 +150,11 @@ extension BazelWorkspace {
         return targets
     }
 
+    /// - Parameter labels: `cquery` output lines, where each label is followed by its configuration,
+    ///   `(null)` for source files
     static func swiftSourcePaths(fromLabels labels: [String]) -> [String] {
-        labels.compactMap { label in
-            let label = mainRepositoryLabel(label)
+        labels.compactMap { line in
+            let label = mainRepositoryLabel(String(line.prefix { $0 != " " }))
             guard label.hasPrefix("//"), label.hasSuffix(".swift") else { return nil }
 
             let components = label.dropFirst(2).split(separator: ":", maxSplits: 1, omittingEmptySubsequences: false).map(String.init)

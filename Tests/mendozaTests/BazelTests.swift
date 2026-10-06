@@ -26,11 +26,11 @@ final class BazelTests: XCTestCase {
 
     func testSwiftSourcePathsAreWorkspaceRelative() {
         let paths = BazelWorkspace.swiftSourcePaths(fromLabels: [
-            "//App:UITests/LoginUITests.swift",
-            "//:RootUITests.swift",
-            "//Modules/Feature:UITests/Nested/FeatureUITests.swift",
-            "//App:UITests/Fixture.json",
-            "@some_repo//:External.swift"
+            "//App:UITests/LoginUITests.swift (null)",
+            "@@//:RootUITests.swift (null)",
+            "//Modules/Feature:UITests/Nested/FeatureUITests.swift (null)",
+            "//App:UITests/Fixture.json (null)",
+            "@some_repo//:External.swift (null)"
         ])
 
         XCTAssertEqual(paths, ["App/UITests/LoginUITests.swift", "RootUITests.swift", "Modules/Feature/UITests/Nested/FeatureUITests.swift"])
