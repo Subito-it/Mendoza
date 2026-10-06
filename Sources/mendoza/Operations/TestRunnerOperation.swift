@@ -112,13 +112,11 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                                           runnerNodes: testRunners?.map(\.node) ?? [],
                                           maxRetryCount: configuration.testing.failingTestsRetryCount ?? 0)
 
-            try pool.execute { [weak self] executer, source in
+            try pool.execute(block: { [weak self] executer, source in
                 guard let self = self else { return }
 
                 let runnerIndex = source.value.index
                 let testRunner = source.value.testRunner
-
-                defer { scheduler.runnerExited(runnerIndex) }
 
                 while true {
                     switch scheduler.nextState(for: runnerIndex) {
@@ -160,7 +158,11 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                 }
 
                 try self.diagnosticReporter.copyDiagnosticReports(executer: executer, testRunner: testRunner)
-            }
+            }, sourceDidExit: { source in
+                // Also reached when the runner's connection fails, before any of the above runs: the
+                // scheduler would otherwise keep waiting for a runner that will never poll it.
+                scheduler.runnerExited(source.value.index)
+            })
 
             postExecutionQueue.waitUntilAllOperationsAreFinished()
 
