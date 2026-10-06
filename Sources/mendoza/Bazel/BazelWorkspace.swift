@@ -58,9 +58,10 @@ struct BazelWorkspace {
     }
 
     func describeUITest(_ target: String) throws -> BazelUITest {
-        let label = try single(query("'\(target)'"), describing: "target \(target)")
-        let hostLabel = try single(query("'labels(test_host, \(label))'"), describing: "test host of \(label), expecting an ios_ui_test with a test_host")
-        let libraryLabel = try single(query(#"'kind("swift_library", labels(deps, \#(label)) + labels(deps, labels(deps, \#(label))))'"#), describing: "swift_library dependency of \(label)")
+        let label = try single(Self.lines(query("'\(target)'")), describing: "target \(target)")
+        // Configured, so a select() in test_host or deps yields only the branch the build uses
+        let hostLabel = try single(cquery("'labels(test_host, \(label))'"), describing: "test host of \(label), expecting an ios_ui_test with a test_host")
+        let libraryLabel = try single(cquery(#"'kind("swift_library", labels(deps, \#(label)) + labels(deps, labels(deps, \#(label))))'"#), describing: "swift_library dependency of \(label)")
 
         let formatUrl = FileManager.default.temporaryDirectory.appendingPathComponent("mendoza-\(UUID().uuidString).cquery")
         try Self.cqueryFormat.write(to: formatUrl, atomically: true, encoding: .utf8)
@@ -78,8 +79,7 @@ struct BazelWorkspace {
             throw Error("Failed reading the Swift module of \(libraryLabel) from `bazel cquery`")
         }
 
-        // Configured, so a select() in srcs yields only the branch the build compiles
-        let sourceLabels = try Self.lines(bazel(#"cquery \#(configFlags) --notool_deps --noimplicit_deps 'kind("source file", deps(labels(srcs, \#(configuredLibrary))))'"#))
+        let sourceLabels = try cquery(#"--notool_deps --noimplicit_deps 'kind("source file", deps(labels(srcs, \#(configuredLibrary))))'"#)
 
         return BazelUITest(workspace: self, label: label, hostLabel: hostLabel, app: app, tests: tests, moduleName: moduleName, sourceFiles: Self.swiftSourcePaths(fromLabels: sourceLabels))
     }
@@ -99,17 +99,21 @@ struct BazelWorkspace {
         try bazel("query \(arguments)")
     }
 
+    /// - Returns: the labels of the configured targets, which resolve select() as the build does
+    private func cquery(_ arguments: String) throws -> [String] {
+        try Self.configuredLabels(bazel("cquery \(configFlags) \(arguments)"))
+    }
+
     private func bazel(_ arguments: String) throws -> String {
         try Self.run(arguments, in: url, executer: executer)
     }
 
-    private func single(_ output: String, describing description: String) throws -> String {
-        let lines = Self.lines(output)
-        guard let line = lines.first, lines.count == 1 else {
-            throw Error("Expecting a single \(description), found \(lines.count): \(lines.joined(separator: ", "))")
+    private func single(_ labels: [String], describing description: String) throws -> String {
+        guard let label = labels.first, labels.count == 1 else {
+            throw Error("Expecting a single \(description), found \(labels.count): \(labels.joined(separator: ", "))")
         }
 
-        return line
+        return label
     }
 }
 
@@ -150,11 +154,19 @@ extension BazelWorkspace {
         return targets
     }
 
-    /// - Parameter labels: `cquery` output lines, where each label is followed by its configuration,
-    ///   `(null)` for source files
+    /// `cquery` follows each label with its configuration, `(null)` for source files, and lists a
+    /// target once per configuration it is reached in.
+    /// - Returns: the distinct labels, in the `//package:name` form `bazel query` prints
+    static func configuredLabels(_ output: String) -> [String] {
+        var seen = Set<String>()
+        return lines(output)
+            .map { mainRepositoryLabel(String($0.prefix { $0 != " " })) }
+            .filter { seen.insert($0).inserted }
+    }
+
     static func swiftSourcePaths(fromLabels labels: [String]) -> [String] {
-        labels.compactMap { line in
-            let label = mainRepositoryLabel(String(line.prefix { $0 != " " }))
+        labels.compactMap { label in
+            let label = mainRepositoryLabel(label)
             guard label.hasPrefix("//"), label.hasSuffix(".swift") else { return nil }
 
             let components = label.dropFirst(2).split(separator: ":", maxSplits: 1, omittingEmptySubsequences: false).map(String.init)

@@ -24,13 +24,25 @@ final class BazelTests: XCTestCase {
         XCTAssertNotNil(targets["@@some_repo//:Dependency"])
     }
 
+    func testConfiguredLabelsDropTheirConfiguration() {
+        let output = """
+        //App:AppUITestsLib (2d89340)
+        @@//App:App (d60262a)
+        //App:AppUITestsLib (d60262a)
+        //App:UITests/LoginUITests.swift (null)
+        @@some_repo//:Dependency (2d89340)
+        """
+
+        XCTAssertEqual(BazelWorkspace.configuredLabels(output), ["//App:AppUITestsLib", "//App:App", "//App:UITests/LoginUITests.swift", "@@some_repo//:Dependency"])
+    }
+
     func testSwiftSourcePathsAreWorkspaceRelative() {
         let paths = BazelWorkspace.swiftSourcePaths(fromLabels: [
-            "//App:UITests/LoginUITests.swift (null)",
-            "@@//:RootUITests.swift (null)",
-            "//Modules/Feature:UITests/Nested/FeatureUITests.swift (null)",
-            "//App:UITests/Fixture.json (null)",
-            "@some_repo//:External.swift (null)"
+            "//App:UITests/LoginUITests.swift",
+            "@@//:RootUITests.swift",
+            "//Modules/Feature:UITests/Nested/FeatureUITests.swift",
+            "//App:UITests/Fixture.json",
+            "@some_repo//:External.swift"
         ])
 
         XCTAssertEqual(paths, ["App/UITests/LoginUITests.swift", "RootUITests.swift", "Modules/Feature/UITests/Nested/FeatureUITests.swift"])
