@@ -52,11 +52,11 @@ class TestExecuter {
     }
 
     private var testCaseStartTimeInterval: TimeInterval = 0
-    private var previewCompletionBlock: ((TestCaseResult) -> Void)?
+    private var previewCompletionBlock: ((TestCaseResult, _ didStartTest: Bool) -> Void)?
 
     /// True once the test method actually started executing (a `Test Case ... started` line was
     /// parsed). Distinguishes a genuine test failure from a simulator-level launch failure where
-    /// the test never ran. Only valid to read after `launch(...)` returns.
+    /// the test never ran. Final once a preview has been delivered or `launch(...)` has returned.
     var didStartTest: Bool {
         testCaseStartTimeInterval > 0
     }
@@ -104,9 +104,9 @@ class TestExecuter {
     /// From the console output at t = A we know that the last test of SIM2 failed and we pass that information to the previewCompletionBlock to the `previewCompletionBlock`
     /// which allows to reenconde the failing test without having to wait for the entire xcodebuild process to compleete
     ///
-    /// - Parameter previewCompletionBlock: a preview of the test case result as soon as the information is extracted from the console output which can occur well before  the xcodebuild process is completed
+    /// - Parameter previewCompletionBlock: a preview of the test case result, and whether the test method started, as soon as the information is extracted from the console output which can occur well before  the xcodebuild process is completed
     /// - Returns: the console output and the full test case result
-    func launch(previewCompletionBlock: @escaping (TestCaseResult) -> Void) throws -> (output: String, testResult: TestCaseResult) {
+    func launch(previewCompletionBlock: @escaping (TestCaseResult, _ didStartTest: Bool) -> Void) throws -> (output: String, testResult: TestCaseResult) {
         self.previewCompletionBlock = previewCompletionBlock
 
         var output = ""
@@ -134,7 +134,7 @@ class TestExecuter {
             let endInterval: TimeInterval = startInterval
 
             testResult = TestCaseResult(node: node.address, runnerName: testRunner.name, runnerIdentifier: testRunner.id, xcResultPath: "", suite: testCase.suite, name: testCase.name, status: .failed, startInterval: startInterval, endInterval: endInterval, averageStdOutIdleTime: nil, maxStdOutIdleTime: nil)
-            previewCompletionBlock(testResult!)
+            previewCompletionBlock(testResult!, didStartTest)
         }
 
         return (output: output, testResult: testResult!)
@@ -251,7 +251,7 @@ extension TestExecuter {
                     let avgIdleTime = idleTimes.isEmpty ? nil : idleTimes.reduce(0, +) / Double(idleTimes.count)
                     let maxIdleTime = idleTimes.max()
                     let result = TestCaseResult(node: self.node.address, runnerName: self.testRunner.name, runnerIdentifier: self.testRunner.id, xcResultPath: "-", suite: self.testCase.suite, name: self.testCase.name, status: .passed, startInterval: testCaseStartTimeInterval, endInterval: CFAbsoluteTimeGetCurrent(), averageStdOutIdleTime: avgIdleTime, maxStdOutIdleTime: maxIdleTime)
-                    previewCompletionBlock?(result); previewCompletionBlock = nil // call preview at most once
+                    previewCompletionBlock?(result, didStartTest); previewCompletionBlock = nil // call preview at most once
 
                     testCaseResult = result
                 case .testFailed, .testCrashed, .testTimedOut:
@@ -261,7 +261,7 @@ extension TestExecuter {
                     let avgIdleTime = idleTimes.isEmpty ? nil : idleTimes.reduce(0, +) / Double(idleTimes.count)
                     let maxIdleTime = idleTimes.max()
                     let result = TestCaseResult(node: self.node.address, runnerName: self.testRunner.name, runnerIdentifier: self.testRunner.id, xcResultPath: "-", suite: self.testCase.suite, name: self.testCase.name, status: .failed, startInterval: testCaseStartTimeInterval, endInterval: CFAbsoluteTimeGetCurrent(), averageStdOutIdleTime: avgIdleTime, maxStdOutIdleTime: maxIdleTime)
-                    previewCompletionBlock?(result); previewCompletionBlock = nil // call preview at most once
+                    previewCompletionBlock?(result, didStartTest); previewCompletionBlock = nil // call preview at most once
 
                     testCaseResult = result
                 case .noSpaceOnDevice:

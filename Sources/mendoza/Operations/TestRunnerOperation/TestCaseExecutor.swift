@@ -11,7 +11,7 @@ import Foundation
 /// output analysis, result handling, coverage, and post-execution tasks
 class TestCaseExecutor {
     typealias TestExecuterBuilder = (Executer, TestCase, Node, TestRunner, Int) -> TestExecuter
-    typealias PreviewHandler = (TestCaseResult) -> Void
+    typealias PreviewHandler = (TestCaseResult, _ didStartTest: Bool) -> Void
 
     /// Outcome of a single test case execution.
     struct Outcome {
@@ -86,8 +86,8 @@ class TestCaseExecutor {
             // Execute the test
             let testExecuter = testExecuterBuilder(executer, testCase, node, testRunner, runnerIndex)
             var xcodebuildOutput = ""
-            (xcodebuildOutput, testCaseResult) = try testExecuter.launch { previewResult in
-                previewHandler(previewResult)
+            (xcodebuildOutput, testCaseResult) = try testExecuter.launch { previewResult, didStartTest in
+                previewHandler(previewResult, didStartTest)
             }
 
             // Analyze output for failures

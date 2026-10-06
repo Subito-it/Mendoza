@@ -161,8 +161,8 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
                             node: source.node,
                             testRunner: testRunner,
                             runnerIndex: runnerIndex,
-                            previewHandler: { [weak self] previewResult in
-                                self?.handleTestCaseResultPreview(previewResult, testCase: testCase, runnerIndex: runnerIndex)
+                            previewHandler: { [weak self] previewResult, didStartTest in
+                                self?.handleTestCaseResultPreview(previewResult, didStartTest: didStartTest, testCase: testCase, runnerIndex: runnerIndex)
                             }
                         )
 
@@ -273,7 +273,7 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
         print("🚧 Recovered runner \(testRunner.name) on \(node.address), resuming test execution {\(runnerIndex)}".green)
     }
 
-    private func handleTestCaseResultPreview(_ previewResult: TestCaseResult, testCase: TestCase, runnerIndex: Int) {
+    private func handleTestCaseResultPreview(_ previewResult: TestCaseResult, didStartTest: Bool, testCase: TestCase, runnerIndex: Int) {
         syncQueue.sync {
             testCasesCompletedCount += 1
 
@@ -287,7 +287,12 @@ class TestRunnerOperation: BaseOperation<[TestCaseResult]> {
             )
 
             if previewResult.status == .failed {
-                if testQueue.enqueueForRetry(testCase, excludedRunnerIndexes: runnerIndexes(onNodeOf: runnerIndex)) {
+                // A test that never started failed because of its runner, not on its own merits. Exclude
+                // only that runner: the failure says nothing about the other simulators on its node.
+                if !didStartTest, testQueue.enqueueForRelaunch(testCase, excludedRunnerIndexes: [runnerIndex]) {
+                    testCasesCount += 1
+                    resultHandler.printRelaunchEnqueue(testCase, relaunchCount: testQueue.relaunchCount(for: testCase))
+                } else if testQueue.enqueueForRetry(testCase, excludedRunnerIndexes: runnerIndexes(onNodeOf: runnerIndex)) {
                     testCasesCount += 1
                     resultHandler.printRetryEnqueue(testCase, retryCount: testQueue.retryCount(for: testCase))
                 }

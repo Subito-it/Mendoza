@@ -13,7 +13,12 @@ class TestQueue {
     private var testCases: [TestCase]
     private var retryCountMap = NSCountedSet()
     private let maxRetryCount: Int
-    /// Runner indexes a test case must not be dequeued by, so a retry lands on a different node.
+    /// Relaunches of test cases that never started are not charged to `maxRetryCount`, but are
+    /// still bounded: quarantined runners rejoin, so a test that cannot start anywhere would
+    /// otherwise be requeued forever.
+    static let maxRelaunchCount = 3
+    private var relaunchCountMap = NSCountedSet()
+    /// Runner indexes a test case must not be dequeued by, so a retry lands on a different runner.
     private var excludedRunners = [TestCase: Set<Int>]()
 
     var count: Int {
@@ -79,6 +84,28 @@ class TestQueue {
             testCases.insert(testCase, at: 0)
 
             return true
+        }
+    }
+
+    /// Enqueue a test case that failed without ever starting, without charging its retry budget
+    /// - Returns: true if the test was enqueued, false if `maxRelaunchCount` was reached
+    func enqueueForRelaunch(_ testCase: TestCase, excludedRunnerIndexes: Set<Int>) -> Bool {
+        syncQueue.sync {
+            guard relaunchCountMap.count(for: testCase) < Self.maxRelaunchCount else {
+                return false
+            }
+
+            relaunchCountMap.add(testCase)
+            excludedRunners[testCase, default: []].formUnion(excludedRunnerIndexes)
+            testCases.insert(testCase, at: 0)
+
+            return true
+        }
+    }
+
+    func relaunchCount(for testCase: TestCase) -> Int {
+        syncQueue.sync {
+            relaunchCountMap.count(for: testCase)
         }
     }
 

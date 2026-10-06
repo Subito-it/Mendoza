@@ -10,11 +10,26 @@ final class TestExecuterTests: XCTestCase {
         ])
         let testExecuter = makeTestExecuter(executer: executer)
 
-        let (output, result) = try testExecuter.launch { _ in }
+        var previewDidStartTest: Bool?
+        let (output, result) = try testExecuter.launch { _, didStartTest in previewDidStartTest = didStartTest }
 
         XCTAssertEqual(result.status, .failed)
+        XCTAssertEqual(previewDidStartTest, false)
         XCTAssertFalse(testExecuter.didStartTest)
         XCTAssertTrue(OutputAnalyzer().analyze(output).isInfrastructureLaunchFailure)
+    }
+
+    func testPreviewReportsStartedTest() throws {
+        let executer = StreamingExecuter(xcodebuildChunks: [
+            "Test Case '-[MyAppUITests.LoginTests testLogin]' started\n",
+            "Test Case '-[MyAppUITests.LoginTests testLogin]' failed (5.0 seconds)\n"
+        ])
+        let testExecuter = makeTestExecuter(executer: executer)
+
+        var previewDidStartTest: Bool?
+        _ = try testExecuter.launch { _, didStartTest in previewDidStartTest = didStartTest }
+
+        XCTAssertEqual(previewDidStartTest, true)
     }
 
     func testOutputNotDeliveredThroughProgressIsParsed() throws {
@@ -24,7 +39,7 @@ final class TestExecuterTests: XCTestCase {
         )
         let testExecuter = makeTestExecuter(executer: executer)
 
-        let (_, result) = try testExecuter.launch { _ in }
+        let (_, result) = try testExecuter.launch { _, _ in }
 
         XCTAssertEqual(result.status, .passed)
         XCTAssertTrue(testExecuter.didStartTest)

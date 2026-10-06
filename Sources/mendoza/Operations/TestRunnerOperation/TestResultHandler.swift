@@ -42,4 +42,10 @@ class TestResultHandler {
             print("🔁  Renqueuing (no result) \(testCase), retry count: \(retryCount)".yellow)
         }
     }
+
+    func printRelaunchEnqueue(_ testCase: TestCase, relaunchCount: Int) {
+        if verbose {
+            print("🔁  Renqueuing (never started) \(testCase), relaunch count: \(relaunchCount)".yellow)
+        }
+    }
 }
