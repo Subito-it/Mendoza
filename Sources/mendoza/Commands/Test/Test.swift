@@ -14,14 +14,16 @@ class Test {
 
     // swiftlint:disable:next large_tuple
     let configuration: Configuration
+    let bazelTest: BazelUITest?
     let eventPlugin: EventPlugin
     let pluginUrl: URL?
     let syncQueue = DispatchQueue(label: String(describing: Test.self))
     let timestamp: String
     var observers = [NSKeyValueObservation]()
 
-    init(configuration: Configuration, pluginUrl: URL?) throws {
+    init(configuration: Configuration, pluginUrl: URL?, bazelTest: BazelUITest? = nil) throws {
         self.configuration = configuration
+        self.bazelTest = bazelTest
         self.pluginUrl = pluginUrl
 
         self.eventPlugin = EventPlugin(baseUrl: pluginUrl, plugin: configuration.plugins)

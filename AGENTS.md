@@ -142,6 +142,7 @@ Sources/mendoza/
 │   ├── Simulator/         # Simulator service and window subcommands
 │   ├── Plugins/           # `plugin describe` and plugin type listing
 │   └── Mendoza/           # Root command wiring
+├── Bazel/                 # Bazel workspace queries and test product assembly
 ├── Executer/              # Command execution abstraction
 │   ├── Executer.swift     # Protocol definition
 │   ├── LocalExecuter.swift
@@ -212,6 +213,10 @@ protocol Executer: AnyObject {
 **Implementations:**
 - `LocalExecuter`: Uses Foundation's `Process` for shell commands
 - `RemoteExecuter`: Uses libssh2 (Shout wrapper) for SSH/SFTP
+
+`LocalExecuter` runs commands through the user's shell, zsh on macOS, and merges stderr into the
+captured output. Avoid names zsh reserves in inline scripts (`status` is read-only), and redirect
+stderr when parsing a command's stdout.
 
 ### 3. ConnectionPool<T> (`Executer/ConnectionPool.swift`)
 
@@ -348,6 +353,26 @@ Each writer reports whether it changed anything, and those results feed a single
 1. Collects `.profdata` and `.xcresult` files from all nodes via rsync
 2. **Batch merging**: Splits xcresults into ~50-result batches, merges in parallel
 3. Final merge using `xcrun xcresulttool merge`
+
+## Bazel Builds
+
+`--bazel_target` swaps `CompileOperation` for `BazelCompileOperation`; nothing else in the pipeline
+knows how the app was built. The contract between the two halves is the `Build/Products` folder:
+the app, `<TestBundle>-Runner.app` and a `<scheme>*.xctestrun`, where `scheme` holds the UI test
+module in Bazel mode.
+
+- Metadata that `XcodeProject` reads for Xcode builds (bundle identifiers, test sources, module
+  name) comes from `bazel query`/`cquery` (`Bazel/BazelWorkspace.swift`). Every command that
+  analyzes must use the build's exact `--config` values: Bazel discards its analysis cache when
+  build options change between invocations.
+- Bazel produces no runner and no `.xctestrun`, so `BazelTestProducts` assembles them the way
+  rules_apple's `ios_xctestrun_runner` does. Two `.xctestrun` keys are required for coverage:
+  `CodeCoverageBuildableInfos` (without it no profile data is written) and
+  `ClangProfileDataDirectoryPath` (without it xcodebuild refuses `-enableCodeCoverage`). The
+  latter is `Path.logs`: xcodebuild writes into a subfolder named after the simulator's
+  identifier, which is the per-runner folder `TestCaseExecutor` collects coverage from.
+- Bazel outputs are read-only. Copies must be made writable or the next session's `rm -rf` of
+  `Path.base` fails.
 
 ## Simulator Service Slimming
 
