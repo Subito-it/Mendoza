@@ -12,7 +12,7 @@ import CoreGraphics
 import Foundation
 
 class MendozaCommand: Command {
-    let name: String? = "mendoza"
+    let name: String? = InternalRootCommand.commandName
     let usage: String? = "Mendoza internally used commands"
     let help: String? = "Internal"
 

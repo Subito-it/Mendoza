@@ -7,5 +7,6 @@ setbuf(__stdoutp, nil)
 // closed pipe would otherwise raise SIGPIPE and take Mendoza down with it.
 signal(SIGPIPE, SIG_IGN)
 
-let parser = Bariloche(command: RootCommand())
+let isInternalCommand = CommandLine.arguments.dropFirst().first == InternalRootCommand.commandName
+let parser = Bariloche(command: isInternalCommand ? InternalRootCommand() : RootCommand())
 let result = parser.parse()
