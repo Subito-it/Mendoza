@@ -17,10 +17,10 @@ class CodeCoverageGenerator {
     }
 
     func generateJsonCoverage(executer: Executer, coverageUrl: URL, summary: Bool, pathEquivalence: String?) throws -> URL {
-        let executablePath = try findExecutablePath(executer: executer, buildBundleIdentifier: configuration.building.buildBundleIdentifier)
+        let objects = try coverageObjects(executer: executer)
         let summaryParameter = summary ? "--summary-only" : ""
         let truncateDecimals = #"| sed -E 's/(percent":[0-9]*\.[0-9])[0-9]*/\1/g'"#
-        var cmd = "xcrun llvm-cov export -instr-profile \(coverageUrl.path) \(executablePath) \(summaryParameter) \(truncateDecimals)"
+        var cmd = "xcrun llvm-cov export -instr-profile \(coverageUrl.path) \(objects) \(summaryParameter) \(truncateDecimals)"
 
         if let pathEquivalence {
             cmd += sedsCommand(from: pathEquivalence)
@@ -36,8 +36,8 @@ class CodeCoverageGenerator {
     }
 
     func generateHtmlCoverage(executer: Executer, coverageUrl: URL, pathEquivalence: String?) throws -> URL {
-        let executablePath = try findExecutablePath(executer: executer, buildBundleIdentifier: configuration.building.buildBundleIdentifier)
-        var cmd = "xcrun llvm-cov show --format=html -instr-profile \(coverageUrl.path) \(executablePath)"
+        let objects = try coverageObjects(executer: executer)
+        var cmd = "xcrun llvm-cov show --format=html -instr-profile \(coverageUrl.path) \(objects)"
 
         if let pathEquivalence {
             cmd += llvmCovPathEquivalenceParameters(from: pathEquivalence)
@@ -51,6 +51,15 @@ class CodeCoverageGenerator {
         _ = try executer.execute("\(cmd) > \(url.path)")
 
         return url
+    }
+
+    /// Debug builds with ENABLE_DEBUG_DYLIB (Xcode 16+ default) move the app's code into `<executable>.debug.dylib`,
+    /// leaving a stub executable without coverage data
+    private func coverageObjects(executer: Executer) throws -> String {
+        let executablePath = try findExecutablePath(executer: executer, buildBundleIdentifier: configuration.building.buildBundleIdentifier)
+        let debugDylibPath = "\(executablePath).debug.dylib"
+
+        return try executer.fileExists(atPath: debugDylibPath) ? "\(executablePath) -object \(debugDylibPath)" : executablePath
     }
 
     /// Convert path equivalence parameters formats from Mendoza (single comma separated) to llvm-cov (multiple parameters)
