@@ -78,6 +78,9 @@ final class BazelTests: XCTestCase {
         XCTAssertEqual(target["UITargetAppBundleIdentifier"] as? String, "com.example.app")
         XCTAssertEqual(target["ClangProfileDataDirectoryPath"] as? String, "/tmp/mendoza/logs")
         XCTAssertEqual(target["IsUITestBundle"] as? Bool, true)
+        XCTAssertEqual(target["PreferredScreenCaptureFormat"] as? String, "screenRecording")
+        XCTAssertEqual(target["SystemAttachmentLifetime"] as? String, "deleteOnSuccess")
+        XCTAssertEqual(target["UserAttachmentLifetime"] as? String, "deleteOnSuccess")
 
         let metadata = try XCTUnwrap(xctestrun["__xctestrun_metadata__"] as? [String: Any])
         let buildables = try XCTUnwrap(metadata["CodeCoverageBuildableInfos"] as? [[String: Any]])

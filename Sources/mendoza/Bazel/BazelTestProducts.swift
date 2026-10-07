@@ -92,6 +92,11 @@ struct BazelTestProducts {
             "UITargetAppBundleIdentifier": test.app.bundleIdentifier,
             "DependentProductPaths": [appPath, runnerPath, "\(runnerPath)/PlugIns/\(test.tests.fileName)"],
             "TestingEnvironmentVariables": ["DYLD_FRAMEWORK_PATH": "__PLATFORMS__/iPhoneSimulator.platform/Developer/Library/Frameworks"],
+            // Xcode's test plan defaults, which it writes into the .xctestrun it builds. Without them
+            // xcodebuild records nothing, leaving failed tests without screen recordings or screenshots.
+            "PreferredScreenCaptureFormat": "screenRecording",
+            "SystemAttachmentLifetime": "deleteOnSuccess",
+            "UserAttachmentLifetime": "deleteOnSuccess",
             // Without it xcodebuild refuses to run with code coverage. It writes the profile data in
             // a subfolder named after the simulator's identifier.
             "ClangProfileDataDirectoryPath": profileDataPath
