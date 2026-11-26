@@ -21,6 +21,8 @@ class Test {
     let timestamp: String
     var observers = [NSKeyValueObservation]()
 
+    private var didTearDown = false
+
     init(configuration: Configuration, pluginUrl: URL?, bazelTest: BazelUITest? = nil) throws {
         self.configuration = configuration
         self.bazelTest = bazelTest
@@ -56,6 +58,15 @@ class Test {
     }
 
     func tearDown(operations: [RunOperation], testSessionResult: TestSessionResult, error: Error?) {
+        // Cancelling terminates the plugins and processes the running operations wait on, so an
+        // operation running alongside the one that failed throws as well and lands here again.
+        // Only the first call reports: each one would otherwise send its own event.
+        let isFirstTearDown = syncQueue.sync { () -> Bool in
+            defer { didTearDown = true }
+            return !didTearDown
+        }
+        guard isFirstTearDown else { return }
+
         cancelOperation(operations)
 
         let logger = ExecuterLogger(name: "Test", address: "localhost")
